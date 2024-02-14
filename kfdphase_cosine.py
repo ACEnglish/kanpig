@@ -14,7 +14,7 @@ import logging
 import argparse
 import itertools
 import multiprocessing
-from functools import partial
+from functools import partial, total_ordering
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -125,7 +125,7 @@ def cosinesim(a, b, size):
     """
     How many standard deviations is the score from random sequence given the size (turned off)
     """
-    score = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    score = abs(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
     #mean, std = get_size_dist(size)
     #print( (score - mean) / std )
     return score
@@ -192,14 +192,25 @@ def phased_k(variants, kmer):
     return h1_k, h1_s, h2_k, h2_s
 
 
+@total_ordering
 @dataclass
 class PhasePath():
     """
     Holds the path/similarities
     """
-    cossim: (float, float) = (0, 0)
-    sizesim: (float, float) = (0, 0)
+    cossim: float = 0
+    sizesim: float = 0
     path: list = field(default_factory=list)
+
+    def __lt__(self, other):
+        # Trues are always worth more
+        if round(self.sizesim, 4) == round(other.sizesim, 4):
+            return self.cossim < other.cossim
+        return self.sizesim < other.sizesim
+
+    def __eq__(self, other):
+        return self.sizesim == other.sizesim and self.cossim == other.cossim
+
 
 def graph_phase_paths(graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths=10000):
     """
@@ -207,32 +218,30 @@ def graph_phase_paths(graph, hap1_difference, hap1_size, hap2_difference, hap2_s
     So this will return list of PhasePath
     """
     ret = []
-    for path in dfs(graph, hap1_size, hap2_size):
-        m_k = np.copy(graph.nodes[path[0]]['kfeat'])
-        m_s = graph.nodes[path[0]]['size']
-        for node in path[1:]:
-            m_k += graph.nodes[node]['kfeat']
-            m_s += graph.nodes[node]['size']
+    for cur_hap_diff, cur_hap_size in [(hap1_difference, hap1_size), (hap2_difference, hap2_size)]:
+        cur_paths = []
+        for path in dfs(graph, cur_hap_size):
+            m_k = np.copy(graph.nodes[path[0]]['kfeat'])
+            m_s = graph.nodes[path[0]]['size']
+            for node in path[1:]:
+                m_k += graph.nodes[node]['kfeat']
+                m_s += graph.nodes[node]['size']
 
-        m_dist1 = cosinesim(m_k, hap1_difference, m_s)
-        m_dist2 = cosinesim(m_k, hap2_difference, m_s)
-        # ensure same sign (same net effect of deletion/insertion)
-        if (hap1_size ^ m_s) < 0:
-            m_sz1 = 0
-        else:
-            m_sz1, _ = truvari.sizesim(abs(hap1_size), abs(m_s))
+            m_dist = cosinesim(m_k, cur_hap_diff, m_s)
+            # ensure same sign (same net effect of deletion/insertion)
+            if (cur_hap_size ^ m_s) < 0:
+                m_sz = 0
+            else:
+                m_sz, _ = truvari.sizesim(abs(cur_hap_size), abs(m_s))
 
-        if (hap2_size ^ m_s) < 0:
-            m_sz2 = 0
-        else:
-            m_sz2, _ = truvari.sizesim(abs(hap2_size), abs(m_s))
-        ret.append(PhasePath((m_dist1, m_dist2), (m_sz1, m_sz2), path))
-        max_paths -= 1
-        if max_paths <= 0:
-            break
+            cur_paths.append(PhasePath(m_dist, m_sz, path))
+            max_paths -= 1
+            if max_paths <= 0:
+                break
+        ret.append(cur_paths)
     return ret
 
-def dfs(g, target1, target2, cur_node=None, cur_len=0, path=None):
+def dfs(g, target, cur_node=None, cur_len=0, path=None):
     """
     Yield paths with DFS with traversal guided by length difference from the target
     """
@@ -242,18 +251,15 @@ def dfs(g, target1, target2, cur_node=None, cur_len=0, path=None):
     else:
         path.append(cur_node)
 
-    cur_node_weight = g.nodes[cur_node]['size']
-    cur_len += cur_node_weight
+    cur_len += g.nodes[cur_node]['size']
     
-    diffs1 = [(abs(target1 - (cur_len + g.nodes[n]['size'])), n) for _, n in g.out_edges(cur_node)]
-    diffs2 = [(abs(target2 - (cur_len + g.nodes[n]['size'])), n) for _, n in g.out_edges(cur_node)]
-    diffs = sorted(diffs1 + diffs2)
+    diffs = sorted([(abs(target - (cur_len + g.nodes[n]['size'])), n) for _, n in g.out_edges(cur_node)])
     for len_diff, next_node in diffs:
         if next_node == 'snk' and cur_node != 'src':
             yield list(path)
         else:
             n_path = list(path)
-            for sub_path in dfs(g, target1, target2, next_node, cur_len, n_path):
+            for sub_path in dfs(g, target, next_node, cur_len, n_path):
                 yield sub_path
 
 def pull_variants(graph, used, h1_min_path, h2_min_path, chunk_id, sample=0):
@@ -268,18 +274,18 @@ def pull_variants(graph, used, h1_min_path, h2_min_path, chunk_id, sample=0):
         v.samples[sample]['GT'] = (g1, g2)
         v.samples[sample].phased = True
         v.samples[sample]["PG"] = chunk_id
-        v.samples[sample]['SZ'] = (round(h1_min_path.sizesim[0], 3), round(h2_min_path.sizesim[1], 3))
-        v.samples[sample]['CS'] = (round(h1_min_path.cossim[0], 3), round(h2_min_path.sizesim[1], 3))
+        v.samples[sample]['SZ'] = (round(h1_min_path.sizesim, 3), round(h2_min_path.sizesim, 3))
+        v.samples[sample]['CS'] = (round(h1_min_path.cossim, 3), round(h2_min_path.sizesim, 3))
         ret_entries.append(v)
     return ret_entries
 
 
-def get_best_path(hap_num, paths, exclude=None, min_cos=0.90, min_size=0.90):
+def get_best_path(paths, exclude=None, min_cos=0.90, min_size=0.90):
     """
     Returns the best path
     """
-    to_analyze = filter(lambda tup: tup.sizesim[hap_num] >= min_size and tup.cossim[hap_num] >= min_cos, paths)
-    to_analyze = sorted(to_analyze, key=lambda tup: tup.cossim[hap_num], reverse=True)
+    to_analyze = filter(lambda tup: tup.sizesim >= min_size and tup.cossim >= min_cos, paths)
+    to_analyze = sorted(to_analyze, reverse=True)
     for path in to_analyze:
         # Don't allow paths under size similarity
         # Or those with previously used variants
@@ -306,8 +312,8 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
     
     all_paths = graph_phase_paths(
         graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths)
-    h1_min_path = get_best_path(0, all_paths, min_cos=min_cos, min_size=min_size)
-    h2_min_path = get_best_path(1, all_paths, min_cos=min_cos, min_size=min_size)
+    h1_min_path = get_best_path(all_paths[0], min_cos=min_cos, min_size=min_size)
+    h2_min_path = get_best_path(all_paths[1], min_cos=min_cos, min_size=min_size)
 
     used = set(h1_min_path.path) | set(h2_min_path.path)
     m_chunk_id = chunk_id
@@ -351,12 +357,6 @@ def kdfp_job(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, mi
     if len(comp_entries) == 0:
         return ret
 
-    #if len(comp_entries) > max_nodes:
-        #for entry in comp_entries:
-            #entry.samples[sample]["GT"] = (0, 0)
-            #ret.append(entry)
-        #return ret
-
     base_entries = chunk_dict['base']
     if len(base_entries) == 0:
         for entry in comp_entries:
@@ -397,7 +397,8 @@ if __name__ == '__main__':
     #regions.merge_overlaps()
     #base_i = regions.iterate(base)
     #comp_i = regions.iterate(comp)
-
+    
+    # v4.2.1
     region_tree = truvari.build_region_tree(base, comp, args.regions)
     truvari.merge_region_tree_overlaps(region_tree)
     base_i = truvari.region_filter(base, region_tree)
