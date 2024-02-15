@@ -19,11 +19,11 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 import pysam
+#import simsimd
 import truvari
 
 import numpy as np
 import networkx as nx
-
 
 def parse_args(args):
     """
@@ -93,7 +93,8 @@ def make_kmer(seq, kmer_len=6):
     """
     Make the kmer array of all kmers and those over min_freq
     """
-    ret = np.zeros(4**kmer_len)
+    #ret = np.zeros(4**kmer_len)
+    ret = np.zeros(4**kmer_len, dtype=np.float32)
     for i in generate_kmers(seq.upper(), kmer_len):
         ret[i] += 1
     return ret
@@ -128,7 +129,8 @@ def cosinesim(a, b, size):
     score = abs(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
     #mean, std = get_size_dist(size)
     #print( (score - mean) / std )
-    return score
+    return float(score) # have to cast for pysam/VCF
+    #return simsimd.cosine(a, b) wasn't faster, didn't work :(
 
 
 def make_kfeat(entry, kmer=3):
@@ -274,8 +276,10 @@ def pull_variants(graph, used, h1_min_path, h2_min_path, chunk_id, sample=0):
         v.samples[sample]['GT'] = (g1, g2)
         v.samples[sample].phased = True
         v.samples[sample]["PG"] = chunk_id
-        v.samples[sample]['SZ'] = (round(h1_min_path.sizesim, 3), round(h2_min_path.sizesim, 3))
-        v.samples[sample]['CS'] = (round(h1_min_path.cossim, 3), round(h2_min_path.sizesim, 3))
+        v.samples[sample]['SZ'] = (round(h1_min_path.sizesim, 3) if g1 else None,
+                                   round(h2_min_path.sizesim, 3) if g2 else None)
+        v.samples[sample]['CS'] = (round(h1_min_path.cossim, 3) if g1 else None,
+                                   round(h2_min_path.cossim, 3) if g2 else None)
         ret_entries.append(v)
     return ret_entries
 
@@ -309,7 +313,7 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
         ret_entries.append(entry)
 
     # num_paths_approx = math.factorial(len(graph.nodes) - 2) + 1
-    
+    # TODO: I need to exclude haps without any variants. It causes spurious FPs
     all_paths = graph_phase_paths(
         graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths)
     h1_min_path = get_best_path(all_paths[0], min_cos=min_cos, min_size=min_size)
@@ -356,6 +360,9 @@ def kdfp_job(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, mi
     comp_entries = chunk_dict['comp']
     if len(comp_entries) == 0:
         return ret
+
+    for entry in comp_entries: # TODO just masking?
+        entry.samples[sample]["GT"] = (None, None)
 
     base_entries = chunk_dict['base']
     if len(base_entries) == 0:
