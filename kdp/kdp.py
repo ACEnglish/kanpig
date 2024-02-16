@@ -20,15 +20,19 @@ def phased_k(variants, kmer):
     h2_k = kdp.seq_to_kmer("", kmer)
     h1_s = 0
     h2_s = 0
+    h1_n = 0
+    h2_n = 0
     for v in variants:
         k, sz = kdp.var_to_kfeat(v, kmer)
         if v.samples[0]['GT'][0] == 1:
             h1_k += k
             h1_s += sz
+            h1_n += 1
         if len(v.samples[0]['GT']) > 1 and v.samples[0]['GT'][1] == 1:
             h2_k += k
             h2_s += sz
-    return h1_k, h1_s, h2_k, h2_s
+            h2_n += 1
+    return h1_k, h1_s, h1_n, h2_k, h2_s, h2_n
 
 
 def pull_variants(graph, used, h1_min_path, h2_min_path, chunk_id, sample=0):
@@ -58,7 +62,7 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
     Returns a list of variants
     """
     ret_entries = []
-    hap1_k, hap1_size, hap2_k, hap2_size = phased_k(p_variants, kmer)
+    hap1_k, hap1_size, hap1_n, hap2_k, hap2_size, hap2_n = phased_k(p_variants, kmer)
     graph, unused_vars = kdp.vars_to_graph(up_variants, kmer)
     unused_cnt = len(unused_vars)
     for entry in unused_vars:
@@ -66,20 +70,27 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
         ret_entries.append(entry)
 
     # TODO: I need to exclude haps without any variants. It causes spurious FPs
-    h1_paths = kdp.find_hap_paths(graph,
-                                  hap1_k,
-                                  hap1_size,
-                                  min_size,
-                                  max_paths)
+    # in 'balanced' events
+    if hap1_n: # Just test this
+        h1_paths = kdp.find_hap_paths(graph,
+                                    hap1_k,
+                                    hap1_size,
+                                    min_size,
+                                    max_paths)
+    else:
+        h1_paths = []
     h1_min_path = kdp.get_best_path(h1_paths,
                                     min_cos=min_cos,
                                     min_size=min_size)
 
-    h2_paths = kdp.find_hap_paths(graph,
-                                  hap2_k,
-                                  hap2_size,
-                                  min_size,
-                                  max_paths)
+    if hap2_n: # Just test this
+        h2_paths = kdp.find_hap_paths(graph,
+                                      hap2_k,
+                                      hap2_size,
+                                      min_size,
+                                      max_paths)
+    else:
+        h2_paths = []
     h2_min_path = kdp.get_best_path(h2_paths,
                                     min_cos=min_cos,
                                     min_size=min_size)
