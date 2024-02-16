@@ -16,12 +16,12 @@ import kdp
 def phased_k(variants, kmer):
     """
     """
-    h1_k = kdp.make_kmer("", kmer)
-    h2_k = kdp.make_kmer("", kmer)
+    h1_k = kdp.seq_to_kmer("", kmer)
+    h2_k = kdp.seq_to_kmer("", kmer)
     h1_s = 0
     h2_s = 0
     for v in variants:
-        k, sz = kdp.make_kfeat(v, kmer)
+        k, sz = kdp.var_to_kfeat(v, kmer)
         if v.samples[0]['GT'][0] == 1:
             h1_k += k
             h1_s += sz
@@ -58,24 +58,31 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
     Returns a list of variants
     """
     ret_entries = []
-    hap1_difference, hap1_size, hap2_difference, hap2_size = phased_k(
-        p_variants, kmer)
+    hap1_k, hap1_size, hap2_k, hap2_size = phased_k(p_variants, kmer)
     graph, unused_vars = kdp.vars_to_graph(up_variants, kmer)
     unused_cnt = len(unused_vars)
     for entry in unused_vars:
         entry.samples[sample]['GT'] = (0, 0)
         ret_entries.append(entry)
 
-    # num_paths_approx = math.factorial(len(graph.nodes) - 2) + 1
     # TODO: I need to exclude haps without any variants. It causes spurious FPs
-    h1_paths = kdp.graph_phase_paths(graph, hap1_difference, hap1_size, max_paths)
-    h2_paths = kdp.graph_phase_paths(graph, hap2_difference, hap2_size, max_paths)
-    #all_paths = kdp.graph_phase_paths(
-        #graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths)
-    h1_min_path = kdp.get_best_path(
-        h1_paths, min_cos=min_cos, min_size=min_size)
-    h2_min_path = kdp.get_best_path(
-        h2_paths, min_cos=min_cos, min_size=min_size)
+    h1_paths = kdp.find_hap_paths(graph,
+                                  hap1_k,
+                                  hap1_size,
+                                  min_size,
+                                  max_paths)
+    h1_min_path = kdp.get_best_path(h1_paths,
+                                    min_cos=min_cos,
+                                    min_size=min_size)
+
+    h2_paths = kdp.find_hap_paths(graph,
+                                  hap2_k,
+                                  hap2_size,
+                                  min_size,
+                                  max_paths)
+    h2_min_path = kdp.get_best_path(h2_paths,
+                                    min_cos=min_cos,
+                                    min_size=min_size)
 
     used = set(h1_min_path.path) | set(h2_min_path.path)
     m_chunk_id = chunk_id
@@ -89,10 +96,14 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
     while pg and (h1_min_path.path or h2_min_path.path):
         p_cnt += 1
         m_chunk_id = chunk_id + f'.{p_cnt}'
-        h1_min_path = get_best_path(
-            0, all_paths, used, min_cos=min_cos, min_size=min_size)
-        h2_min_path = get_best_path(
-            1, all_paths, used, min_cos=min_cos, min_size=min_size)
+        h1_min_path = kdp.get_best_path(h1_paths,
+                                        exclude=used,
+                                        min_cos=min_cos,
+                                        min_size=min_size)
+        h2_min_path = kdp.get_best_path(h2_paths,
+                                        exclude=used,
+                                        min_cos=min_cos,
+                                        min_size=min_size)
         new_used = set(h1_min_path.path) | set(h2_min_path.path)
         ret_entries.extend(pull_variants(
             graph, new_used, h1_min_path, h2_min_path, m_chunk_id, sample))

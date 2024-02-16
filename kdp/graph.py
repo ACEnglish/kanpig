@@ -36,7 +36,7 @@ def vars_to_graph(variants, kmer=3):
     keep_vars = []
     unused_vars = []
     for entry in variants:
-        k, s = kdp.make_kfeat(entry, kmer)
+        k, s = kdp.var_to_kfeat(entry, kmer)
         if k.sum() != 0:
             keep_vars.append((truvari.entry_to_hash(entry), entry, k, s))
         else:
@@ -75,54 +75,27 @@ def get_best_path(paths, exclude=None, min_cos=0.90, min_size=0.90):
             return path
     return PhasePath()
 
-def graph_phase_paths_orig(graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths=10000):
+
+def find_hap_paths(graph, hap_k, hap_size, min_size, max_paths=10000):
     """
     This will return the paths and we'll let phase_region do the editing/deciding
     So this will return list of PhasePath
     """
     ret = []
-    for cur_hap_diff, cur_hap_size in [(hap1_difference, hap1_size), (hap2_difference, hap2_size)]:
-        cur_paths = []
-        for path in dfs(graph, cur_hap_size):
-            m_k = np.copy(graph.nodes[path[0]]['kfeat'])
-            m_s = graph.nodes[path[0]]['size']
-            for node in path[1:]:
-                m_k += graph.nodes[node]['kfeat']
-                m_s += graph.nodes[node]['size']
-
-            m_dist = kdp.cosinesim(m_k, cur_hap_diff, m_s)
-            # ensure same sign (same net effect of deletion/insertion)
-            if (cur_hap_size ^ m_s) < 0:
-                m_sz = 0
-            else:
-                m_sz, _ = truvari.sizesim(abs(cur_hap_size), abs(m_s))
-
-            cur_paths.append(PhasePath(m_dist, m_sz, path))
-            max_paths -= 1
-            if max_paths <= 0:
-                break
-        ret.append(cur_paths)
-    return ret
-
-
-
-def graph_phase_paths(graph, cur_hap_diff, cur_hap_size, max_paths=10000):
-    """
-    This will return the paths and we'll let phase_region do the editing/deciding
-    So this will return list of PhasePath
-    """
-    ret = []
-    for path in dfs(graph, cur_hap_size):
+    for path in dfs(graph, hap_size):
+        if max_paths <= 0:
+            break
+        max_paths -= 1
         m_s = graph.nodes[path[0]]['size']
         for node in path[1:]:
             m_s += graph.nodes[node]['size']
 
         # ensure same sign (same net effect of deletion/insertion)
-        if (cur_hap_size ^ m_s) < 0:
+        if (hap_size ^ m_s) < 0:
             m_sz = 0
         else:
-            m_sz, _ = truvari.sizesim(abs(cur_hap_size), abs(m_s))
-        # This is all I've done different
+            m_sz, _ = truvari.sizesim(abs(hap_size), abs(m_s))
+        # No need to waste time on this variant
         if m_sz < min_size:
             continue
 
@@ -130,11 +103,8 @@ def graph_phase_paths(graph, cur_hap_diff, cur_hap_size, max_paths=10000):
         for node in path[1:]:
             m_k += graph.nodes[node]['kfeat']
 
-        m_dist = kdp.cosinesim(m_k, cur_hap_diff, m_s)
+        m_dist = kdp.cosinesim(m_k, hap_k, m_s)
         ret.append(PhasePath(m_dist, m_sz, path))
-        max_paths -= 1
-        if max_paths <= 0:
-            break
     return ret
 
 

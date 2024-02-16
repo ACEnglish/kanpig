@@ -8,13 +8,13 @@ from kdp.similarity import (
 )
 
 from kdp.kmer import (
-    make_kfeat,
-    make_kmer,
+    var_to_kfeat,
+    seq_to_kmer,
 )
 
 from kdp.graph import (
     PhasePath,
     vars_to_graph,
     get_best_path,
-    graph_phase_paths,
+    find_hap_paths,
 )

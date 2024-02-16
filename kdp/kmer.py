@@ -24,7 +24,7 @@ def generate_kmers(sequence, kmer=3):
         yield result
 
 
-def make_kmer(seq, kmer_len=6):
+def seq_to_kmer(seq, kmer_len=6):
     """
     Make the kmer array of all kmers and those over min_freq
     """
@@ -36,12 +36,12 @@ def make_kmer(seq, kmer_len=6):
 
 
 
-def make_kfeat(entry, kmer=3):
+def var_to_kfeat(entry, kmer=3):
     """
     Make the kmer featurization of this variant
     """
-    alt = make_kmer(entry.alts[0], kmer)
-    ref = make_kmer(entry.ref, kmer)
+    alt = seq_to_kmer(entry.alts[0], kmer)
+    ref = seq_to_kmer(entry.ref, kmer)
     szdiff = len(entry.alts[0]) - len(entry.ref)
     return alt - ref, szdiff
 
