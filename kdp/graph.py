@@ -75,8 +75,7 @@ def get_best_path(paths, exclude=None, min_cos=0.90, min_size=0.90):
             return path
     return PhasePath()
 
-
-def graph_phase_paths(graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths=10000):
+def graph_phase_paths_orig(graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths=10000):
     """
     This will return the paths and we'll let phase_region do the editing/deciding
     So this will return list of PhasePath
@@ -103,6 +102,39 @@ def graph_phase_paths(graph, hap1_difference, hap1_size, hap2_difference, hap2_s
             if max_paths <= 0:
                 break
         ret.append(cur_paths)
+    return ret
+
+
+
+def graph_phase_paths(graph, cur_hap_diff, cur_hap_size, max_paths=10000):
+    """
+    This will return the paths and we'll let phase_region do the editing/deciding
+    So this will return list of PhasePath
+    """
+    ret = []
+    for path in dfs(graph, cur_hap_size):
+        m_s = graph.nodes[path[0]]['size']
+        for node in path[1:]:
+            m_s += graph.nodes[node]['size']
+
+        # ensure same sign (same net effect of deletion/insertion)
+        if (cur_hap_size ^ m_s) < 0:
+            m_sz = 0
+        else:
+            m_sz, _ = truvari.sizesim(abs(cur_hap_size), abs(m_s))
+        # This is all I've done different
+        if m_sz < min_size:
+            continue
+
+        m_k = np.copy(graph.nodes[path[0]]['kfeat'])
+        for node in path[1:]:
+            m_k += graph.nodes[node]['kfeat']
+
+        m_dist = kdp.cosinesim(m_k, cur_hap_diff, m_s)
+        ret.append(PhasePath(m_dist, m_sz, path))
+        max_paths -= 1
+        if max_paths <= 0:
+            break
     return ret
 
 

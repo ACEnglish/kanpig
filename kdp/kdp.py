@@ -68,12 +68,14 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
 
     # num_paths_approx = math.factorial(len(graph.nodes) - 2) + 1
     # TODO: I need to exclude haps without any variants. It causes spurious FPs
-    all_paths = kdp.graph_phase_paths(
-        graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths)
+    h1_paths = kdp.graph_phase_paths(graph, hap1_difference, hap1_size, max_paths)
+    h2_paths = kdp.graph_phase_paths(graph, hap2_difference, hap2_size, max_paths)
+    #all_paths = kdp.graph_phase_paths(
+        #graph, hap1_difference, hap1_size, hap2_difference, hap2_size, max_paths)
     h1_min_path = kdp.get_best_path(
-        all_paths[0], min_cos=min_cos, min_size=min_size)
+        h1_paths, min_cos=min_cos, min_size=min_size)
     h2_min_path = kdp.get_best_path(
-        all_paths[1], min_cos=min_cos, min_size=min_size)
+        h2_paths, min_cos=min_cos, min_size=min_size)
 
     used = set(h1_min_path.path) | set(h2_min_path.path)
     m_chunk_id = chunk_id
