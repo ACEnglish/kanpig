@@ -4,7 +4,8 @@ __version__ = '0.1.0-dev'
 from kdp.kdp import *
 
 from kdp.similarity import (
-        cosinesim,
+    cosinesim,
+    weighted_cosinesim,
 )
 
 from kdp.kmer import (

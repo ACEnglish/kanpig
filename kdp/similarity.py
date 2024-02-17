@@ -22,7 +22,7 @@ def get_size_dist(size):
     return mean, std
 
 
-def cosinesim(a, b, size):
+def cosinesim(a, b):
     """
     How many standard deviations is the score from random sequence given the size (turned off)
     """
@@ -33,3 +33,12 @@ def cosinesim(a, b, size):
     #return simsimd.cosine(a, b) wasn't faster, didn't work :(
 
 
+def weighted_cosinesim(a, b):
+    """
+    Weighted cosinesim... which uses weighted hamming distance
+    https://link.springer.com/chapter/10.1007/978-3-642-41278-3_74
+    https://datagy.io/python-hamming-distance/
+    """
+    cos = cosinesim(a, b)
+    dist = (1 / len(a)) * np.sum(np.abs(a - b))
+    return cos / (dist**2 + cos)

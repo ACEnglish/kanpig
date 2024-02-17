@@ -103,7 +103,8 @@ def find_hap_paths(graph, hap_k, hap_size, min_size, max_paths=10000):
         for node in path[1:]:
             m_k += graph.nodes[node]['kfeat']
 
-        m_dist = kdp.cosinesim(m_k, hap_k, m_s)
+        #m_dist = kdp.cosinesim(m_k, hap_k)
+        m_dist = kdp.weighted_cosinesim(m_k, hap_k)
         ret.append(PhasePath(m_dist, m_sz, path))
     return ret
 

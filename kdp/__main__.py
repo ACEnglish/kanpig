@@ -41,7 +41,7 @@ def parse_args(args):
                         help="Minimum size similarity between a path and haplotype (%(default)s)")
     parser.add_argument("--pg", action="store_true",
                         help="Allow multiple phase groups (%(default)s)")
-    parser.add_argument("--chunksize", type=truvari.restricted_int, default=500,
+    parser.add_argument("--chunksize", type=truvari.restricted_int, default=100,
                         help="Max reference distance to phase calls (%(default)s)")
     parser.add_argument("--debug", action="store_true",
                         help="Verbose logging")
