@@ -64,5 +64,6 @@ setup(
     install_requires=[
         "truvari >= 4.2.1",
         # numpy
+        # sklearn something
     ],
 )

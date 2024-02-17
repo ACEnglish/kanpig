@@ -21,5 +21,6 @@ from kdp.graph import (
 )
 
 from kdp.haps import (
+    Haplotype,
     vcf_haps,
 )

@@ -31,11 +31,11 @@ def parse_args(args):
                         help="Name of sample to apply genotypes (first)")
     parser.add_argument("--passonly", action="store_true",
                         help="Only phase passing variants")
-    parser.add_argument("--sizemin", type=int, default=0,
+    parser.add_argument("--sizemin", type=int, default=20,
                         help="Minimum variant size (%(default)s)")
     parser.add_argument("--sizemax", type=int, default=50000,
                         help="Maximum variant size (%(default)s)")
-    parser.add_argument("--maxpaths", type=int, default=10000,
+    parser.add_argument("--maxpaths", type=int, default=1000,
                         help="Stop region processing after trying N paths (%(default)s)")
     parser.add_argument("--cossim", type=float, default=0.90,
                         help="Minimum cosine similarity (%(default)s)")
@@ -52,6 +52,8 @@ def parse_args(args):
     if (not args.bam and not args.vcf) or args.bam and args.vcf:
         logging.error("One of --vcf xor --bam must be provided")
         exit(1)
+    if args.sizemin < 20:
+        logging.warning("--sizemin is recommended to be at least 20")
     return args
 
 def main():
@@ -89,6 +91,7 @@ def main():
                     'Description="Phase group id from kdp">'))
     args.sample = 0 if args.sample is None else args.sample
     out_vcf = pysam.VariantFile(out_name, 'w', header=header)
+
     task = partial(kdp.kdfp_job,
                    max_paths=args.maxpaths,
                    phase_groups=args.pg,

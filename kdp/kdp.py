@@ -14,7 +14,6 @@ import logging
 import kdp
 
 
-
 def pull_variants(graph, used, h1_min_path, h2_min_path, chunk_id, sample=0):
     """
     Update the variants in the two paths and return them
@@ -45,22 +44,20 @@ def get_bounds(cnk):
         mend = max(mend, i.stop)
     return mstart, mend
 
-def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0,
+def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0,
                  max_paths=10000):
     """
-    Phase the variants from a region over the reference and haplotypes
+    Phase the variants from a region over two haplotypes
     Returns a list of variants
     """
     ret_entries = []
-    hap1, hap2 = kdp.vcf_haps(p_variants, kmer)
     graph, unused_vars = kdp.vars_to_graph(up_variants, kmer)
     unused_cnt = len(unused_vars)
     for entry in unused_vars:
         entry.samples[sample]['GT'] = (0, 0)
         ret_entries.append(entry)
 
-    # TODO: I need to exclude haps without any variants. It causes spurious FPs
-    # in 'balanced' events
+    # No changes to apply
     if hap1.n:
         h1_paths = kdp.find_hap_paths(graph,
                                       hap1,
@@ -121,7 +118,7 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
     return ret_entries
 
 
-def kdfp_job(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
+def kdfp_job_vcf(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
     """
     Phase a chunk of variants
     """
@@ -134,7 +131,8 @@ def kdfp_job(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, mi
 
     for entry in comp_entries:  # TODO just masking?
         entry.samples[sample]["GT"] = (None, None)
-
+    
+    # No base variants, assuming all comp is covered
     base_entries = chunk_dict['base']
     if len(base_entries) == 0:
         for entry in comp_entries:
@@ -142,12 +140,42 @@ def kdfp_job(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, mi
             ret.append(entry)
         return ret
 
+    hap1, hap2 = kdp.vcf_haps(base_entries, kmer)
+
     # gross but don't have to keep passing around the header
     for _ in comp_entries:
         _.translate(header)
 
     chunk_id = str(chunk_id)
-    for entry in phase_region(comp_entries, base_entries, phase_groups, chunk_id, kmer=kmer, min_cos=min_cos,
+    for entry in phase_region(comp_entries, hap1, hap2, phase_groups, chunk_id, kmer=kmer, min_cos=min_cos,
+                              min_size=min_size, sample=sample, max_paths=max_paths):
+        ret.append(entry)
+    return ret
+
+def kdfp_job_bam(chunk, bam, buffer=100, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
+    """
+    Phase a chunk of variants
+    """
+    chunk_dict, chunk_id = chunk
+    ret = []
+
+    comp_entries = chunk_dict['comp']
+    if len(comp_entries) == 0:
+        return ret
+
+    for entry in comp_entries:  # TODO just masking?
+        entry.samples[sample]["GT"] = (None, None)
+    
+    start, end = get_bounds(comp_entries)
+
+    hap1, hap2 = kdp.bam_haps(bam, comp_entries[0].chrom, start, end, kmer, buffer, sizemin)
+
+    # gross but don't have to keep passing around the header
+    for _ in comp_entries:
+        _.translate(header)
+
+    chunk_id = str(chunk_id)
+    for entry in phase_region(comp_entries, hap1, hap2, phase_groups, chunk_id, kmer=kmer, min_cos=min_cos,
                               min_size=min_size, sample=sample, max_paths=max_paths):
         ret.append(entry)
     return ret
