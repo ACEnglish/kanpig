@@ -13,12 +13,14 @@ import kdp
 def parse_args(args):
     """
     """
-    parser = argparse.ArgumentParser(prog="kfdphase", description=__doc__,
+    parser = argparse.ArgumentParser(prog="kdp", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("-b", "--base", type=str, required=True,
-                        help="Phased VCF")
-    parser.add_argument("-c", "--comp", type=str, required=True,
-                        help="VCF to phase")
+    parser.add_argument("-i", "--input", type=str, required=True,
+                        help="VCF to genotype")
+    parser.add_argument("--vcf", type=str,
+                        help="Phased VCF with genotypes to apply")
+    parser.add_argument("--bam", type=str,
+                        help="Bam file with reads to apply")
     parser.add_argument("-o", "--output", type=str, default="/dev/stdout",
                         help="Output VCF (stdout)")
     parser.add_argument("-r", "--regions", type=str, default=None,
@@ -47,6 +49,9 @@ def parse_args(args):
                         help="Verbose logging")
 
     args = parser.parse_args(args)
+    if (not args.bam and not args.vcf) or args.bam and args.vcf:
+        logging.error("One of --vcf xor --bam must be provided")
+        exit(1)
     return args
 
 def main():
@@ -54,8 +59,8 @@ def main():
     truvari.setup_logging(args.debug)
     logging.info("Starting")
 
-    base = pysam.VariantFile(args.base)
-    comp = pysam.VariantFile(args.comp)
+    base = pysam.VariantFile(args.vcf)
+    comp = pysam.VariantFile(args.input)
 
     matcher = truvari.Matcher()
     matcher.params.passonly = args.passonly
@@ -64,15 +69,6 @@ def main():
     matcher.params.sizemax = args.sizemax
     matcher.params.chunksize = args.chunksize
 
-    # v4.2.0 <=
-    #regions = truvari.RegionVCFIterator(base, comp,
-                                        #args.regions,
-                                        #matcher.params.sizemax)
-    #regions.merge_overlaps()
-    #base_i = regions.iterate(base)
-    #comp_i = regions.iterate(comp)
-    
-    # v4.2.1
     region_tree = truvari.build_region_tree(base, comp, args.regions)
     truvari.merge_region_tree_overlaps(region_tree)
     base_i = truvari.region_filter(base, region_tree)

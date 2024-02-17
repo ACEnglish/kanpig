@@ -19,3 +19,7 @@ from kdp.graph import (
     get_best_path,
     find_hap_paths,
 )
+
+from kdp.haps import (
+    vcf_haps,
+)
