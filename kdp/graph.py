@@ -7,7 +7,6 @@ import truvari
 
 import kdp
 
-
 @total_ordering
 @dataclass
 class PhasePath():
@@ -76,13 +75,13 @@ def get_best_path(paths, exclude=None, min_cos=0.90, min_size=0.90):
     return PhasePath()
 
 
-def find_hap_paths(graph, hap_k, hap_size, min_size, max_paths=10000):
+def find_hap_paths(graph, hap, min_size, max_paths=10000):
     """
     This will return the paths and we'll let phase_region do the editing/deciding
     So this will return list of PhasePath
     """
     ret = []
-    for path in dfs(graph, hap_size):
+    for path in dfs(graph, hap.size):
         if max_paths <= 0:
             break
         max_paths -= 1
@@ -91,10 +90,10 @@ def find_hap_paths(graph, hap_k, hap_size, min_size, max_paths=10000):
             m_s += graph.nodes[node]['size']
 
         # ensure same sign (same net effect of deletion/insertion)
-        if (hap_size ^ m_s) < 0:
+        if (hap.size ^ m_s) < 0:
             m_sz = 0
         else:
-            m_sz, _ = truvari.sizesim(abs(hap_size), abs(m_s))
+            m_sz, _ = truvari.sizesim(abs(hap.size), abs(m_s))
         # No need to waste time on this variant
         if m_sz < min_size:
             continue
@@ -104,7 +103,7 @@ def find_hap_paths(graph, hap_k, hap_size, min_size, max_paths=10000):
             m_k += graph.nodes[node]['kfeat']
 
         #m_dist = kdp.cosinesim(m_k, hap_k)
-        m_dist = kdp.weighted_cosinesim(m_k, hap_k)
+        m_dist = kdp.weighted_cosinesim(m_k, hap.kfeat)
         ret.append(PhasePath(m_dist, m_sz, path))
     return ret
 

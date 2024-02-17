@@ -52,33 +52,29 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
     Returns a list of variants
     """
     ret_entries = []
-    hap1_k, hap1_size, hap1_n, hap2_k, hap2_size, hap2_n = kdp.vcf_haps(p_variants, kmer)
+    hap1, hap2 = kdp.vcf_haps(p_variants, kmer)
     graph, unused_vars = kdp.vars_to_graph(up_variants, kmer)
     unused_cnt = len(unused_vars)
     for entry in unused_vars:
         entry.samples[sample]['GT'] = (0, 0)
         ret_entries.append(entry)
 
-    logging.info(get_bounds(up_variants))
-
     # TODO: I need to exclude haps without any variants. It causes spurious FPs
     # in 'balanced' events
-    if hap1_n: # Just test this
+    if hap1.n:
         h1_paths = kdp.find_hap_paths(graph,
-                                    hap1_k,
-                                    hap1_size,
-                                    min_size,
-                                    max_paths)
+                                      hap1,
+                                      min_size,
+                                      max_paths)
     else:
         h1_paths = []
     h1_min_path = kdp.get_best_path(h1_paths,
                                     min_cos=min_cos,
                                     min_size=min_size)
 
-    if hap2_n: # Just test this
+    if hap2.n:
         h2_paths = kdp.find_hap_paths(graph,
-                                      hap2_k,
-                                      hap2_size,
+                                      hap2,
                                       min_size,
                                       max_paths)
     else:
