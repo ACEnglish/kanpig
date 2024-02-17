@@ -8,6 +8,7 @@ I think an A* could be faster if I can use the sizediff of current path from hap
 Figure out if I can do something about the size-separator. Like, it worked good for 'isn't random', but
     What I really need is "are the same"
 """
+import sys
 import logging
 
 import kdp
@@ -54,6 +55,16 @@ def pull_variants(graph, used, h1_min_path, h2_min_path, chunk_id, sample=0):
         ret_entries.append(v)
     return ret_entries
 
+def get_bounds(cnk):
+    """
+    Need min/max position of variants
+    """
+    mstart = sys.maxsize
+    mend = 0
+    for i in cnk:
+        mstart = min(mstart, i.start)
+        mend = max(mend, i.stop)
+    return mstart, mend
 
 def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0,
                  max_paths=10000):
@@ -68,6 +79,8 @@ def phase_region(up_variants, p_variants, pg=False, chunk_id=None, kmer=3, min_c
     for entry in unused_vars:
         entry.samples[sample]['GT'] = (0, 0)
         ret_entries.append(entry)
+
+    logging.info(get_bounds(up_variants))
 
     # TODO: I need to exclude haps without any variants. It causes spurious FPs
     # in 'balanced' events
