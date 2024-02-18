@@ -18,8 +18,9 @@ class PhasePath():
     path: list = field(default_factory=list)
 
     def __lt__(self, other):
-        # Trues are always worth more
-        if round(self.sizesim, 4) == round(other.sizesim, 4):
+        # if the size similarity is very close, then try to pick the more similar one
+        # What I really need to be doing is trying to take into account the length of the path, as well
+        if abs(self.sizesim - other.sizesim) < 0.02:
             return self.cossim < other.cossim
         return self.sizesim < other.sizesim
 
@@ -39,12 +40,13 @@ def vars_to_graph(variants, kmer=3):
         if k.sum() != 0:
             keep_vars.append((truvari.entry_to_hash(entry), entry, k, s))
         else:
+            logging.debug("Removing %s", entry)
             unused_vars.append(entry)
     graph = nx.DiGraph()
     graph.add_node('src', size=0)
     graph.add_node('snk', size=0)
     for key, v, k, s in keep_vars:
-        logging.critical("%s %s", key, str(v))
+        logging.debug("%s %s", key, str(v))
         graph.add_node(key, variant=v, kfeat=k, size=s)
         graph.add_edge('src', key)
         graph.add_edge(key, 'snk')
@@ -104,9 +106,13 @@ def find_hap_paths(graph, hap, min_size, max_paths=10000):
             m_k += graph.nodes[node]['kfeat']
 
         #m_dist = kdp.cosinesim(m_k, hap_k)
-        m_dist = kdp.weighted_cosinesim(m_k, hap.kfeat)
+        if m_s < 500:
+            m_dist = kdp.weighted_cosinesim(m_k, hap.kfeat)
+        else:
+            m_dist = kdp.cosinesim(m_k, hap.kfeat)
+
         ret.append(PhasePath(m_dist, m_sz, path))
-        logging.critical(ret[-1])
+        logging.debug('chose %s', ret[-1])
     return ret
 
 

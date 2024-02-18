@@ -59,7 +59,7 @@ def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_c
         ret_entries.append(entry)
 
     # No changes to apply
-    logging.critical('h1 %s', hap1)
+    logging.debug('h1 %s', hap1)
     if hap1.n:
         h1_paths = kdp.find_hap_paths(graph,
                                       hap1,
@@ -71,7 +71,7 @@ def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_c
                                     min_cos=min_cos,
                                     min_size=min_size)
 
-    logging.critical('h1 %s', hap2)
+    logging.debug('h2 %s', hap2)
     if hap2.n:
         h2_paths = kdp.find_hap_paths(graph,
                                       hap2,
@@ -172,7 +172,7 @@ def kdp_job_bam(chunk, bam, reference, buffer=100, sizemin=20, sizemax=50000, ma
     chrom = comp_entries[0].chrom
     start, end = get_bounds(comp_entries)
     refseq = reference.fetch(chrom, start - buffer, end + buffer)
-    hap1, hap2 = kdp.bam_haps(bam, refseq, chrom, start, end, kmer, buffer, sizemin, sizemax)
+    hap1, hap2 = kdp.bam_haps(bam, refseq, chrom, start, end, kmer, buffer, min_cos, sizemin, sizemax)
 
     # gross but don't have to keep passing around the header
     for _ in comp_entries:
