@@ -44,6 +44,7 @@ def vars_to_graph(variants, kmer=3):
     graph.add_node('src', size=0)
     graph.add_node('snk', size=0)
     for key, v, k, s in keep_vars:
+        logging.critical("%s %s", key, str(v))
         graph.add_node(key, variant=v, kfeat=k, size=s)
         graph.add_edge('src', key)
         graph.add_edge(key, 'snk')
@@ -74,7 +75,7 @@ def get_best_path(paths, exclude=None, min_cos=0.90, min_size=0.90):
             return path
     return PhasePath()
 
-
+import logging
 def find_hap_paths(graph, hap, min_size, max_paths=10000):
     """
     This will return the paths and we'll let phase_region do the editing/deciding
@@ -105,6 +106,7 @@ def find_hap_paths(graph, hap, min_size, max_paths=10000):
         #m_dist = kdp.cosinesim(m_k, hap_k)
         m_dist = kdp.weighted_cosinesim(m_k, hap.kfeat)
         ret.append(PhasePath(m_dist, m_sz, path))
+        logging.critical(ret[-1])
     return ret
 
 

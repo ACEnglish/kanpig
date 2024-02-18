@@ -40,8 +40,9 @@ def var_to_kfeat(entry, kmer=3):
     """
     Make the kmer featurization of this variant
     """
-    alt = seq_to_kmer(entry.alts[0], kmer)
-    ref = seq_to_kmer(entry.ref, kmer)
+    # Trim off the anchor base - not great for MNPs, but maybe we won't miss it
+    alt = seq_to_kmer(entry.alts[0][1:], kmer)
+    ref = seq_to_kmer(entry.ref[1:], kmer)
     szdiff = len(entry.alts[0]) - len(entry.ref)
     return alt - ref, szdiff
 

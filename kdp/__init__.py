@@ -1,7 +1,10 @@
 
 __version__ = '0.1.0-dev'
 
-from kdp.kdp import *
+from kdp.kdp import (
+        kdp_job_vcf,
+        kdp_job_bam,
+)
 
 from kdp.similarity import (
     cosinesim,
@@ -23,4 +26,5 @@ from kdp.graph import (
 from kdp.haps import (
     Haplotype,
     vcf_haps,
+    bam_haps,
 )

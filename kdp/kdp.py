@@ -14,7 +14,7 @@ import logging
 import kdp
 
 
-def pull_variants(graph, used, h1_min_path, h2_min_path, chunk_id, sample=0):
+def pull_variants(graph, used, h1_min_path, h1, h2_min_path, h2, chunk_id, sample=0):
     """
     Update the variants in the two paths and return them
     """
@@ -23,13 +23,14 @@ def pull_variants(graph, used, h1_min_path, h2_min_path, chunk_id, sample=0):
         g1 = int(node in h1_min_path.path)
         g2 = int(node in h2_min_path.path)
         v = graph.nodes[node]["variant"]
-        v.samples[sample]['GT'] = (g1, g2)
+        v.samples[sample]["GT"] = (g1, g2)
         v.samples[sample].phased = True
         v.samples[sample]["PG"] = chunk_id
-        v.samples[sample]['SZ'] = (round(h1_min_path.sizesim, 3) if g1 else None,
+        v.samples[sample]["SZ"] = (round(h1_min_path.sizesim, 3) if g1 else None,
                                    round(h2_min_path.sizesim, 3) if g2 else None)
-        v.samples[sample]['CS'] = (round(h1_min_path.cossim, 3) if g1 else None,
+        v.samples[sample]["CS"] = (round(h1_min_path.cossim, 3) if g1 else None,
                                    round(h2_min_path.cossim, 3) if g2 else None)
+        v.samples[sample]["AD"] = (h1.coverage, h2.coverage)
         ret_entries.append(v)
     return ret_entries
 
@@ -58,6 +59,7 @@ def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_c
         ret_entries.append(entry)
 
     # No changes to apply
+    logging.critical('h1 %s', hap1)
     if hap1.n:
         h1_paths = kdp.find_hap_paths(graph,
                                       hap1,
@@ -69,6 +71,7 @@ def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_c
                                     min_cos=min_cos,
                                     min_size=min_size)
 
+    logging.critical('h1 %s', hap2)
     if hap2.n:
         h2_paths = kdp.find_hap_paths(graph,
                                       hap2,
@@ -85,7 +88,7 @@ def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_c
     if pg:
         m_chunk_id += f'.0'
     ret_entries.extend(pull_variants(
-        graph, used, h1_min_path, h2_min_path, m_chunk_id, sample))
+        graph, used, h1_min_path, hap1, h2_min_path, hap2, m_chunk_id, sample))
 
     # while multiple-phase groups is on and we've been applying variants somewhere
     p_cnt = 0
@@ -118,7 +121,7 @@ def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_c
     return ret_entries
 
 
-def kdfp_job_vcf(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
+def kdp_job_vcf(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
     """
     Phase a chunk of variants
     """
@@ -152,7 +155,7 @@ def kdfp_job_vcf(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3
         ret.append(entry)
     return ret
 
-def kdfp_job_bam(chunk, bam, buffer=100, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
+def kdp_job_bam(chunk, bam, reference, buffer=100, sizemin=20, sizemax=50000, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
     """
     Phase a chunk of variants
     """
@@ -166,9 +169,10 @@ def kdfp_job_bam(chunk, bam, buffer=100, max_paths=10000, phase_groups=False, he
     for entry in comp_entries:  # TODO just masking?
         entry.samples[sample]["GT"] = (None, None)
     
+    chrom = comp_entries[0].chrom
     start, end = get_bounds(comp_entries)
-
-    hap1, hap2 = kdp.bam_haps(bam, comp_entries[0].chrom, start, end, kmer, buffer, sizemin)
+    refseq = reference.fetch(chrom, start - buffer, end + buffer)
+    hap1, hap2 = kdp.bam_haps(bam, refseq, chrom, start, end, kmer, buffer, sizemin, sizemax)
 
     # gross but don't have to keep passing around the header
     for _ in comp_entries:

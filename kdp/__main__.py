@@ -21,6 +21,8 @@ def parse_args(args):
                         help="Phased VCF with genotypes to apply")
     parser.add_argument("--bam", type=str,
                         help="Bam file with reads to apply")
+    parser.add_argument("-f", "--reference", type=str,
+                        help="Reference the bam was aligned to")
     parser.add_argument("-o", "--output", type=str, default="/dev/stdout",
                         help="Output VCF (stdout)")
     parser.add_argument("-r", "--regions", type=str, default=None,
@@ -49,19 +51,25 @@ def parse_args(args):
                         help="Verbose logging")
 
     args = parser.parse_args(args)
+    truvari.setup_logging(args.debug)
     if (not args.bam and not args.vcf) or args.bam and args.vcf:
         logging.error("One of --vcf xor --bam must be provided")
-        exit(1)
+        sys.exit(1)
     if args.sizemin < 20:
         logging.warning("--sizemin is recommended to be at least 20")
+    if args.bam and not args.reference:
+        logging.error("--bam requires --reference")
+        sys.exit(1)
+    elif args.vcf and args.reference:
+        logging.warning("--reference is not used with --vcf (until we start dealing with symbolic alts)")
     return args
 
 def main():
     args = parse_args(sys.argv[1:])
-    truvari.setup_logging(args.debug)
     logging.info("Starting")
 
-    base = pysam.VariantFile(args.vcf)
+    if args.vcf is not None:
+        base = pysam.VariantFile(args.vcf)
     comp = pysam.VariantFile(args.input)
 
     matcher = truvari.Matcher()
@@ -71,13 +79,19 @@ def main():
     matcher.params.sizemax = args.sizemax
     matcher.params.chunksize = args.chunksize
 
-    region_tree = truvari.build_region_tree(base, comp, args.regions)
+    if args.vcf is not None:
+        region_tree = truvari.build_region_tree(base, comp, args.regions)
+    else:
+        # Probably need to figure out how to check bam contigs
+        region_tree = truvari.build_region_tree(comp, includebed=args.regions)
     truvari.merge_region_tree_overlaps(region_tree)
-    base_i = truvari.region_filter(base, region_tree)
     comp_i = truvari.region_filter(comp, region_tree)
-
-    chunks = truvari.chunker(matcher, ('base', base_i), ('comp', comp_i))
-
+    if args.vcf is not None:
+        base_i = truvari.region_filter(base, region_tree)
+        chunks = truvari.chunker(matcher, ('base', base_i), ('comp', comp_i))
+    else:
+        chunks = truvari.chunker(matcher, ('comp', comp_i))
+    
     out_name = args.output
     if out_name.endswith(".vcf.gz"):
         out_name = args.output[:-len(".gz")]
@@ -89,17 +103,34 @@ def main():
                     'Description="Cosine similarity of phase group">'))
     header.add_line(('##FORMAT=<ID=PG,Number=1,Type=String,'
                     'Description="Phase group id from kdp">'))
+    header.add_line(('##FORMAT=<ID=AD,Number=R,Type=Integer,'
+                     'Description="Allele Depth">'))
     args.sample = 0 if args.sample is None else args.sample
     out_vcf = pysam.VariantFile(out_name, 'w', header=header)
 
-    task = partial(kdp.kdfp_job,
-                   max_paths=args.maxpaths,
-                   phase_groups=args.pg,
-                   header=header,
-                   kmer=args.kmer,
-                   min_cos=args.cossim,
-                   min_size=args.pctsize,
-                   sample=args.sample)
+    if args.vcf is not None:
+        task = partial(kdp.kdp_job_vcf,
+                       max_paths=args.maxpaths,
+                       phase_groups=args.pg,
+                       header=header,
+                       kmer=args.kmer,
+                       min_cos=args.cossim,
+                       min_size=args.pctsize,
+                       sample=args.sample)
+    else:
+        task = partial(kdp.kdp_job_bam,
+                       bam=pysam.AlignmentFile(args.bam),
+                       reference=pysam.FastaFile(args.reference),
+                       sizemin=args.sizemin,
+                       sizemax=args.sizemax,
+                       buffer=args.chunksize,
+                       max_paths=args.maxpaths,
+                       phase_groups=args.pg,
+                       header=header,
+                       kmer=args.kmer,
+                       min_cos=args.cossim,
+                       min_size=args.pctsize,
+                       sample=args.sample)
 
     for variant in itertools.chain.from_iterable(map(task, chunks)):
         out_vcf.write(variant)
