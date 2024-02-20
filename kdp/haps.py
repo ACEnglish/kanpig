@@ -94,17 +94,15 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, kmer=4, buffer=100, cossim=
     Pileup a region and return same thing as vcf_haps
     """
     tot_cov = 0
-    # TODO - I don't like this buffer business.. maybe
-    m_haps = {} # readname: Haplotype
+    m_haps = {}
     for column in bam.pileup(chrom, reg_start - buffer, reg_end + buffer, truncate=True):
-        # Check for deletions
         tot_cov += column.n
         for read in column.pileups:
             # Guard against partial alignments which mess up the kfeat 
             # Will revisit when I can turn a Haplotype into a single-path graph
             if not ((read.alignment.reference_start < reg_start) and (read.alignment.reference_end > reg_end)):
                 continue
-            # Only count reads that span the region towards coverage
+
             # Only consider things greater than 20bp
             if not (sizemin <= abs(read.indel) <= sizemax):
                 continue
@@ -125,27 +123,20 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, kmer=4, buffer=100, cossim=
                 m_haps[read.alignment.query_name] = hap
             else:
                 m_haps[read.alignment.query_name] += hap
+
     # Region coverage
     coverage = int(tot_cov / (reg_end - reg_start + 2*buffer))
-    logging.debug('reg coverage %d', coverage)
+    logging.debug('coverage %d', coverage)
     # Nothing to compare
+    # TODO: no coverage means we can't genotype it. Separate out these two conditions
     if coverage == 0 or len(m_haps) == 0:
         ret = kdp.Haplotype.new(kmer, coverage)
         return ret, ret
 
-    # No alternates
-    #if len(m_haps) == 0:
-        #return [kdp.Haplotype.new(kmer, coverage)]
-
     m_haps = hap_deduplicate(m_haps.values())
 
-    # Old clustering... which had its benefits, but... like... yeah
     # no reads or no alts means reference
-    # TODO: no coverage means we can't genotype it. Separate out these two conditions
-    if (coverage == 0) or (len(m_haps) == 0):
-        all_ref = kdp.Haplotype.new(kmer, coverage)
-        return all_ref, all_ref
-    elif len(m_haps) == 1: # one read can't be clustered, just return it
+    if len(m_haps) == 1: # one read can't be clustered, just return it
         hap2 = list(m_haps.values())[0]
         if (hap2.coverage / coverage) < REFTHRESHOLD:
             hap1 = kdp.Haplotype.new(kmer, coverage)
@@ -158,6 +149,7 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, kmer=4, buffer=100, cossim=
 
 def hap_deduplicate(m_haps):
     """
+    Haps with same kfeat are consolidated
     """
     ret = {}
     for i in m_haps:
@@ -167,10 +159,9 @@ def hap_deduplicate(m_haps):
             ret[i] = i
     return ret
 
-def average_of_haps(m_haps):
+def consolidate_with_best(m_haps):
     """
-    Return the hap from a cluster of haps the highest coverage or fewest changes
-    #Make a new hap that's the average of all the reads
+    Return the hap from a cluster with highest coverage or fewest changes
     """
     # Pick the one with the highest coverage or closest to the centroid
     best = m_haps[0]
@@ -201,24 +192,24 @@ def read_cluster(all_ks, kmer, coverage, cossim):
     # If we 
     Todo - The coverage from non-variant reads is the reference haplotype
     """
-    # clustering
+    # clustering to try and separate reads into haplotypes
     kmeans = KMeans(n_clusters=2, random_state=0)
     weight = [_.coverage for _ in all_ks.values()]
-    # Separate reads into haplotypes
     grps = kmeans.fit_predict([_.kfeat for _ in all_ks.values()], sample_weight=weight)
     n_grps = len(set(grps))
     alt_cov = sum([_.coverage for _ in all_ks])
+
     # REF & HET
     if n_grps == 1 and (alt_cov / coverage) < REFTHRESHOLD :
         logging.debug('ref_het')
         hap1 = kdp.Haplotype(kdp.seq_to_kmer("", 4), 0, coverage - alt_cov)
-        hap2 = average_of_haps(all_ks.values())
+        hap2 = consolidate_with_best(all_ks.values())
         return hap1, hap2
 
     # HOM ALT
     if n_grps == 1:
         logging.debug('hom_alt')
-        hap = average_of_haps(all_ks.values())
+        hap = consolidate_with_best(all_ks.values())
         return hap, hap
 
     # Compound HET?
@@ -227,13 +218,13 @@ def read_cluster(all_ks, kmer, coverage, cossim):
     for m_gt, hap_name in zip(grps, all_ks.keys()):
         haps[m_gt].append(all_ks[hap_name])
 
-    hap1 = average_of_haps(haps[0])
-    hap2 = average_of_haps(haps[1])
+    hap1 = consolidate_with_best(haps[0])
+    hap2 = consolidate_with_best(haps[1])
 
     # if the two haps are super similar, just combine them
     # and then double check the reference threshold
     if kdp.cosinesim(hap1.kfeat, hap2.kfeat) >= cossim:
-        hap2 = average_of_haps([hap1, hap2])
+        hap2 = consolidate_with_best([hap1, hap2])
         if (alt_cov / coverage) < REFTHRESHOLD:
             hap1 = kdp.Haplotype(kdp.seq_to_kmer("", 4), 0, coverage - alt_cov)
         else:

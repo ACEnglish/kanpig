@@ -10,6 +10,7 @@ Figure out if I can do something about the size-separator. Like, it worked good 
 """
 import sys
 import logging
+import truvari
 
 import kdp
 
@@ -170,9 +171,31 @@ def kdp_job_bam(chunk, bam, reference, buffer=100, sizemin=20, sizemax=50000, ma
         entry.samples[sample]["GT"] = (None, None)
     
     chrom = comp_entries[0].chrom
-    start, end = get_bounds(comp_entries)
-    refseq = reference.fetch(chrom, start - buffer, end + buffer)
-    hap1, hap2 = kdp.bam_haps(bam, refseq, chrom, start, end, kmer, buffer, min_cos, sizemin, sizemax)
+    n_tries = 5
+    while n_tries and comp_entries:
+        start, end = get_bounds(comp_entries)
+        refseq = reference.fetch(chrom, start - buffer, end + buffer)
+        hap1, hap2 = kdp.bam_haps(bam, refseq, chrom, start, end, kmer, buffer, min_cos, sizemin, sizemax)
+        n_tries -= 1
+        # Neither hap describes a variant, possibly due to bad boundaries from a giant variant
+        # First attempt is to just remove the largest variant and then retry
+        # Long term solution is that we collect the Haplotypes over the region and record
+        # with them the start/end they span. Then, we work to apply those variants over the sub-graph 
+        # within that span
+        # Like, this whole approach we're currently using with letting the chunk window dictate the variants
+        # isn't great. The reads should speak for themselves and then get placed onto the chunk
+        if hap1.n == 0 and hap2.n == 0: 
+            # Remove the largest comp_entry
+            largest_idx = 0
+            for i in range(len(comp_entries)):
+                if truvari.entry_size(comp_entries[i]) > truvari.entry_size(comp_entries[largest_idx]):
+                    largst_idx = i
+            ret.append(comp_entries.pop(largest_idx))
+        else:
+            n_tries = 0
+
+    if not comp_entries:
+        return ret
 
     # gross but don't have to keep passing around the header
     for _ in comp_entries:
