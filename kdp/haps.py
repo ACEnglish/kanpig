@@ -112,13 +112,17 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, params):
     for column in bam.pileup(chrom, reg_start - params.chunksize, reg_end + params.chunksize, truncate=True):
         tot_cov += column.n
         for read in column.pileups:
-            # Guard against partial alignments which mess up the kfeat 
-            # Will revisit when I can turn a Haplotype into a single-path graph
-            if not ((read.alignment.reference_start < reg_start) and (read.alignment.reference_end > reg_end)):
+            # This is weird
+            if read.query_position is None:
                 continue
 
             # Only consider things greater than 20bp
             if not (params.sizemin <= abs(read.indel) <= params.sizemax):
+                continue
+
+            # Guard against partial alignments which mess up the kfeat 
+            # Will revisit when I can turn a Haplotype into a single-path graph
+            if not ((read.alignment.reference_start < reg_start) and (read.alignment.reference_end > reg_end)):
                 continue
 
             if (read.indel ^ 1) > 0:  # Insertion
@@ -207,7 +211,7 @@ def read_cluster(all_ks, kmer, coverage, cossim, wcoslen):
     Todo - The coverage from non-variant reads is the reference haplotype
     """
     # clustering to try and separate reads into haplotypes
-    kmeans = KMeans(n_clusters=2, random_state=0)
+    kmeans = KMeans(n_clusters=2, random_state=0, n_init='auto')
     weight = [_.coverage for _ in all_ks.values()]
     grps = kmeans.fit_predict([_.kfeat for _ in all_ks.values()], sample_weight=weight)
     n_grps = len(set(grps))

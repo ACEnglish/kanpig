@@ -63,8 +63,8 @@ setup(
     },
     install_requires=[
         "truvari >= 4.2.1",
-        # numpy
-        # sklearn something
-        # networkx
+        "numpy >= 1.26.4",
+        "scikit-learn >=1.4.1",
+        "networkx >= 3.2.1",
     ],
 )

@@ -136,7 +136,7 @@ def kdp_job_bam(chunk, bam, reference, params, header=None, sample=0):
         entry.samples[sample]["GT"] = (None, None)
     
     chrom = comp_entries[0].chrom
-    n_tries = 5
+    n_tries = 1 # turn this off, for now. I think its slow - good proof of concept, though
     while n_tries and comp_entries:
         start, end = get_bounds(comp_entries)
         refseq = reference.fetch(chrom, start - params.chunksize, end + params.chunksize)
