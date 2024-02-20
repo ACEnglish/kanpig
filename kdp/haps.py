@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from collections import defaultdict
 
 import pysam
+import truvari
 import numpy as np
 from numpy.typing import ArrayLike
 from sklearn.cluster import KMeans
@@ -162,7 +163,7 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, params):
             hap1 = hap2
         return hap1, hap2
 
-    hap1, hap2 = read_cluster(m_haps, params.kmer, coverage, params.cossim, params.wcoslen)
+    hap1, hap2 = read_cluster(m_haps, params.kmer, coverage, params.cossim, params.pctsize)
     return hap1, hap2
 
 def hap_deduplicate(m_haps):
@@ -194,7 +195,7 @@ def consolidate_with_best(m_haps):
     return best
 
 @ignore_warnings(category=ConvergenceWarning)
-def read_cluster(all_ks, kmer, coverage, cossim, wcoslen):
+def read_cluster(all_ks, kmer, coverage, cossim, pctsize):
     """
     if the number of variant reads is appx 0%:
         we expect reference homozygous
@@ -240,12 +241,16 @@ def read_cluster(all_ks, kmer, coverage, cossim, wcoslen):
     hap2 = consolidate_with_best(haps[1])
 
     # if the two haps are super similar, just combine them
+    # Similar defined as same type (same sign)
+    # and within the size similarity
     # and then double check the reference threshold
-    if abs(hap1.size) < wcoslen or abs(hap2.size) < wcoslen:
-        m_sim = kdp.weighted_cosinesim(hap1.kfeat, hap2.kfeat)
-    else:
-        m_sim = kdp.cosinesim(hap1.kfeat, hap2.kfeat)
-    if  m_sim >= cossim:
+    # Should still try to keep sequence similarity (below)
+    #if abs(hap1.size) < wcoslen or abs(hap2.size) < wcoslen:
+    #    m_sim = kdp.weighted_cosinesim(hap1.kfeat, hap2.kfeat)
+    #else:
+    #    m_sim = kdp.cosinesim(hap1.kfeat, hap2.kfeat)
+    #if  m_sim >= cossim:
+    if (hap1.size ^ hap2.size >= 0) and truvari.sizesim(abs(hap1.size), abs(hap2.size))[0] > pctsize:
         hap2 = consolidate_with_best([hap1, hap2])
         if (alt_cov / coverage) < REFTHRESHOLD:
             hap1 = kdp.Haplotype(kdp.seq_to_kmer("", kmer), 0, coverage - alt_cov)

@@ -114,7 +114,7 @@ def find_hap_paths(graph, hap, params):
             m_dist = kdp.cosinesim(m_k, hap.kfeat)
 
         ret.append(PhasePath(m_dist, m_sz, path))
-        logging.debug('chose %s', ret[-1])
+        logging.debug('found %s', ret[-1])
     return ret
 
 
