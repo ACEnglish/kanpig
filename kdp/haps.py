@@ -109,7 +109,7 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, params):
     # paths
     # 
     m_haps = {}
-    for column in bam.pileup(chrom, reg_start - params.chunksize, reg_end + params.chunksize, truncate=True):
+    for column in bam.pileup(chrom, reg_start - params.chunksize, reg_end + params.chunksize, min_base_quality=0, truncate=True):
         tot_cov += column.n
         for read in column.pileups:
             # This is weird
