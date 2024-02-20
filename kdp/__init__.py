@@ -28,3 +28,9 @@ from kdp.haps import (
     vcf_haps,
     bam_haps,
 )
+
+from kdp.cli import (
+        IOParams,
+        KDParams,
+        parse_args,
+)

@@ -63,12 +63,12 @@ def vars_to_graph(variants, kmer=3):
     return graph, unused_vars
 
 
-def get_best_path(paths, exclude=None, min_cos=0.90, min_size=0.90):
+def get_best_path(paths, params, exclude=None):
     """
-    Returns the best path
+    Returns the best path, this used to do more work when we tried to track pg
     """
     to_analyze = filter(lambda tup: tup.sizesim >=
-                        min_size and tup.cossim >= min_cos, paths)
+                        params.pctsize and tup.cossim >= params.cossim, paths)
     to_analyze = sorted(to_analyze, reverse=True)
     for path in to_analyze:
         # Don't allow paths under size similarity
@@ -78,12 +78,13 @@ def get_best_path(paths, exclude=None, min_cos=0.90, min_size=0.90):
     return PhasePath()
 
 import logging
-def find_hap_paths(graph, hap, min_size, max_paths=10000):
+def find_hap_paths(graph, hap, params):
     """
     This will return the paths and we'll let phase_region do the editing/deciding
     So this will return list of PhasePath
     """
     ret = []
+    max_paths = params.maxpaths
     for path in dfs(graph, hap.size):
         if max_paths <= 0:
             break
@@ -97,8 +98,9 @@ def find_hap_paths(graph, hap, min_size, max_paths=10000):
             m_sz = 0
         else:
             m_sz, _ = truvari.sizesim(abs(hap.size), abs(m_s))
+
         # No need to waste time on this variant
-        if m_sz < min_size:
+        if m_sz < params.pctsize:
             continue
 
         m_k = np.copy(graph.nodes[path[0]]['kfeat'])
@@ -106,7 +108,7 @@ def find_hap_paths(graph, hap, min_size, max_paths=10000):
             m_k += graph.nodes[node]['kfeat']
 
         #m_dist = kdp.cosinesim(m_k, hap_k)
-        if m_s < 500:
+        if m_s < params.wcoslen:
             m_dist = kdp.weighted_cosinesim(m_k, hap.kfeat)
         else:
             m_dist = kdp.cosinesim(m_k, hap.kfeat)

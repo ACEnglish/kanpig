@@ -14,7 +14,6 @@ import truvari
 
 import kdp
 
-
 def pull_variants(graph, used, h1_min_path, h1, h2_min_path, h2, chunk_id, sample=0):
     """
     Update the variants in the two paths and return them
@@ -46,14 +45,13 @@ def get_bounds(cnk):
         mend = max(mend, i.stop)
     return mstart, mend
 
-def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0,
-                 max_paths=10000):
+def phase_region(up_variants, hap1, hap2, params, chunk_id=None, sample=0):
     """
     Phase the variants from a region over two haplotypes
     Returns a list of variants
     """
     ret_entries = []
-    graph, unused_vars = kdp.vars_to_graph(up_variants, kmer)
+    graph, unused_vars = kdp.vars_to_graph(up_variants, params.kmer)
     unused_cnt = len(unused_vars)
     for entry in unused_vars:
         entry.samples[sample]['GT'] = (0, 0)
@@ -62,53 +60,21 @@ def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_c
     # No changes to apply
     logging.debug('h1 %s', hap1)
     if hap1.n:
-        h1_paths = kdp.find_hap_paths(graph,
-                                      hap1,
-                                      min_size,
-                                      max_paths)
+        h1_paths = kdp.find_hap_paths(graph, hap1, params)
     else:
         h1_paths = []
-    h1_min_path = kdp.get_best_path(h1_paths,
-                                    min_cos=min_cos,
-                                    min_size=min_size)
+    h1_min_path = kdp.get_best_path(h1_paths, params)
 
     logging.debug('h2 %s', hap2)
     if hap2.n:
-        h2_paths = kdp.find_hap_paths(graph,
-                                      hap2,
-                                      min_size,
-                                      max_paths)
+        h2_paths = kdp.find_hap_paths(graph, hap2, params)
     else:
         h2_paths = []
-    h2_min_path = kdp.get_best_path(h2_paths,
-                                    min_cos=min_cos,
-                                    min_size=min_size)
+    h2_min_path = kdp.get_best_path(h2_paths, params)
 
     used = set(h1_min_path.path) | set(h2_min_path.path)
-    m_chunk_id = chunk_id
-    if pg:
-        m_chunk_id += f'.0'
     ret_entries.extend(pull_variants(
-        graph, used, h1_min_path, hap1, h2_min_path, hap2, m_chunk_id, sample))
-
-    # while multiple-phase groups is on and we've been applying variants somewhere
-    p_cnt = 0
-    while pg and (h1_min_path.path or h2_min_path.path):
-        p_cnt += 1
-        m_chunk_id = chunk_id + f'.{p_cnt}'
-        h1_min_path = kdp.get_best_path(h1_paths,
-                                        exclude=used,
-                                        min_cos=min_cos,
-                                        min_size=min_size)
-        h2_min_path = kdp.get_best_path(h2_paths,
-                                        exclude=used,
-                                        min_cos=min_cos,
-                                        min_size=min_size)
-        new_used = set(h1_min_path.path) | set(h2_min_path.path)
-        ret_entries.extend(pull_variants(
-            graph, new_used, h1_min_path, h2_min_path, m_chunk_id, sample))
-        # More variants to work on
-        used |= new_used
+        graph, used, h1_min_path, hap1, h2_min_path, hap2, chunk_id, sample))
 
     unused_cnt = 0
     for node in set(graph.nodes) - used:
@@ -122,7 +88,7 @@ def phase_region(up_variants, hap1, hap2, pg=False, chunk_id=None, kmer=3, min_c
     return ret_entries
 
 
-def kdp_job_vcf(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
+def kdp_job_vcf(chunk, params, header=None, sample=0):
     """
     Phase a chunk of variants
     """
@@ -144,19 +110,18 @@ def kdp_job_vcf(chunk, max_paths=10000, phase_groups=False, header=None, kmer=3,
             ret.append(entry)
         return ret
 
-    hap1, hap2 = kdp.vcf_haps(base_entries, kmer)
+    hap1, hap2 = kdp.vcf_haps(base_entries, params.kmer)
 
     # gross but don't have to keep passing around the header
     for _ in comp_entries:
         _.translate(header)
 
     chunk_id = str(chunk_id)
-    for entry in phase_region(comp_entries, hap1, hap2, phase_groups, chunk_id, kmer=kmer, min_cos=min_cos,
-                              min_size=min_size, sample=sample, max_paths=max_paths):
+    for entry in phase_region(comp_entries, hap1, hap2, params, chunk_id, sample):
         ret.append(entry)
     return ret
 
-def kdp_job_bam(chunk, bam, reference, buffer=100, sizemin=20, sizemax=50000, max_paths=10000, phase_groups=False, header=None, kmer=3, min_cos=0.90, min_size=0.90, sample=0):
+def kdp_job_bam(chunk, bam, reference, params, header=None, sample=0):
     """
     Phase a chunk of variants
     """
@@ -174,8 +139,8 @@ def kdp_job_bam(chunk, bam, reference, buffer=100, sizemin=20, sizemax=50000, ma
     n_tries = 5
     while n_tries and comp_entries:
         start, end = get_bounds(comp_entries)
-        refseq = reference.fetch(chrom, start - buffer, end + buffer)
-        hap1, hap2 = kdp.bam_haps(bam, refseq, chrom, start, end, kmer, buffer, min_cos, sizemin, sizemax)
+        refseq = reference.fetch(chrom, start - params.chunksize, end + params.chunksize)
+        hap1, hap2 = kdp.bam_haps(bam, refseq, chrom, start, end, params)
         n_tries -= 1
         # Neither hap describes a variant, possibly due to bad boundaries from a giant variant
         # First attempt is to just remove the largest variant and then retry
@@ -184,6 +149,7 @@ def kdp_job_bam(chunk, bam, reference, buffer=100, sizemin=20, sizemax=50000, ma
         # within that span
         # Like, this whole approach we're currently using with letting the chunk window dictate the variants
         # isn't great. The reads should speak for themselves and then get placed onto the chunk
+        # I think I found it https://web.eecs.umich.edu/~dkoutra/papers/18-HashAlign-PAKDD.pdf
         if hap1.n == 0 and hap2.n == 0: 
             # Remove the largest comp_entry
             largest_idx = 0
@@ -202,7 +168,6 @@ def kdp_job_bam(chunk, bam, reference, buffer=100, sizemin=20, sizemax=50000, ma
         _.translate(header)
 
     chunk_id = str(chunk_id)
-    for entry in phase_region(comp_entries, hap1, hap2, phase_groups, chunk_id, kmer=kmer, min_cos=min_cos,
-                              min_size=min_size, sample=sample, max_paths=max_paths):
+    for entry in phase_region(comp_entries, hap1, hap2, params, chunk_id, sample):
         ret.append(entry)
     return ret

@@ -35,7 +35,6 @@ def seq_to_kmer(seq, kmer_len=6):
     return ret
 
 
-
 def var_to_kfeat(entry, kmer=3):
     """
     Make the kmer featurization of this variant

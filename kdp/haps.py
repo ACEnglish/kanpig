@@ -89,13 +89,27 @@ def vcf_haps(variants, kmer):
     return h1, h2
 
 
-def bam_haps(bam, refseq, chrom, reg_start, reg_end, kmer=4, buffer=100, cossim=0.95, sizemin=20, sizemax=50000):
+def bam_haps(bam, refseq, chrom, reg_start, reg_end, params):
     """
     Pileup a region and return same thing as vcf_haps
     """
     tot_cov = 0
+    # So, what if instead of a single Haplotype, we change the value to a graph.
+    # What if we make one graph here. And use reads to draw edges to each variants.
+    # We'll want to collapse identical (highly similar variants) so they don't make new nodes
+    # And at the end of each column, we then add to the read an edge to these new Haplotypes
+    # Once we've traversed the region, we'll have a graph with nodes being variants, edges being distances.
+    # the variants will have coverage information
+    # Then, we can try to replicate the LSH/binning to find matches between this graph and the next.
+    # And then we just have to work up/down to try zip up the Haps to the Phase
+    # Assuming we have matches between, we can also play with combining. So say we got an anchor, but
+    # the next variant doesn't match. We can take the smaller and make a temporary 'joined' node (adding them together)
+    # If that gets us closer to matching, then we replace the 'split' nodes with the temp node, preserving edges.
+    # Actually, no. I don't want to do that. No replacing nodes. But we can add to the single/double to the 'golden'
+    # paths
+    # 
     m_haps = {}
-    for column in bam.pileup(chrom, reg_start - buffer, reg_end + buffer, truncate=True):
+    for column in bam.pileup(chrom, reg_start - params.chunksize, reg_end + params.chunksize, truncate=True):
         tot_cov += column.n
         for read in column.pileups:
             # Guard against partial alignments which mess up the kfeat 
@@ -104,19 +118,19 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, kmer=4, buffer=100, cossim=
                 continue
 
             # Only consider things greater than 20bp
-            if not (sizemin <= abs(read.indel) <= sizemax):
+            if not (params.sizemin <= abs(read.indel) <= params.sizemax):
                 continue
 
             if (read.indel ^ 1) > 0:  # Insertion
                 seq = read.alignment.query_sequence[read.query_position:read.query_position + read.indel]
-                hap = kdp.Haplotype(kdp.seq_to_kmer(seq, kmer), read.indel, 1)
+                hap = kdp.Haplotype(kdp.seq_to_kmer(seq, params.kmer), read.indel, 1)
                 logging.debug('INS %d @ %d -> %s', len(seq), read.query_position, seq)
             else:  # Deletion
                 # Add 1 for the .. reason..
-                m_start = column.reference_pos - (reg_start - buffer) + 1
+                m_start = column.reference_pos - (reg_start - params.chunksize) + 1
                 m_end = m_start + abs(read.indel)
                 seq = refseq[m_start: m_end]
-                hap = kdp.Haplotype(-kdp.seq_to_kmer(seq, kmer), read.indel, 1)
+                hap = kdp.Haplotype(-kdp.seq_to_kmer(seq, params.kmer), read.indel, 1)
                 logging.debug('DEL %d @ %d -> %s', len(seq), column.reference_pos, seq)
 
             if read.alignment.query_name not in m_haps:
@@ -125,12 +139,12 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, kmer=4, buffer=100, cossim=
                 m_haps[read.alignment.query_name] += hap
 
     # Region coverage
-    coverage = int(tot_cov / (reg_end - reg_start + 2*buffer))
+    coverage = int(tot_cov / (reg_end - reg_start + (2 * params.chunksize)))
     logging.debug('coverage %d', coverage)
     # Nothing to compare
     # TODO: no coverage means we can't genotype it. Separate out these two conditions
     if coverage == 0 or len(m_haps) == 0:
-        ret = kdp.Haplotype.new(kmer, coverage)
+        ret = kdp.Haplotype.new(params.kmer, coverage)
         return ret, ret
 
     m_haps = hap_deduplicate(m_haps.values())
@@ -139,12 +153,12 @@ def bam_haps(bam, refseq, chrom, reg_start, reg_end, kmer=4, buffer=100, cossim=
     if len(m_haps) == 1: # one read can't be clustered, just return it
         hap2 = list(m_haps.values())[0]
         if (hap2.coverage / coverage) < REFTHRESHOLD:
-            hap1 = kdp.Haplotype.new(kmer, coverage)
+            hap1 = kdp.Haplotype.new(params.kmer, coverage)
         else:
             hap1 = hap2
         return hap1, hap2
 
-    hap1, hap2 = read_cluster(m_haps, kmer, coverage, cossim)
+    hap1, hap2 = read_cluster(m_haps, params.kmer, coverage, params.cossim, params.wcoslen)
     return hap1, hap2
 
 def hap_deduplicate(m_haps):
@@ -176,7 +190,7 @@ def consolidate_with_best(m_haps):
     return best
 
 @ignore_warnings(category=ConvergenceWarning)
-def read_cluster(all_ks, kmer, coverage, cossim):
+def read_cluster(all_ks, kmer, coverage, cossim, wcoslen):
     """
     if the number of variant reads is appx 0%:
         we expect reference homozygous
@@ -202,7 +216,7 @@ def read_cluster(all_ks, kmer, coverage, cossim):
     # REF & HET
     if n_grps == 1 and (alt_cov / coverage) < REFTHRESHOLD :
         logging.debug('ref_het')
-        hap1 = kdp.Haplotype(kdp.seq_to_kmer("", 4), 0, coverage - alt_cov)
+        hap1 = kdp.Haplotype(kdp.seq_to_kmer("", kmer), 0, coverage - alt_cov)
         hap2 = consolidate_with_best(all_ks.values())
         return hap1, hap2
 
@@ -223,10 +237,14 @@ def read_cluster(all_ks, kmer, coverage, cossim):
 
     # if the two haps are super similar, just combine them
     # and then double check the reference threshold
-    if kdp.cosinesim(hap1.kfeat, hap2.kfeat) >= cossim:
+    if abs(hap1.size) < wcoslen or abs(hap2.size) < wcoslen:
+        m_sim = kdp.weighted_cosinesim(hap1.kfeat, hap2.kfeat)
+    else:
+        m_sim = kdp.cosinesim(hap1.kfeat, hap2.kfeat)
+    if  m_sim >= cossim:
         hap2 = consolidate_with_best([hap1, hap2])
         if (alt_cov / coverage) < REFTHRESHOLD:
-            hap1 = kdp.Haplotype(kdp.seq_to_kmer("", 4), 0, coverage - alt_cov)
+            hap1 = kdp.Haplotype(kdp.seq_to_kmer("", kmer), 0, coverage - alt_cov)
         else:
             hap1 = hap2
         return hap1, hap2
