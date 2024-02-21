@@ -9,6 +9,23 @@ import truvari
 
 import kdp
 
+def unify_chromosomes(tree, bam_fn, ref_fn):
+    """
+    Remove regions from VCF tree that bam or reference don't hold
+    """
+    vcf_names = set(tree.keys())
+    bam = pysam.AlignmentFile(bam_fn)
+    bam_names = set(bam.references)
+    ref = pysam.FastaFile(ref_fn)
+    ref_names = set(ref.references)
+    bam_rm = vcf_names - bam_names
+    ref_rm = vcf_names - ref_names
+    if bam_rm or ref_rm:
+        logging.warning("VCF has %d references not in BAM and %d not in REF. Removing", len(bam_rm), len(ref_rm))
+        for i in bam_rm + ref_rm:
+            del(tree[i])
+    return tree
+            
 def main():
     io_params, kd_params = kdp.parse_args(sys.argv[1:])
     logging.info("Starting")
@@ -27,8 +44,8 @@ def main():
     if io_params.vcf is not None:
         region_tree = truvari.build_region_tree(base, comp, io_params.regions)
     else:
-        # Probably need to figure out how to check bam contigs
         region_tree = truvari.build_region_tree(comp, includebed=io_params.regions)
+        region_tree = unify_chromosomes(region_tree, io_params.bam, io_params.reference)
     truvari.merge_region_tree_overlaps(region_tree)
     comp_i = truvari.region_filter(comp, region_tree)
     if io_params.vcf is not None:
