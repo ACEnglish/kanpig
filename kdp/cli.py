@@ -36,8 +36,10 @@ def parse_args(args):
                         help="Minimum cosine similarity (%(default)s)")
     parser.add_argument("--pctsize", type=truvari.restricted_float, default=0.90,
                         help="Minimum size similarity between a path and haplotype (%(default)s)")
-    parser.add_argument("--wcoslen", type=truvari.restricted_int, default=500,
+    parser.add_argument("--wcoslen", type=truvari.restricted_int, default=2000,
                         help="Size threshold to switch to weighted cossim (%(default)s)")
+    parser.add_argument("--n_tries", type=truvari.restricted_int, default=5,
+                        help="Number of attempts to find variants (%(default)s)")
     parser.add_argument("--pg", action="store_true",
                         help="Allow multiple phase groups (don't use) (%(default)s)")
     parser.add_argument("--chunksize", type=truvari.restricted_int, default=100,
@@ -77,7 +79,8 @@ def parse_args(args):
                          args.cossim,
                          args.pctsize,
                          args.wcoslen,
-                         args.chunksize)
+                         args.chunksize,
+                         args.n_tries)
     return io_params, kd_params
 
 @dataclass
@@ -108,3 +111,4 @@ class KDParams():
     pctsize: float = 0.90
     wcoslen: int = 500
     chunksize: int = 100
+    n_tries: int = 5

@@ -8,20 +8,22 @@ import truvari
 import kdp
 
 @total_ordering
-@dataclass
+@dataclass(order=False)
 class PhasePath():
     """
     Holds the path/similarities
     """
-    cossim: float = 0
     sizesim: float = 0
+    cossim: float = 0
     path: list = field(default_factory=list)
 
     def __lt__(self, other):
         # if the size similarity is very close, then try to pick the more similar one
         # What I really need to be doing is trying to take into account the length of the path, as well
-        if abs(self.sizesim - other.sizesim) < 0.02:
-            return self.cossim < other.cossim
+        #if abs(self.sizesim - other.sizesim) < 0.005:
+            #return self.cossim < other.cossim
+        # This weighing is questionable
+        #return (self.sizesim / len(self.path)) < (other.sizesim / len(other.path))
         return self.sizesim < other.sizesim
 
     def __eq__(self, other):
@@ -107,8 +109,7 @@ def find_hap_paths(graph, hap, params):
         for node in path[1:]:
             m_k += graph.nodes[node]['kfeat']
 
-        #m_dist = kdp.cosinesim(m_k, hap_k)
-        if m_s < params.wcoslen:
+        if abs(m_s) < params.wcoslen:
             m_dist = kdp.weighted_cosinesim(m_k, hap.kfeat)
         else:
             m_dist = kdp.cosinesim(m_k, hap.kfeat)

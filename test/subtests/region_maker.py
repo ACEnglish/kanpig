@@ -64,11 +64,11 @@ if __name__ == '__main__':
     base_i = truvari.region_filter(base, region_tree)
     chunks = truvari.chunker(matcher, ('base', base_i))
 
-    out_files = {"iso": open("chr20.isolated_truth.bed", 'w'),
-                 "het_dis": open("chr20.hets.dissimilar.bed", 'w'),
-                 "het_sim": open("chr20.hets.similar.bed", 'w'),
-                 "split": open("chr20.split.bed", 'w'),
-                 "cpx": open("chr20.cpx.bed", 'w')}
+    out_files = {"iso": open("isolated_truth.bed", 'w'),
+                 "het_dis": open("hets.dissimilar.bed", 'w'),
+                 "het_sim": open("hets.similar.bed", 'w'),
+                 "split": open("split.bed", 'w'),
+                 "cpx": open("cpx.bed", 'w')}
 
     for c, _ in chunks:
         calls = c['base']
