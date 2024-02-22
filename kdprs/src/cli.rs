@@ -6,10 +6,10 @@ use clap::Parser;
 #[command(author = "ACEnglish", version)]
 pub struct ArgParser {
     #[command(flatten)]
-    io: IOParams,
+    pub io: IOParams,
 
     #[command(flatten)]
-    kd: KDParams,
+    pub kd: KDParams,
 }
 
 #[derive(clap::Args, Debug)]
