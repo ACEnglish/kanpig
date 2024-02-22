@@ -3,11 +3,10 @@ use indexmap::IndexMap;
 
 pub type ContigMap = IndexMap<Name, Map<Contig>>;
 // Now I need a bed parser
+use crate::bedparser::BedParser;
 
-
-pub fn build_region_tree(vcfA_contigs: &ContigMap, includebed: u8) -> IndexMap<String, Vec<(u64, u64)>> {
-
-    let mut ret = IndexMap::new(); // chrom : [[start, end]]
+pub fn build_region_tree(vcfA_contigs: &ContigMap, includebed: Option<std::path::PathBuf>) -> IndexMap<String, Vec<(u64, u64)>> {
+    let mut m_contigs = IndexMap::new();
     for (k, v) in vcfA_contigs {
         let name = k.to_string();
         let length = match v.length() {
@@ -17,8 +16,28 @@ pub fn build_region_tree(vcfA_contigs: &ContigMap, includebed: u8) -> IndexMap<S
                 std::process::exit(1);
             }
         };
-        ret.insert(name, [(0, length as u64)].to_vec());
+        m_contigs.insert(name, [(0, length as u64)].to_vec());
     }
 
+    if includebed.is_none() {
+        return m_contigs;
+    }
+
+    // Parse the Bed Lines and return them as the IndexMap.
+    let mut ret = IndexMap::new();
+    let mut m_parser = BedParser::new(&includebed.unwrap());
+    for (chrom, m_start, m_stop) in m_parser.parse().into_iter() {
+        if !m_contigs.contains_key(&chrom) {
+            continue;
+        }
+        if !ret.contains_key(&chrom) {
+            ret.insert(chrom.clone(), Vec::<(u64, u64)>::new());
+        }
+
+        if let Some(val) = ret.get_mut(&chrom) {
+            val.push((m_start, m_stop))
+        };
+    }
+    
     ret
 }

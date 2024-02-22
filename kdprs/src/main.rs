@@ -10,6 +10,7 @@ mod cli;
 mod kmer;
 mod chunker;
 mod regions;
+mod bedparser;
 mod similarity;
 mod comparisons;
 
@@ -62,6 +63,8 @@ fn main() {
     let input_header = input_vcf.read_header().expect("Unable to parse header");
     let mut m_contigs = input_header.contigs().clone();
     
+    let tree = build_region_tree(&m_contigs, args.io.regions);
+
     let mut base_vcf = match args.io.vcf {
         Some(i) => {
             let mut fh = vcf::reader::Builder::default().build_from_path(i).expect("Unable to parse vcf");
@@ -72,7 +75,9 @@ fn main() {
         None => None
     };
 
+    // I think I should abandon --vcf for this...
+    // It won't be used and trying to switch back and forth is a problem
+    // If I don't have --vcf then I won't have to make file_zipper
     // chrom: [start, end] for every region to parse
-    let tree = build_region_tree(&m_contigs, 1);
     println!("{:?}", tree);
 }
