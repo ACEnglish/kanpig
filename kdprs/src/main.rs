@@ -72,8 +72,7 @@ fn main() {
         None => None
     };
 
-    // Get all of its contigs, that's all we're parsing
-
-    // Validate that all of the
-    build_region_tree(&m_contigs, 1);
+    // chrom: [start, end] for every region to parse
+    let tree = build_region_tree(&m_contigs, 1);
+    println!("{:?}", tree);
 }
