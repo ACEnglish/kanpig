@@ -7,7 +7,9 @@ use clap::Parser;
 
 mod cli;
 mod kmer;
+mod chunker;
 mod similarity;
+mod comparisons;
 
 use crate::cli::ArgParser;
 use crate::kmer::seq_to_kmer;

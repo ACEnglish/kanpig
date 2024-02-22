@@ -30,10 +30,10 @@ impl FromStr for Svtype {
 }
 
 pub fn coords_within(
-    qstart: usize,
-    qend: usize,
-    rstart: usize,
-    rend: usize,
+    qstart: u64,
+    qend: u64,
+    rstart: u64,
+    rend: u64,
     end_within: bool,
 ) -> bool {
     let ending = if end_within {
@@ -44,9 +44,9 @@ pub fn coords_within(
     (qstart >= rstart) & ending
 }
 
-pub fn entry_boundaries(entry: &vcf::Record, ins_inflate: bool) -> (usize, usize) {
-    let mut start = usize::from(entry.position()) - 1;
-    let mut end = usize::from(entry.end().expect("No Variant End"));
+pub fn entry_boundaries(entry: &vcf::Record, ins_inflate: bool) -> (u64, u64) {
+    let mut start: u64 = u64::try_from(usize::from(entry.position())).unwrap() - 1;
+    let mut end: u64 = u64::try_from(usize::from(entry.end().expect("No Variant End"))).unwrap();
     if ins_inflate & (entry_variant_type(entry) == Svtype::Ins) {
         let size = entry_size(entry);
         start -= size / 2;
@@ -55,23 +55,23 @@ pub fn entry_boundaries(entry: &vcf::Record, ins_inflate: bool) -> (usize, usize
     (start, end)
 }
 
-pub fn entry_size(entry: &vcf::Record) -> usize {
+pub fn entry_size(entry: &vcf::Record) -> u64 {
     let svlen = entry
         .info()
         .get(&field::Key::from_str("SVLEN").expect("No SVLEN INFO"));
     if let Some(Some(field::Value::Integer(svlen))) = svlen {
-        return svlen.unsigned_abs() as usize;
+        return svlen.unsigned_abs() as u64;
     } else if let Some(Some(field::Value::Array(field::value::Array::Integer(svlen)))) = svlen {
-        return svlen[0].expect("Bad SVLEN").unsigned_abs() as usize;
+        return svlen[0].expect("Bad SVLEN").unsigned_abs() as u64;
     }
 
-    let r_len = entry.reference_bases().len();
-    let a_len = match entry.alternate_bases().first() {
-        Some(allele::Allele::Bases(alt)) => alt.len(),
+    let r_len: u64 = entry.reference_bases().len() as u64;
+    let a_len: u64 = match entry.alternate_bases().first() {
+        Some(allele::Allele::Bases(alt)) => alt.len() as u64,
         Some(allele::Allele::Symbol(_alt)) => {
             let (start, end) = entry_boundaries(entry, false);
-            start.abs_diff(end) + 1 // I don't understand why I have to add 1 to match the
-                                    // python code.
+            (start.abs_diff(end) + 1) as u64
+                                    
         }
         _ => 0,
     };
@@ -80,33 +80,31 @@ pub fn entry_size(entry: &vcf::Record) -> usize {
         if r_len == 1 {
             return 0;
         } else {
-            return r_len;
+            return r_len as u64;
         }
     }
 
-    r_len.abs_diff(a_len)
+    r_len.abs_diff(a_len) as u64
 }
 
 
-pub fn sizesim(size_a: usize, size_b: usize) -> (f32, isize) {
+pub fn sizesim(size_a: usize, size_b: usize) -> f32 {
     if ((size_a == 0) || (size_b == 0)) && size_a == size_b {
-        return (1.0, 0);
+        return 1.0;
     }
-    let pct = std::cmp::max(std::cmp::min(size_a, size_b), 1) as f32
-        / std::cmp::max(std::cmp::max(size_a, size_b), 1) as f32;
-    let diff = size_a as isize - size_b as isize;
-    (pct, diff)
+    std::cmp::max(std::cmp::min(size_a, size_b), 1) as f32
+        / std::cmp::max(std::cmp::max(size_a, size_b), 1) as f32
 }
 
 
-pub fn entry_within(entry: &vcf::Record, rstart: usize, rend: usize) -> bool {
+pub fn entry_within(entry: &vcf::Record, rstart: u64, rend: u64) -> bool {
     let (qstart, qend) = entry_boundaries(entry, false);
     let end_within = entry_variant_type(entry) != Svtype::Ins;
     coords_within(qstart, qend, rstart, rend, end_within)
 }
 
 
-pub fn overlaps(s1: usize, e1: usize, s2: usize, e2: usize) -> bool {
+pub fn overlaps(s1: u64, e1: u64, s2: u64, e2: u64) -> bool {
     std::cmp::max(s1, s2) < std::cmp::min(e1, e2)
 }
 
@@ -115,6 +113,39 @@ pub fn entry_is_filtered(entry: &vcf::Record) -> bool {
     match entry.filters() {
         Some(map) => *map != Filters::Pass,
         None => false,
+    }
+}
+
+pub fn entry_variant_type(entry: &vcf::Record) -> Svtype {
+    match entry
+        .info()
+        .get(&field::Key::from_str("SVTYPE").expect("Unable to make key"))
+    {
+        // INFO/SVTYPE
+        Some(Some(field::Value::String(svtype))) => svtype.parse().expect("Bad SVTYPE"),
+        Some(Some(field::Value::Array(field::value::Array::String(svtype)))) => {
+            svtype[0].clone().expect("Bad SVTYPE").parse().unwrap()
+        }
+        // Direct from REF/ALT
+        _ => match entry.alternate_bases().first() {
+            Some(allele::Allele::Bases(alt)) => {
+                let asz = alt.len();
+                let rsz = entry.reference_bases().len();
+                if asz > rsz {
+                    Svtype::Ins
+                } else if asz < rsz {
+                    Svtype::Del
+                } else if asz == 1 {
+                    Svtype::Snp
+                } else {
+                    Svtype::Unk
+                }
+            }
+            Some(allele::Allele::Symbol(alt)) => {
+                Svtype::from_str(&alt.to_string()).expect("Bad Symbolic Alt")
+            }
+            _ => Svtype::Unk,
+        },
     }
 }
 
