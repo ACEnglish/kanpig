@@ -32,5 +32,4 @@ fn main() {
     println!("{:?}", cosinesim(&a, &b)); // 0.8952744
     println!("{:?}", weighted_cosinesim(&a, &b)); // 0.8952744
     println!("{:?}", args);
-
 }
