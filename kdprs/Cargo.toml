@@ -9,3 +9,4 @@ edition = "2021"
 clap = { version = "4.0", features = ["derive"] }
 pretty_env_logger = { version = "0.4.0" }
 log = { version = "0.4", features = ["std", "serde"] }
+simsimd = "3.8.0"

@@ -71,6 +71,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc"
+version = "1.0.86"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f9fa1897e4325be0d68d48df6aa1a71ac2ed4d27723887e7754192705350730"
+
+[[package]]
 name = "clap"
 version = "4.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -160,6 +166,7 @@ dependencies = [
  "clap",
  "log",
  "pretty_env_logger",
+ "simsimd",
 ]
 
 [[package]]
@@ -264,6 +271,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "simsimd"
+version = "3.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdb478b1bf2945bc29c68236f447451dd499075533b98e3a1395d6b28779ce6b"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
