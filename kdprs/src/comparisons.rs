@@ -29,13 +29,7 @@ impl FromStr for Svtype {
     }
 }
 
-pub fn coords_within(
-    qstart: u64,
-    qend: u64,
-    rstart: u64,
-    rend: u64,
-    end_within: bool,
-) -> bool {
+pub fn coords_within(qstart: u64, qend: u64, rstart: u64, rend: u64, end_within: bool) -> bool {
     let ending = if end_within {
         qend <= rend
     } else {
@@ -71,7 +65,6 @@ pub fn entry_size(entry: &vcf::Record) -> u64 {
         Some(allele::Allele::Symbol(_alt)) => {
             let (start, end) = entry_boundaries(entry, false);
             (start.abs_diff(end) + 1) as u64
-                                    
         }
         _ => 0,
     };
@@ -87,7 +80,6 @@ pub fn entry_size(entry: &vcf::Record) -> u64 {
     r_len.abs_diff(a_len) as u64
 }
 
-
 pub fn sizesim(size_a: usize, size_b: usize) -> f32 {
     if ((size_a == 0) || (size_b == 0)) && size_a == size_b {
         return 1.0;
@@ -96,13 +88,11 @@ pub fn sizesim(size_a: usize, size_b: usize) -> f32 {
         / std::cmp::max(std::cmp::max(size_a, size_b), 1) as f32
 }
 
-
 pub fn entry_within(entry: &vcf::Record, rstart: u64, rend: u64) -> bool {
     let (qstart, qend) = entry_boundaries(entry, false);
     let end_within = entry_variant_type(entry) != Svtype::Ins;
     coords_within(qstart, qend, rstart, rend, end_within)
 }
-
 
 pub fn overlaps(s1: u64, e1: u64, s2: u64, e2: u64) -> bool {
     std::cmp::max(s1, s2) < std::cmp::min(e1, e2)

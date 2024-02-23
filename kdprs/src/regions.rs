@@ -1,11 +1,14 @@
-use noodles_vcf::header::record::value::{map::Contig, Map, map::contig::Name};
 use indexmap::IndexMap;
+use noodles_vcf::header::record::value::{map::contig::Name, map::Contig, Map};
 
 pub type ContigMap = IndexMap<Name, Map<Contig>>;
-// Now I need a bed parser
+pub type Regions = IndexMap<String, Vec<(u64, u64)>>;
 use crate::bedparser::BedParser;
 
-pub fn build_region_tree(vcfA_contigs: &ContigMap, includebed: Option<std::path::PathBuf>) -> IndexMap<String, Vec<(u64, u64)>> {
+pub fn build_region_tree(
+    vcfA_contigs: &ContigMap,
+    includebed: Option<std::path::PathBuf>,
+) -> Regions {
     let mut m_contigs = IndexMap::new();
     for (k, v) in vcfA_contigs {
         let name = k.to_string();
@@ -13,7 +16,6 @@ pub fn build_region_tree(vcfA_contigs: &ContigMap, includebed: Option<std::path:
             Some(l) => l,
             None => {
                 panic!("--vcf contig header missing length");
-                std::process::exit(1);
             }
         };
         m_contigs.insert(name, [(0, length as u64)].to_vec());
@@ -38,6 +40,6 @@ pub fn build_region_tree(vcfA_contigs: &ContigMap, includebed: Option<std::path:
             val.push((m_start, m_stop))
         };
     }
-    
+
     ret
 }

@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import networkx as nx
 from functools import total_ordering
@@ -79,7 +80,18 @@ def get_best_path(paths, params, exclude=None):
             return path
     return PhasePath()
 
-import logging
+def find_hap_paths_align(graph, hap, params):
+    """
+    Alignment based path finding
+    Returns a list of PhasePaths (actually should just return 1 - the best)
+    1. build a matrix that has the similarity of every node against every hap
+    2. Every one that matches above the threshold we keep
+    3. Every doubly used hap need to pick a single best
+    4. We then need to start at the snk and go to the first match.
+    5. if the 
+    """
+    pass
+
 def find_hap_paths(graph, hap, params):
     """
     This will return the paths and we'll let phase_region do the editing/deciding

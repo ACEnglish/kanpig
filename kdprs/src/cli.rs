@@ -36,7 +36,7 @@ pub struct IOParams {
     pub sample: Option<String>,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Clone)]
 pub struct KDParams {
     #[arg(long, default_value_t = 4)]
     pub kmer: u8,
@@ -45,10 +45,10 @@ pub struct KDParams {
     pub passonly: bool,
 
     #[arg(long, default_value_t = 20)]
-    pub sizemin: usize,
+    pub sizemin: u64,
 
     #[arg(long, default_value_t = 50000)]
-    pub sizemax: usize,
+    pub sizemax: u64,
 
     #[arg(long, default_value_t = 1000)]
     pub maxpaths: usize,
