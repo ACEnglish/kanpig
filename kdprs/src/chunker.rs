@@ -52,26 +52,13 @@ impl<R: BufRead> Iterator for VCFIter<R> {
                 _ => continue,
             }
         }
-
-        /*while !filter_entry(&entry, &self.kd_params) {
-            match self.m_vcf.read_record(&self.m_header, &mut entry) {
-                Ok(0) => return None,
-                Err(_) => return None,
-                Ok(_) => (),
-            }
-        }
-        Some(entry)*/
     }
 }
 /*
- * build_region_tree
- * merge_region_tree_overlaps
- * filter (region, size, pass, resolved) on each file
- *
  * file_zipper to put them together
  * chunker to make the units for parsing
  * so chunk/zip can be one.. except that sometimes its 1 vcf and sometimes 2. So we want to keep
- * them separate
+ * them separate.. except if I don't do double VCF, then I don't need both
  *
  * regions = build_region_tree
  * file1 = filter(vcf, filter settings, regions)

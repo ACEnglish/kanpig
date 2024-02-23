@@ -6,11 +6,11 @@ pub type Regions = IndexMap<String, Vec<(u64, u64)>>;
 use crate::bedparser::BedParser;
 
 pub fn build_region_tree(
-    vcfA_contigs: &ContigMap,
+    vcf_contigs: &ContigMap,
     includebed: Option<std::path::PathBuf>,
 ) -> Regions {
     let mut m_contigs = IndexMap::new();
-    for (k, v) in vcfA_contigs {
+    for (k, v) in vcf_contigs {
         let name = k.to_string();
         let length = match v.length() {
             Some(l) => l,

@@ -29,7 +29,7 @@ fn check_vcf_contigs(keep: &mut ContigMap, reduce: &ContigMap) {
             removed.push(i.clone());
         }
     }
-    if removed.len() != 0 {
+    if !removed.is_empty() {
         warn!(
             "{} --input contigs do not have a --vcf contig. Removing",
             removed.len()
@@ -82,7 +82,9 @@ fn main() {
     };
     
     let mut m_input = chunker::VCFIter::new(input_vcf, input_header, tree, args.kd.clone());
+    let mut cnt = 0;
     for entry in &mut m_input {
-        println!("{:?}", entry);
+        cnt += 1;
     }
+    println!("parsed {} entries", cnt);
 }

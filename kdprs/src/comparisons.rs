@@ -64,7 +64,7 @@ pub fn entry_size(entry: &vcf::Record) -> u64 {
         Some(allele::Allele::Bases(alt)) => alt.len() as u64,
         Some(allele::Allele::Symbol(_alt)) => {
             let (start, end) = entry_boundaries(entry, false);
-            (start.abs_diff(end) + 1) as u64
+            start.abs_diff(end) + 1
         }
         _ => 0,
     };
@@ -73,7 +73,7 @@ pub fn entry_size(entry: &vcf::Record) -> u64 {
         if r_len == 1 {
             return 0;
         } else {
-            return r_len as u64;
+            return r_len;
         }
     }
 
