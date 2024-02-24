@@ -57,7 +57,8 @@ fn main() {
     let m_contigs = input_header.contigs().clone();
 
     let tree = build_region_tree(&m_contigs, args.io.bed);
-    // info!("loaded {} regions over {} contigs", );
+
+    //let guard = pprof::ProfilerGuardBuilder::default().frequency(1000).blocklist(&["libc", "libgcc", "pthread", "vdso"]).build().unwrap();
     let mut m_input = VcfChunker::new(input_vcf, input_header, tree, args.kd.clone());
     let mut cnt = 0;
     for chunk in &mut m_input {
@@ -67,6 +68,7 @@ fn main() {
             //println!("{} {}", i.chromosome(), i.position());
         //}
     }
+    //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };
     println!("parsed {} entries", cnt);
     info!("finished kdp");
 }
