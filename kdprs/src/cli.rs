@@ -26,10 +26,10 @@ pub struct IOParams {
     #[arg(short, long)]
     pub out: std::path::PathBuf,
 
-    #[arg(short, long)]
-    pub regions: Option<std::path::PathBuf>,
+    #[arg(long)]
+    pub bed: Option<std::path::PathBuf>,
 
-    #[arg(short, long)]
+    #[arg(long)]
     pub sample: Option<String>,
 }
 
