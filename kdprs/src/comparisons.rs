@@ -29,6 +29,7 @@ impl FromStr for Svtype {
     }
 }
 
+/// start and end positions of an entry
 pub fn entry_boundaries(entry: &vcf::Record, ins_inflate: bool) -> (u64, u64) {
     let mut start: u64 = u64::try_from(usize::from(entry.position())).unwrap() - 1;
     let mut end: u64 = u64::try_from(usize::from(entry.end().expect("No Variant End"))).unwrap();
@@ -40,6 +41,7 @@ pub fn entry_boundaries(entry: &vcf::Record, ins_inflate: bool) -> (u64, u64) {
     (start, end)
 }
 
+/// grab entry's length from either SVLEN field or infer it from the REF ALT fields
 pub fn entry_size(entry: &vcf::Record) -> u64 {
     let svlen = entry
         .info()
@@ -71,7 +73,9 @@ pub fn entry_size(entry: &vcf::Record) -> u64 {
     r_len.abs_diff(a_len) as u64
 }
 
-pub fn sizesim(size_a: usize, size_b: usize) -> f32 {
+/// size similarity of two variant sizes
+/// sizes must be positive
+pub fn sizesim(size_a: u64, size_b: u64) -> f32 {
     if ((size_a == 0) || (size_b == 0)) && size_a == size_b {
         return 1.0;
     }
@@ -79,18 +83,20 @@ pub fn sizesim(size_a: usize, size_b: usize) -> f32 {
         / std::cmp::max(std::cmp::max(size_a, size_b), 1) as f32
 }
 
+/// do two intervals overlap
 pub fn overlaps(s1: u64, e1: u64, s2: u64, e2: u64) -> bool {
     std::cmp::max(s1, s2) < std::cmp::min(e1, e2)
 }
 
+/// checks if an entry's FILTER is '.' or PASS, true if it is filtered
 pub fn entry_is_filtered(entry: &vcf::Record) -> bool {
-    // Filter is None or PASS not in filter
     match entry.filters() {
         Some(map) => *map != Filters::Pass,
         None => false,
     }
 }
 
+/// return the Svtype of a vcf entry
 pub fn entry_variant_type(entry: &vcf::Record) -> Svtype {
     match entry
         .info()

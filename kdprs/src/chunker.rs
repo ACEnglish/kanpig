@@ -7,6 +7,8 @@ use crate::cli::KDParams;
 use crate::comparisons;
 use crate::regions::Regions;
 
+/// Takes a vcf and filtering parameters to create in iterable which will
+/// return chunks of variants in the same neighborhood
 pub struct VcfChunker<R: BufRead> {
     pub m_vcf: vcf::reader::Reader<R>,
     pub m_header: vcf::Header,
@@ -43,6 +45,8 @@ impl<R: BufRead> VcfChunker<R> {
         }
     }
 
+    /// Checks if entry passes all parameter conditions including
+    /// within --bed regions, passing, and within expected size
     fn filter_entry(&mut self, entry: &vcf::Record) -> bool {
         // Is it inside a region
         let mut default = VecDeque::new();
@@ -86,6 +90,7 @@ impl<R: BufRead> VcfChunker<R> {
         true
     }
 
+    /// Return the next vcf entry which passes parameter conditions
     fn get_next_entry(&mut self) -> Option<vcf::Record> {
         let mut entry = vcf::Record::default();
 
@@ -101,7 +106,9 @@ impl<R: BufRead> VcfChunker<R> {
             }
         }
     }
-
+    
+    /// Checks if this variant is within params.chunksize distance of last
+    /// seen variant in this chunk
     fn entry_in_chunk(&mut self, entry: &vcf::Record) -> bool {
         let check_chrom = entry.chromosome().to_string();
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;

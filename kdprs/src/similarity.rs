@@ -6,6 +6,8 @@ pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Weighted cosine similarity
+/// Cosine similarity seems to be influenced by large outlier values. By weighing by frequency, 
+/// long sequences' cosine similarity behaves more consistently with small sequences
 pub fn weighted_cosinesim(a: &[f32], b: &[f32]) -> f32 {
     let cos: f32 = cosinesim(a, b);
     let dist: f32 = (1.0 / a.len() as f32)

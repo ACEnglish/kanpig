@@ -4,6 +4,7 @@ use itertools::Itertools;
 use noodles_vcf::{self as vcf};
 use petgraph::graph::{DiGraph, NodeIndex};
 
+/// Every --input variant is placed inside a node is turned into a graph.
 #[derive(Debug)]
 pub struct VarNode {
     name: String,
@@ -16,7 +17,7 @@ pub struct VarNode {
 
 impl VarNode {
     pub fn new(entry: vcf::Record, kmer: u8) -> Self {
-        let name = "".to_string(); // Want to make a hash for these names, I think. For debugging.
+        let name = "".to_string(); // Want to make a hash for these names for debugging, I think.
         let (start, end) = entry_boundaries(&entry, false);
         let (kfeat, size) = var_to_kfeat(&entry, kmer);
         Self {
@@ -28,7 +29,8 @@ impl VarNode {
             entry: Some(entry),
         }
     }
-
+    
+    /// For the 'src' and 'snk' nodes, just need the name
     pub fn new_anchor(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -41,6 +43,11 @@ impl VarNode {
     }
 }
 
+/// Build a graph of all variants in a chunk.
+/// Assumes variants are ordered by position (small to large)
+/// Variants will have edges to every downstream variant that it does not overlap
+/// The graph has an upstream 'src' node that point to every variant node
+/// The graph has a dnstream 'snk' node that is pointed to by every variant node and 'src'
 pub fn vars_to_graph(
     mut variants: Vec<vcf::Record>,
     kmer: u8,

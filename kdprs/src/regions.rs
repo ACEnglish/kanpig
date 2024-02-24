@@ -7,6 +7,9 @@ pub type ContigMap = IndexMap<Name, Map<Contig>>;
 pub type Regions = HashMap<String, VecDeque<(u64, u64)>>;
 use crate::bedparser::BedParser;
 
+/// create a HashMap with keys of chromsome names and 
+/// values a list of start, end positions with regions
+/// which should be ananlyzed
 pub fn build_region_tree(
     vcf_contigs: &ContigMap,
     includebed: Option<std::path::PathBuf>,
