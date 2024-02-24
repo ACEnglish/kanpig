@@ -19,6 +19,8 @@ pub struct VcfChunker<R: BufRead> {
     // fits in the current chunk. We need to hold on to it for the
     // next chunk
     hold_entry: Option<vcf::Record>,
+    chunk_count: u64,
+    call_count: u64,
 }
 
 impl<R: BufRead> VcfChunker<R> {
@@ -36,6 +38,8 @@ impl<R: BufRead> VcfChunker<R> {
             cur_chrom: String::new(),
             cur_end: 0,
             hold_entry: None,
+            chunk_count: 0,
+            call_count: 0,
         }
     }
 
@@ -77,6 +81,8 @@ impl<R: BufRead> VcfChunker<R> {
             return false;
         }
 
+        // Need to make sure its sequence resolved
+        // We'll make an exception for <DEL> in the future? (ref fetch, though..)
         true
     }
 
@@ -117,17 +123,24 @@ impl<R: BufRead> Iterator for VcfChunker<R> {
         let mut ret = self.hold_entry.take().into_iter().collect::<Vec<_>>();
 
         while let Some(entry) = self.get_next_entry() {
+            self.call_count += 1;
             if self.entry_in_chunk(&entry) {
                 ret.push(entry);
             } else {
                 self.hold_entry = Some(entry);
+                self.chunk_count += 1;
                 return Some(ret);
             }
         }
 
         if !ret.is_empty() {
+            self.chunk_count += 1;
             Some(ret)
         } else {
+            info!(
+                "{} chunks of {} variants",
+                self.chunk_count, self.call_count
+            );
             None
         }
     }
