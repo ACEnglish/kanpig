@@ -123,33 +123,3 @@ pub fn entry_variant_type(entry: &vcf::Record) -> Svtype {
         },
     }
 }
-
-// keep? Maybe use this instead of cosine..?
-/*
-pub fn seqsim(seq_a: &String, seq_b: &String) -> f32 {
-    let align_res = edlibAlignRs(
-        seq_a.as_bytes(),
-        seq_b.as_bytes(),
-        &EdlibAlignConfigRs::default(),
-    );
-    let totlen: f32 = (seq_a.len() + seq_b.len()) as f32;
-    (totlen - align_res.editDistance as f32) / totlen
-}
-
-// keep? Maybe use this instead of cosine.. ?
-pub fn unroll_compare(a_seq: &String, b_seq: &String, p: usize, up: bool) -> f32 {
-    let b_len = b_seq.len();
-    let f = p % b_len;
-    let position = b_len - f; // I'm worried about signs here
-    if position >= b_len {
-        return 0.0; // should never be called unless Symbolic alts are present, in which case we
-                    // can't compare
-    }
-    // If up, a_seq is upstream of b_seq
-    let rolled = match up {
-        true => format!("{}{}", &b_seq[position..], &b_seq[..position]),
-        false => format!("{}{}", &b_seq[..position], &b_seq[position..]),
-    };
-    seqsim(a_seq, &rolled)
-}
-*/
