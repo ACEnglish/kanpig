@@ -19,6 +19,7 @@ use crate::cli::ArgParser;
 use crate::kmer::seq_to_kmer;
 use crate::regions::{build_region_tree, ContigMap};
 use crate::similarity::{cosinesim, weighted_cosinesim};
+use std::path::PathBuf;
 
 /// Remove contigs from keep that aren't in reduce
 /// Works in-place
@@ -52,15 +53,6 @@ fn main() {
         std::process::exit(1);
     }
 
-    let a = seq_to_kmer("ACATACAATACAACATACATACCATGGACACAGTA".into(), 3);
-    let b = seq_to_kmer("ACATAGAATTAGACATACATACCATGGACACAGTA".into(), 3);
-    println!("{:?}", a);
-    println!("{:?}", b);
-    println!("{:?}", cosinesim(&a, &b)); // 0.8952744
-    println!("{:?}", weighted_cosinesim(&a, &b)); // 0.8952744
-    println!("{:?}", args);
-
-    // Must be an input
     let mut input_vcf = vcf::reader::Builder::default()
         .build_from_path(args.io.input)
         .expect("Unable to parse vcf");
@@ -69,18 +61,6 @@ fn main() {
 
     let tree = build_region_tree(&m_contigs, args.io.regions);
 
-    let mut base_vcf = match args.io.vcf {
-        Some(i) => {
-            let mut fh = vcf::reader::Builder::default()
-                .build_from_path(i)
-                .expect("Unable to parse vcf");
-            let header = fh.read_header().expect("Unable to parse header");
-            check_vcf_contigs(&mut m_contigs, header.contigs());
-            Some(fh)
-        }
-        None => None,
-    };
-    
     let mut m_input = chunker::VCFIter::new(input_vcf, input_header, tree, args.kd.clone());
     let mut cnt = 0;
     for entry in &mut m_input {

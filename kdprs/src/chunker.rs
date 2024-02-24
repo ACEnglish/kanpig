@@ -13,12 +13,17 @@ pub fn filter_entry(entry: &vcf::Record, params: &KDParams) -> bool {
     if params.sizemin > size || params.sizemax < size {
         return false;
     }
+
+    // Need to check the variant is inside our regions, too.
+    // If it is before, just false
+    // If it is inside, great
+    // If it start is after the current I need to pop_front and try again.
     true
 }
 
 pub struct VCFIter<R: BufRead> {
-    m_vcf: vcf::reader::Reader<R>,
-    m_header: vcf::Header,
+    pub m_vcf: vcf::reader::Reader<R>,
+    pub m_header: vcf::Header,
     regions: Regions,
     kd_params: KDParams,
 }

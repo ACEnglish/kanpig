@@ -17,14 +17,11 @@ pub struct IOParams {
     #[arg(short, long)]
     pub input: std::path::PathBuf,
 
-    #[arg(long)]
-    pub vcf: Option<std::path::PathBuf>,
-
-    #[arg(long)]
-    pub bam: Option<std::path::PathBuf>,
+    #[arg(short, long)]
+    pub bam: std::path::PathBuf,
 
     #[arg(short = 'f', long)]
-    pub reference: Option<std::path::PathBuf>,
+    pub reference: std::path::PathBuf,
 
     #[arg(short, long)]
     pub out: std::path::PathBuf,
@@ -74,13 +71,18 @@ impl ArgParser {
     pub fn validate(&self) -> bool {
         let mut is_ok = true;
 
-        if self.io.bam.is_some() == self.io.vcf.is_some() {
-            error!("One of --vcf xor --bam must be provided");
+        if !self.io.input.exists() {
+            error!("--input does not exist");
             is_ok = false;
         }
 
-        if self.io.bam.is_some() && self.io.reference.is_none() {
-            error!("--bam requires --reference");
+        if !self.io.bam.exists() {
+            error!("--bam does not exist");
+            is_ok = false;
+        }
+
+        if !self.io.reference.exists() {
+            error!("--reference does not exist");
             is_ok = false;
         }
 
