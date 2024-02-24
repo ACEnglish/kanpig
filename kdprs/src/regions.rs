@@ -1,22 +1,26 @@
-use noodles_vcf::header::record::value::{map::Contig, Map, map::contig::Name};
+use std::collections::VecDeque;
+
 use indexmap::IndexMap;
+use noodles_vcf::header::record::value::{map::contig::Name, map::Contig, Map};
 
 pub type ContigMap = IndexMap<Name, Map<Contig>>;
-// Now I need a bed parser
+pub type Regions = IndexMap<String, VecDeque<(u64, u64)>>;
 use crate::bedparser::BedParser;
 
-pub fn build_region_tree(vcfA_contigs: &ContigMap, includebed: Option<std::path::PathBuf>) -> IndexMap<String, Vec<(u64, u64)>> {
+pub fn build_region_tree(
+    vcf_contigs: &ContigMap,
+    includebed: Option<std::path::PathBuf>,
+) -> Regions {
     let mut m_contigs = IndexMap::new();
-    for (k, v) in vcfA_contigs {
+    for (k, v) in vcf_contigs {
         let name = k.to_string();
         let length = match v.length() {
             Some(l) => l,
             None => {
                 panic!("--vcf contig header missing length");
-                std::process::exit(1);
             }
         };
-        m_contigs.insert(name, [(0, length as u64)].to_vec());
+        m_contigs.insert(name, VecDeque::from([(0, length as u64)]));
     }
 
     if includebed.is_none() {
@@ -26,18 +30,39 @@ pub fn build_region_tree(vcfA_contigs: &ContigMap, includebed: Option<std::path:
     // Parse the Bed Lines and return them as the IndexMap.
     let mut ret = IndexMap::new();
     let mut m_parser = BedParser::new(&includebed.unwrap());
-    for (chrom, m_start, m_stop) in m_parser.parse().into_iter() {
-        if !m_contigs.contains_key(&chrom) {
-            continue;
-        }
-        if !ret.contains_key(&chrom) {
-            ret.insert(chrom.clone(), Vec::<(u64, u64)>::new());
+    let mut prev_chrom = String::new();
+    let mut prev_start: u64 = 0;
+
+    for (chrom, m_start, m_stop) in m_parser
+        .parse()
+        .into_iter()
+        .filter(|(chrom, _, _)| m_contigs.contains_key(chrom))
+    {
+        if chrom != prev_chrom {
+            prev_chrom = chrom.clone();
+            prev_start = 0;
         }
 
-        if let Some(val) = ret.get_mut(&chrom) {
-            val.push((m_start, m_stop))
-        };
+        if m_stop <= m_start {
+            error!(
+                "malformed bed line: stop <= start @ {}:{}-{}",
+                chrom, m_start, m_stop
+            );
+            std::process::exit(1);
+        }
+
+        if m_start < prev_start {
+            error!(
+                "bed file unordered `sort -k3n -k1,2n` @ {}:{}-{}",
+                chrom, m_start, m_stop
+            );
+            std::process::exit(1);
+        }
+
+        ret.entry(chrom)
+            .or_insert_with(VecDeque::new)
+            .push_back((m_start, m_stop));
     }
-    
+
     ret
 }

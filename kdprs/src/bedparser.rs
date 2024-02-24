@@ -14,7 +14,7 @@ where
 
 pub struct BedParser {
     /* Read tab delimited bed files while ensuring entries have start < end.
-    It also ensures entries are sorted .. except in the case of chrA to chrB 
+    It also ensures entries are sorted .. except in the case of chrA to chrB
     back to chrA*/
     file: std::path::PathBuf,
     prev_chrom: String,

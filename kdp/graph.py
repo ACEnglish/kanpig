@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import networkx as nx
 from functools import total_ordering
@@ -79,7 +80,6 @@ def get_best_path(paths, params, exclude=None):
             return path
     return PhasePath()
 
-import logging
 def find_hap_paths(graph, hap, params):
     """
     This will return the paths and we'll let phase_region do the editing/deciding

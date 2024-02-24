@@ -17,14 +17,11 @@ pub struct IOParams {
     #[arg(short, long)]
     pub input: std::path::PathBuf,
 
-    #[arg(long)]
-    pub vcf: Option<std::path::PathBuf>,
-
-    #[arg(long)]
-    pub bam: Option<std::path::PathBuf>,
+    #[arg(short, long)]
+    pub bam: std::path::PathBuf,
 
     #[arg(short = 'f', long)]
-    pub reference: Option<std::path::PathBuf>,
+    pub reference: std::path::PathBuf,
 
     #[arg(short, long)]
     pub out: std::path::PathBuf,
@@ -36,7 +33,7 @@ pub struct IOParams {
     pub sample: Option<String>,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Clone)]
 pub struct KDParams {
     #[arg(long, default_value_t = 4)]
     pub kmer: u8,
@@ -45,10 +42,10 @@ pub struct KDParams {
     pub passonly: bool,
 
     #[arg(long, default_value_t = 20)]
-    pub sizemin: usize,
+    pub sizemin: u64,
 
     #[arg(long, default_value_t = 50000)]
-    pub sizemax: usize,
+    pub sizemax: u64,
 
     #[arg(long, default_value_t = 1000)]
     pub maxpaths: usize,
@@ -74,13 +71,18 @@ impl ArgParser {
     pub fn validate(&self) -> bool {
         let mut is_ok = true;
 
-        if self.io.bam.is_some() == self.io.vcf.is_some() {
-            error!("One of --vcf xor --bam must be provided");
+        if !self.io.input.exists() {
+            error!("--input does not exist");
             is_ok = false;
         }
 
-        if self.io.bam.is_some() && self.io.reference.is_none() {
-            error!("--bam requires --reference");
+        if !self.io.bam.exists() {
+            error!("--bam does not exist");
+            is_ok = false;
+        }
+
+        if !self.io.reference.exists() {
+            error!("--reference does not exist");
             is_ok = false;
         }
 

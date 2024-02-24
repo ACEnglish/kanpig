@@ -46,8 +46,8 @@ class Haplotype():
         """
         Turn variant record into a kfeat
         """
-        alt = kdp.seq_to_kmer(entry.alts[0], kmer)
-        ref = kdp.seq_to_kmer(entry.ref, kmer)
+        alt = kdp.seq_to_kmer(entry.alts[0][1:], kmer)
+        ref = kdp.seq_to_kmer(entry.ref[1:], kmer)
         szdiff = len(entry.alts[0]) - len(entry.ref)
         return Haplotype(alt - ref, szdiff, 1)
 
@@ -79,14 +79,14 @@ def vcf_haps(variants, kmer):
     """
     Parse a set of phased variants and return the two Haplotypes
     """
-    h1 = Haplotype.new(kmer)
-    h2 = Haplotype.new(kmer)
+    h1 = []
+    h2 = []
     for entry in variants:
         m_hap = Haplotype.from_vcf(entry, kmer)
         if entry.samples[0]['GT'][0] == 1:
-            h1 += m_hap
+            h1.append(m_hap)
         if len(entry.samples[0]['GT']) > 1 and entry.samples[0]['GT'][1] == 1:
-            h2 += m_hap
+            h2.append(m_hap)
     return h1, h2
 
 
