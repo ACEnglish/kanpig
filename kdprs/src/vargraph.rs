@@ -10,8 +10,8 @@ pub struct VarNode {
     start: u64,
     end: u64,
     size: i64,
-    kfeat: Vec<f32>, // I think this could be a slice... https://stackoverflow.com/questions/30262970/array-as-a-struct-field
-    entry: vcf::Record,
+    kfeat: Option<Vec<f32>>,
+    entry: Option<vcf::Record>,
 }
 
 impl VarNode {
@@ -24,8 +24,8 @@ impl VarNode {
             start,
             end,
             size,
-            kfeat,
-            entry,
+            kfeat: Some(kfeat),
+            entry: Some(entry),
         }
     }
 
@@ -35,8 +35,8 @@ impl VarNode {
             start: 0,
             end: 0,
             size: 0,
-            kfeat: vec![], // Danger!! -- I now need to worry about not adding src/snk kfeats
-            entry: vcf::Record::default(),
+            kfeat: None,
+            entry: None,
         }
     }
 }
