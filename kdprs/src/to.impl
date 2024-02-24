@@ -1,7 +1,6 @@
 main.rs
 __main__.py:def unify_chromosomes(tree, bam_fn, ref_fn):
 __main__.py:def main():
-kdp.py:def kdp_job_vcf(chunk, params, header=None, sample=0):
 kdp.py:def kdp_job_bam(chunk, bam, reference, params, header=None, sample=0):
 kdp.py:def phase_region(up_variants, hap1, hap2, params, chunk_id=None, sample=0):
 
@@ -19,6 +18,14 @@ similarity.rs <--- Done
 similarity.py:def cosinesim(a, b):
 similarity.py:def weighted_cosinesim(a, b):
 
+chunker.rs <-- Done
+matcher for filtering variants on input (truvari.Matcher, region_filter)
+region tree which is essentially another filter (build_region_tree, merge_region_tree_overlaps)
+truvari.chunker - need a way to iterate the stuff
+
+comparisons.rs <-- Done
+entry_boundaries, overlaps, sizesim, entry_size, 
+
 graph.rs
 graph.py:class PhasePath():
 graph.py:def dfs(g, target, cur_node=None, cur_len=0, path=None):
@@ -27,9 +34,8 @@ graph.py:def get_best_path(paths, params, exclude=None):
 graph.py:def find_hap_paths(graph, hap, params):
 
 vcf.rs
-haps.py:def vcf_haps(variants, kmer):
-kmer.py:def var_to_kfeat(entry, kmer=3):
-graph.py:def vars_to_graph(variants, kmer=3):
+kmer.py:def var_to_kfeat(entry, kmer=3): <-- Done
+graph.py:def vars_to_graph(variants, kmer=3): <-- Done
 kdp.py:def pull_variants(graph, used, h1_min_path, h1, h2_min_path, h2, chunk_id, sample=0):
 kdp.py:def get_bounds(cnk):
 
@@ -38,15 +44,6 @@ haps.py:def bam_haps(bam, refseq, chrom, reg_start, reg_end, params):
 haps.py:def hap_deduplicate(m_haps):
 haps.py:def consolidate_with_best(m_haps):
 haps.py:def read_cluster(all_ks, kmer, coverage, cossim, pctsize):
-
-
-chunker.rs
-matcher for filtering variants on input (truvari.Matcher, region_filter)
-region tree which is essentially another filter (build_region_tree, merge_region_tree_overlaps)
-truvari.chunker - need a way to iterate the stuff
-
-comparisons.rs
-entry_boundaries, overlaps, sizesim, entry_size, 
 
 notsure.rs
 truvari.compress_index_vcf

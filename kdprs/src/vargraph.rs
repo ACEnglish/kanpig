@@ -53,12 +53,12 @@ pub fn vars_to_graph(
         .collect();
 
     for pair in node_indices.iter().combinations(2) {
-        if let [Some(up_node), Some(dn_node)] = [graph.node_weight(*pair[0]), graph.node_weight(*pair[1])] {
+        if let [Some(up_node), Some(dn_node)] =
+            [graph.node_weight(*pair[0]), graph.node_weight(*pair[1])]
+        {
             if !overlaps(up_node.start, up_node.end, dn_node.start, dn_node.end) {
                 graph.add_edge(*pair[0], *pair[1], ());
             }
-        } else {
-            panic!("Fetched a node that doesn't exist");
         }
     }
 

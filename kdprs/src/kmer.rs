@@ -1,6 +1,5 @@
 use noodles_vcf::{self as vcf};
 
-/// Return tuple of direct/complement encoding of a nucleotide
 fn encode_nuc(nuc: u8) -> u64 {
     match nuc {
         b'A' => 0,
@@ -18,6 +17,7 @@ pub fn seq_to_kmer(sequence: &[u8], kmer: u8) -> Vec<f32> {
     if sequence.len() < kmer as usize {
         return kcounts;
     }
+
     let ukmer = kmer as usize;
     // index of the first kmer
     let mut f_result: u64 = 0;
