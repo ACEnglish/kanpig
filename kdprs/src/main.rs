@@ -60,8 +60,12 @@ fn main() {
     // info!("loaded {} regions over {} contigs", );
     let mut m_input = VCFIter::new(input_vcf, input_header, tree, args.kd.clone());
     let mut cnt = 0;
-    for entry in &mut m_input {
+    for chunk in &mut m_input {
         cnt += 1;
+        println!("{}", cnt);
+        for i in chunk {
+            println!("{}", i);
+        }
     }
     println!("parsed {} entries", cnt);
     info!("finished kdp");

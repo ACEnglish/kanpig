@@ -13,6 +13,14 @@ pub struct VCFIter<R: BufRead> {
     pub m_header: vcf::Header,
     regions: Regions,
     params: KDParams,
+    // Variables for tracking chunks
+    cur_chrom: String,
+    cur_end: u64,
+    // When iterating, we will encounter a variant that no longer
+    // fits in the current chunk. We need to hold on to it for the 
+    // next chunk
+    hold_entry: Option<vcf::Record>,
+
 }
 
 impl<R: BufRead> VCFIter<R> {
@@ -23,10 +31,13 @@ impl<R: BufRead> VCFIter<R> {
         params: KDParams,
     ) -> Self {
         Self {
-            m_vcf,
-            m_header,
-            regions,
-            params,
+            m_vcf:m_vcf,
+            m_header:m_header,
+            regions:regions,
+            params:params,
+            cur_chrom:String::new(),
+            cur_end:0,
+            hold_entry:None,
         }
     }
 
@@ -74,12 +85,8 @@ impl<R: BufRead> VCFIter<R> {
 
         true
     }
-}
 
-impl<R: BufRead> Iterator for VCFIter<R> {
-    type Item = vcf::Record;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn get_next_entry(&mut self) -> Option<vcf::Record> {
         let mut entry = vcf::Record::default();
 
         loop {
@@ -92,6 +99,52 @@ impl<R: BufRead> Iterator for VCFIter<R> {
                 Ok(_) if self.filter_entry(&entry) => return Some(entry),
                 _ => continue,
             }
+        }
+    }
+    
+    fn entry_in_chunk(&mut self, entry: &vcf::Record) -> bool {
+        let check_chrom = entry.chromosome().to_string();
+        let new_chrom = self.cur_chrom.len() != 0 && check_chrom != self.cur_chrom;
+        let (start, end) = comparisons::entry_boundaries(entry, false);
+        let new_chunk = self.cur_end != 0 && self.cur_end + self.params.chunksize < start;
+
+        // Update where we're looking
+        self.cur_chrom = check_chrom;
+        self.cur_end = std::cmp::max(self.cur_end, end);
+
+        !(new_chunk || new_chrom)
+    }
+}
+
+impl<R: BufRead> Iterator for VCFIter<R> {
+    type Item = Vec<vcf::Record>;
+    
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut ret = match &self.hold_entry {
+            Some(entry) => {
+                vec![entry.clone()]
+            },
+            None => vec![],
+        };
+        self.hold_entry = None;
+
+        loop {
+            match self.get_next_entry() {
+                Some(entry) => {
+                    if self.entry_in_chunk(&entry) {
+                        ret.push(entry);
+                    } else {
+                        self.hold_entry = Some(entry);
+                        return Some(ret);
+                    }
+                },
+                None => break,
+            };
+        }
+
+        match ret.is_empty() {
+            false => Some(ret),
+            true => None,
         }
     }
 }

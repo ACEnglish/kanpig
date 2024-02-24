@@ -44,6 +44,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 20)]
     pub sizemin: u64,
 
+    // change this to 10k? also filtered variants are just plain gone...
     #[arg(long, default_value_t = 50000)]
     pub sizemax: u64,
 
@@ -63,7 +64,7 @@ pub struct KDParams {
     pub n_tries: usize,
 
     #[arg(long, default_value_t = 100)]
-    pub chunksize: usize,
+    pub chunksize: u64,
 }
 
 impl ArgParser {
