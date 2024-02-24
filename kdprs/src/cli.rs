@@ -22,7 +22,7 @@ pub struct IOParams {
     #[arg(short, long)]
     pub bam: std::path::PathBuf,
 
-    /// Reference bam is aligned to 
+    /// Reference bam is aligned to
     #[arg(short = 'f', long)]
     pub reference: std::path::PathBuf,
 
@@ -77,7 +77,6 @@ pub struct KDParams {
     /// Size threshold above which weighted cosine similarity is used
     #[arg(long, default_value_t = 2000)]
     pub wcoslen: usize,
-
 
     /// Number of attempts through the graph (experimental)
     #[arg(long, default_value_t = 5)]

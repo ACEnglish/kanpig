@@ -106,7 +106,7 @@ impl<R: BufRead> VcfChunker<R> {
             }
         }
     }
-    
+
     /// Checks if this variant is within params.chunksize distance of last
     /// seen variant in this chunk
     fn entry_in_chunk(&mut self, entry: &vcf::Record) -> bool {

@@ -29,7 +29,7 @@ impl VarNode {
             entry: Some(entry),
         }
     }
-    
+
     /// For the 'src' and 'snk' nodes, just need the name
     pub fn new_anchor(name: &str) -> Self {
         Self {
