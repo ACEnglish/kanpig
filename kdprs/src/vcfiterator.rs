@@ -1,9 +1,12 @@
 use std::io::BufRead;
 use std::collections::VecDeque;
+
 use noodles_vcf::{self as vcf};
+
 use crate::cli::KDParams;
 use crate::comparisons;
 use crate::regions::Regions;
+
 
 pub struct VCFIter<R: BufRead> {
     pub m_vcf: vcf::reader::Reader<R>,
@@ -82,22 +85,13 @@ impl<R: BufRead> Iterator for VCFIter<R> {
         loop {
             match self.m_vcf.read_record(&self.m_header, &mut entry) {
                 Ok(0) => return None,
-                Err(e) => panic!("ERROR: Unable to parse VCF!\n\tDetails -> {:?}", e),
+                Err(e) => {
+                    error!("skipping invalid VCF entry {:?}", e);
+                    continue
+                },
                 Ok(_) if self.filter_entry(&entry) => return Some(entry),
                 _ => continue,
             }
         }
     }
 }
-/*
- * file_zipper to put them together
- * chunker to make the units for parsing
- * so chunk/zip can be one.. except that sometimes its 1 vcf and sometimes 2. So we want to keep
- * them separate.. except if I don't do double VCF, then I don't need both
- *
- * regions = build_region_tree
- * file1 = filter(vcf, filter settings, regions)
- * file2 = filter(vcf, filter settings, regions)
- * zipped = file_zipper([file1, file2])
- * chunks = chunker(zipped)
- */

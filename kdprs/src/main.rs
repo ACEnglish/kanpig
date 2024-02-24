@@ -44,7 +44,7 @@ fn main() {
         .init();
 
     let args = ArgParser::parse();
-
+    info!("starting kdp");
     if !args.validate() {
         error!("please fix arguments");
         std::process::exit(1);
@@ -57,11 +57,12 @@ fn main() {
     let m_contigs = input_header.contigs().clone();
 
     let tree = build_region_tree(&m_contigs, args.io.regions);
-
+    // info!("loaded {} regions over {} contigs", );
     let mut m_input = VCFIter::new(input_vcf, input_header, tree, args.kd.clone());
     let mut cnt = 0;
     for entry in &mut m_input {
         cnt += 1;
     }
     println!("parsed {} entries", cnt);
+    info!("finished kdp");
 }
