@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
-indexmap = "2.2.3"
+indexmap = { version = "2.2.3" }
+itertools = { version = "0.12.1" }
 log = { version = "0.4", features = ["std", "serde"] }
 noodles-vcf = { version = "0.49.0" }
 petgraph = { version = "0.6.2" }

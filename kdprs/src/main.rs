@@ -13,10 +13,12 @@ mod comparisons;
 mod kmer;
 mod regions;
 mod similarity;
+mod vargraph;
 
 use crate::chunker::VcfChunker;
 use crate::cli::ArgParser;
 use crate::regions::{build_region_tree, ContigMap};
+use crate::vargraph::vars_to_graph;
 
 /// Remove contigs from keep that aren't in reduce
 /// Works in-place
@@ -63,9 +65,11 @@ fn main() {
     let mut cnt = 0;
     for chunk in &mut m_input {
         cnt += 1;
+        let m_graph = vars_to_graph(chunk, args.kd.kmer);
+        println!("{:?}", m_graph);
         //println!("{}", cnt);
         //for i in chunk {
-            //println!("{} {}", i.chromosome(), i.position());
+        //println!("{} {}", i.chromosome(), i.position());
         //}
     }
     //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };

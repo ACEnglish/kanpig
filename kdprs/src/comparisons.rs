@@ -29,15 +29,6 @@ impl FromStr for Svtype {
     }
 }
 
-pub fn coords_within(qstart: u64, qend: u64, rstart: u64, rend: u64, end_within: bool) -> bool {
-    let ending = if end_within {
-        qend <= rend
-    } else {
-        qend < rend
-    };
-    (qstart >= rstart) & ending
-}
-
 pub fn entry_boundaries(entry: &vcf::Record, ins_inflate: bool) -> (u64, u64) {
     let mut start: u64 = u64::try_from(usize::from(entry.position())).unwrap() - 1;
     let mut end: u64 = u64::try_from(usize::from(entry.end().expect("No Variant End"))).unwrap();
@@ -86,12 +77,6 @@ pub fn sizesim(size_a: usize, size_b: usize) -> f32 {
     }
     std::cmp::max(std::cmp::min(size_a, size_b), 1) as f32
         / std::cmp::max(std::cmp::max(size_a, size_b), 1) as f32
-}
-
-pub fn entry_within(entry: &vcf::Record, rstart: u64, rend: u64) -> bool {
-    let (qstart, qend) = entry_boundaries(entry, false);
-    let end_within = entry_variant_type(entry) != Svtype::Ins;
-    coords_within(qstart, qend, rstart, rend, end_within)
 }
 
 pub fn overlaps(s1: u64, e1: u64, s2: u64, e2: u64) -> bool {

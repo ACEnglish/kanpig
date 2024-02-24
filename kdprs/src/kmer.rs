@@ -1,3 +1,5 @@
+use noodles_vcf::{self as vcf};
+
 /// Return tuple of direct/complement encoding of a nucleotide
 fn encode_nuc(nuc: u8) -> u64 {
     match nuc {
@@ -10,10 +12,13 @@ fn encode_nuc(nuc: u8) -> u64 {
 }
 
 /// Count kmers in a sequence
-pub fn seq_to_kmer(sequence: Vec<u8>, kmer: u8) -> Vec<f32> {
+pub fn seq_to_kmer(sequence: &[u8], kmer: u8) -> Vec<f32> {
     let mut kcounts = vec![0f32; 4u64.pow(kmer.into()) as usize];
+    // Must be at least one kmer long
+    if sequence.len() < kmer as usize {
+        return kcounts;
+    }
     let ukmer = kmer as usize;
-
     // index of the first kmer
     let mut f_result: u64 = 0;
     for (pos, i) in sequence.iter().take(ukmer).enumerate() {
@@ -34,4 +39,27 @@ pub fn seq_to_kmer(sequence: Vec<u8>, kmer: u8) -> Vec<f32> {
     }
 
     kcounts
+}
+
+/// Convert vcf::Record to kfeat
+pub fn var_to_kfeat(entry: &vcf::Record, kmer: u8) -> (Vec<f32>, i64) {
+    let ref_seq = entry.reference_bases().to_string();
+    let alt_seq = entry
+        .alternate_bases()
+        .first()
+        .expect("Can only work on sequence resolved variants")
+        .to_string();
+
+    let size = alt_seq.len() as i64 - ref_seq.len() as i64;
+
+    let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer);
+    let m_alt = seq_to_kmer(&alt_seq.as_bytes()[1..], kmer);
+
+    let m_ret: Vec<_> = m_alt
+        .iter()
+        .zip(m_ref.iter())
+        .map(|(&x, &y)| (x - y))
+        .collect();
+
+    (m_ret, size)
 }
