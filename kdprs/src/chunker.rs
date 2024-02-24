@@ -8,7 +8,7 @@ use crate::comparisons;
 use crate::regions::Regions;
 
 
-pub struct VCFIter<R: BufRead> {
+pub struct VcfChunker<R: BufRead> {
     pub m_vcf: vcf::reader::Reader<R>,
     pub m_header: vcf::Header,
     regions: Regions,
@@ -23,7 +23,7 @@ pub struct VCFIter<R: BufRead> {
 
 }
 
-impl<R: BufRead> VCFIter<R> {
+impl<R: BufRead> VcfChunker<R> {
     pub fn new(
         m_vcf: vcf::reader::Reader<R>,
         m_header: vcf::Header,
@@ -116,7 +116,7 @@ impl<R: BufRead> VCFIter<R> {
     }
 }
 
-impl<R: BufRead> Iterator for VCFIter<R> {
+impl<R: BufRead> Iterator for VcfChunker<R> {
     type Item = Vec<vcf::Record>;
     
     fn next(&mut self) -> Option<Self::Item> {

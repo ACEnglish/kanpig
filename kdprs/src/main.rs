@@ -6,17 +6,17 @@ extern crate log;
 use clap::Parser;
 use noodles_vcf::{self as vcf};
 
-mod bedparser;
-mod vcfiterator;
 mod cli;
-mod comparisons;
 mod kmer;
+mod chunker;
 mod regions;
+mod bedparser;
 mod similarity;
+mod comparisons;
 
 use crate::cli::ArgParser;
 use crate::regions::{build_region_tree, ContigMap};
-use crate::vcfiterator::VCFIter;
+use crate::chunker::VcfChunker;
 
 /// Remove contigs from keep that aren't in reduce
 /// Works in-place
@@ -58,7 +58,7 @@ fn main() {
 
     let tree = build_region_tree(&m_contigs, args.io.regions);
     // info!("loaded {} regions over {} contigs", );
-    let mut m_input = VCFIter::new(input_vcf, input_header, tree, args.kd.clone());
+    let mut m_input = VcfChunker::new(input_vcf, input_header, tree, args.kd.clone());
     let mut cnt = 0;
     for chunk in &mut m_input {
         cnt += 1;
