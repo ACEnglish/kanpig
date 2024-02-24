@@ -62,10 +62,10 @@ fn main() {
     let mut cnt = 0;
     for chunk in &mut m_input {
         cnt += 1;
-        println!("{}", cnt);
-        for i in chunk {
-            println!("{}", i);
-        }
+        //println!("{}", cnt);
+        //for i in chunk {
+            //println!("{} {}", i.chromosome(), i.position());
+        //}
     }
     println!("parsed {} entries", cnt);
     info!("finished kdp");

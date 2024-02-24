@@ -110,7 +110,7 @@ impl<R: BufRead> VcfChunker<R> {
         let new_chunk = self.cur_end != 0 && self.cur_end + self.params.chunksize < start;
 
         self.cur_chrom = check_chrom;
-        self.cur_end = std::cmp::max(self.cur_end, end);
+        self.cur_end = if new_chrom { end } else { std::cmp::max(self.cur_end, end) };
 
         !(new_chrom || new_chunk)
     }
