@@ -42,14 +42,14 @@ impl VarNode {
 }
 
 pub fn vars_to_graph(
-    variants: Vec<vcf::Record>,
+    mut variants: Vec<vcf::Record>,
     kmer: u8,
 ) -> (Vec<NodeIndex>, DiGraph<VarNode, ()>) {
     let mut graph = DiGraph::new();
 
     let node_indices: Vec<NodeIndex<_>> = variants
-        .iter()
-        .map(|entry| graph.add_node(VarNode::new(entry.clone(), kmer))) // maybe? https://stackoverflow.com/questions/45803990/how-can-i-take-an-item-from-a-vec-in-rust
+        .drain(..) // drain lets us move the entry without a clone
+        .map(|entry| graph.add_node(VarNode::new(entry, kmer)))
         .collect();
 
     for pair in node_indices.iter().combinations(2).collect::<Vec<_>>() {
