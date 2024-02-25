@@ -1,5 +1,3 @@
-use noodles_vcf::{self as vcf};
-
 fn encode_nuc(nuc: u8) -> u64 {
     match nuc {
         b'A' => 0,
@@ -39,27 +37,4 @@ pub fn seq_to_kmer(sequence: &[u8], kmer: u8) -> Vec<f32> {
     }
 
     kcounts
-}
-
-/// Convert vcf::Record to kfeat
-pub fn var_to_kfeat(entry: &vcf::Record, kmer: u8) -> (Vec<f32>, i64) {
-    let ref_seq = entry.reference_bases().to_string();
-    let alt_seq = entry
-        .alternate_bases()
-        .first()
-        .expect("Can only work on sequence resolved variants")
-        .to_string();
-
-    let size = alt_seq.len() as i64 - ref_seq.len() as i64;
-
-    let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer);
-    let m_alt = seq_to_kmer(&alt_seq.as_bytes()[1..], kmer);
-
-    let m_ret: Vec<_> = m_alt
-        .iter()
-        .zip(m_ref.iter())
-        .map(|(&x, &y)| (x - y))
-        .collect();
-
-    (m_ret, size)
 }

@@ -1,5 +1,5 @@
-use crate::comparisons::{entry_boundaries, overlaps};
-use crate::kmer::var_to_kfeat;
+use crate::metrics::overlaps;
+use crate::vcf_traits::KdpVcf;
 use itertools::Itertools;
 use noodles_vcf::{self as vcf};
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -18,8 +18,8 @@ pub struct VarNode {
 impl VarNode {
     pub fn new(entry: vcf::Record, kmer: u8) -> Self {
         let name = "".to_string(); // Want to make a hash for these names for debugging, I think.
-        let (start, end) = entry_boundaries(&entry, false);
-        let (kfeat, size) = var_to_kfeat(&entry, kmer);
+        let (start, end) = entry.boundaries(false);
+        let (kfeat, size) = entry.to_kfeat(kmer);
         Self {
             name,
             start,

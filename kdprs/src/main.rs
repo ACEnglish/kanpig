@@ -9,10 +9,10 @@ use noodles_vcf::{self as vcf};
 mod bedparser;
 mod chunker;
 mod cli;
-mod comparisons;
+mod vcf_traits;
 mod kmer;
 mod regions;
-mod similarity;
+mod metrics;
 mod vargraph;
 
 use crate::chunker::VcfChunker;

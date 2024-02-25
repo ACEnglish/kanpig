@@ -4,7 +4,7 @@ use std::io::BufRead;
 use noodles_vcf::{self as vcf};
 
 use crate::cli::KDParams;
-use crate::comparisons;
+use crate::vcf_traits::KdpVcf;
 use crate::regions::Regions;
 
 /// Takes a vcf and filtering parameters to create in iterable which will
@@ -59,7 +59,7 @@ impl<R: BufRead> VcfChunker<R> {
             return false;
         }
 
-        let (var_up, var_dn) = comparisons::entry_boundaries(entry, false);
+        let (var_up, var_dn) = entry.boundaries(false);
 
         let (mut reg_up, mut reg_dn) = (0, 0);
         while let Some((coord_up, coord_dn)) = m_coords.front() {
@@ -76,11 +76,11 @@ impl<R: BufRead> VcfChunker<R> {
             return false;
         }
 
-        if self.params.passonly & comparisons::entry_is_filtered(entry) {
+        if self.params.passonly & entry.is_filtered() {
             return false;
         }
 
-        let size = comparisons::entry_size(entry);
+        let size = entry.size();
         if self.params.sizemin > size || self.params.sizemax < size {
             return false;
         }
@@ -113,7 +113,7 @@ impl<R: BufRead> VcfChunker<R> {
         let check_chrom = entry.chromosome().to_string();
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;
 
-        let (start, end) = comparisons::entry_boundaries(entry, false);
+        let (start, end) = entry.boundaries(false);
         let new_chunk = self.cur_end != 0 && self.cur_end + self.params.chunksize < start;
 
         self.cur_chrom = check_chrom;
