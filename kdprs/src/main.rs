@@ -9,36 +9,17 @@ use noodles_vcf::{self as vcf};
 mod bedparser;
 mod chunker;
 mod cli;
-mod vcf_traits;
 mod kmer;
-mod regions;
 mod metrics;
+mod regions;
 mod vargraph;
+mod vcf_traits;
 
 use crate::chunker::VcfChunker;
 use crate::cli::ArgParser;
-use crate::regions::{build_region_tree, ContigMap};
+use crate::regions::build_region_tree;
 use crate::vargraph::vars_to_graph;
 
-/// Remove contigs from keep that aren't in reduce
-/// Works in-place
-fn check_vcf_contigs(keep: &mut ContigMap, reduce: &ContigMap) {
-    let mut removed = vec![];
-    for i in keep.keys() {
-        if !reduce.contains_key(i) {
-            removed.push(i.clone());
-        }
-    }
-    if !removed.is_empty() {
-        warn!(
-            "{} --input contigs do not have a --vcf contig. Removing",
-            removed.len()
-        );
-        for i in removed {
-            keep.shift_remove(&i);
-        }
-    }
-}
 
 fn main() {
     pretty_env_logger::formatted_timed_builder()
