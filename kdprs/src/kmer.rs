@@ -12,13 +12,13 @@ fn encode_nuc(nuc: u8) -> u64 {
 
 /// Count kmers in a sequence
 pub fn seq_to_kmer(sequence: &[u8], kmer: u8) -> Vec<f32> {
-    let mut kcounts = vec![0f32; 4u64.pow(kmer.into()) as usize];
+    let mut kcounts = vec![0f32; 4_usize.pow(kmer.into())];
+    let ukmer = kmer as usize;
     // Must be at least one kmer long
-    if sequence.len() < kmer as usize {
+    if sequence.len() < ukmer {
         return kcounts;
     }
 
-    let ukmer = kmer as usize;
     // index of the first kmer
     let mut f_result: u64 = 0;
     for (pos, i) in sequence.iter().take(ukmer).enumerate() {

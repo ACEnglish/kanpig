@@ -14,3 +14,47 @@
  * Then there's a read cluster - which isn't too bad with a decent kmeans library
  * just gotta work on the consolidate with best
  */
+
+use htslib::{Bam, bam::Read};
+
+pub struct BamParser {
+    pub bam_name: std::path::PathBuf,
+    pub ref_name: std::path::PathBuf,
+    bam: something,
+    reference: something,
+    params: KDParams,
+}
+
+impl BamParser {
+    pub fn new (bam_name, ref_name, params) -> Self {
+        // Open the BAM or CRAM file
+        let mut bam = Bam::from_path(bam_path).unwrap();
+
+        // Region of interest (e.g., chromosome:start-end)
+        let region = "chr1:1000-2000";
+
+        // Seek to the region of interest
+        bam.seek(region).unwrap();
+
+        // Iterate over the pileup for the region
+        for pileup in bam.pileup() {
+            let pileup = pileup.unwrap();
+            println!("Position: {}, Depth: {}", pileup.pos(), pileup.depth());
+            
+            // Access additional pileup information as needed
+            for alignment in pileup.alignments() {
+                println!("Alignment: {:?}", alignment);
+            }
+        }
+
+    }
+
+    fn find_haps(&self, chrom, start, end) -> Two haplotypes {
+
+    }
+
+    fn hap_deduplicate {}
+
+    fn read_cluster {}
+
+}
