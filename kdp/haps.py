@@ -79,14 +79,14 @@ def vcf_haps(variants, kmer):
     """
     Parse a set of phased variants and return the two Haplotypes
     """
-    h1 = []
-    h2 = []
+    h1 = Haplotype.new(kmer)
+    h2 = Haplotype.new(kmer)
     for entry in variants:
         m_hap = Haplotype.from_vcf(entry, kmer)
         if entry.samples[0]['GT'][0] == 1:
-            h1.append(m_hap)
+            h1 += m_hap
         if len(entry.samples[0]['GT']) > 1 and entry.samples[0]['GT'][1] == 1:
-            h2.append(m_hap)
+            h2 += m_hap
     return h1, h2
 
 

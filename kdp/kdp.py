@@ -60,7 +60,7 @@ def phase_region(up_variants, hap1, hap2, params, chunk_id=None, sample=0):
     # No changes to apply
     logging.debug('h1 %s', hap1)
     if hap1:
-        h1_paths = kdp.find_hap_paths_align(graph, hap1, params)
+        h1_paths = kdp.find_hap_paths(graph, hap1, params)
     else:
         h1_paths = []
     h1_min_path = kdp.get_best_path(h1_paths, params)
@@ -68,7 +68,7 @@ def phase_region(up_variants, hap1, hap2, params, chunk_id=None, sample=0):
 
     logging.debug('h2 %s', hap2)
     if hap2:
-        h2_paths = kdp.find_hap_paths_align(graph, hap2, params)
+        h2_paths = kdp.find_hap_paths(graph, hap2, params)
     else:
         h2_paths = []
     h2_min_path = kdp.get_best_path(h2_paths, params)

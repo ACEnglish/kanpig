@@ -2,7 +2,7 @@ extern crate pretty_env_logger;
 
 use clap::Parser;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Clone, Debug)]
 #[command(author = "ACEnglish", version)]
 pub struct ArgParser {
     #[command(flatten)]
@@ -12,7 +12,7 @@ pub struct ArgParser {
     pub kd: KDParams,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Clone, Debug)]
 pub struct IOParams {
     /// VCF to genotype
     #[arg(short, long)]
@@ -39,7 +39,7 @@ pub struct IOParams {
     pub sample: Option<String>,
 }
 
-#[derive(clap::Args, Debug, Clone)]
+#[derive(clap::Args, Clone, Debug)]
 pub struct KDParams {
     /// Kmer size for featurization
     #[arg(long, default_value_t = 4)]
