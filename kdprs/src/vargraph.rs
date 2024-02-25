@@ -17,8 +17,9 @@ pub struct VarNode {
 
 impl VarNode {
     pub fn new(entry: vcf::Record, kmer: u8) -> Self {
-        let name = "".to_string(); // Want to make a hash for these names for debugging, I think.
-        let (start, end) = entry.boundaries(false);
+        // Want to make a hash for these names for debugging, I think.
+        let name = "".to_string();
+        let (start, end) = entry.boundaries();
         let (kfeat, size) = entry.to_kfeat(kmer);
         Self {
             name,

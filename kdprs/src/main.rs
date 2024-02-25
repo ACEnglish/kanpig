@@ -36,7 +36,7 @@ fn main() {
         .build_from_path(args.io.input.clone())
         .expect("Unable to parse vcf");
     let input_header = input_vcf.read_header().expect("Unable to parse header");
-    
+
     // Ensure sample is correctly setup
     if args.io.sample.is_none() {
         if input_header.sample_names().is_empty() {

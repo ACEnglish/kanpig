@@ -32,7 +32,7 @@ impl FromStr for Svtype {
 /// Convert vcf::Record to kfeat
 pub trait KdpVcf {
     fn to_kfeat(&self, kmer: u8) -> (Vec<f32>, i64);
-    fn boundaries(&self, ins_inflate: bool) -> (u64, u64);
+    fn boundaries(&self) -> (u64, u64);
     fn size(&self) -> u64;
     fn is_filtered(&self) -> bool;
     fn variant_type(&self) -> Svtype;
@@ -63,14 +63,9 @@ impl KdpVcf for vcf::Record {
     }
 
     /// start and end positions of an entry
-    fn boundaries(&self, ins_inflate: bool) -> (u64, u64) {
-        let mut start: u64 = u64::try_from(usize::from(self.position())).unwrap() - 1;
-        let mut end: u64 = u64::try_from(usize::from(self.end().expect("No Variant End"))).unwrap();
-        if ins_inflate & (self.variant_type() == Svtype::Ins) {
-            let size = self.size();
-            start -= size / 2;
-            end += size / 2;
-        }
+    fn boundaries(&self) -> (u64, u64) {
+        let start: u64 = u64::try_from(usize::from(self.position())).unwrap() - 1;
+        let end: u64 = u64::try_from(usize::from(self.end().expect("No Variant End"))).unwrap();
         (start, end)
     }
 
@@ -89,7 +84,7 @@ impl KdpVcf for vcf::Record {
         let a_len: u64 = match self.alternate_bases().first() {
             Some(allele::Allele::Bases(alt)) => alt.len() as u64,
             Some(allele::Allele::Symbol(_alt)) => {
-                let (start, end) = self.boundaries(false);
+                let (start, end) = self.boundaries();
                 start.abs_diff(end) + 1
             }
             _ => 0,

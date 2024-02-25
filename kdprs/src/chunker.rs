@@ -59,7 +59,7 @@ impl<R: BufRead> VcfChunker<R> {
             return false;
         }
 
-        let (var_up, var_dn) = entry.boundaries(false);
+        let (var_up, var_dn) = entry.boundaries();
 
         let (mut reg_up, mut reg_dn) = (0, 0);
         while let Some((coord_up, coord_dn)) = m_coords.front() {
@@ -113,7 +113,7 @@ impl<R: BufRead> VcfChunker<R> {
         let check_chrom = entry.chromosome().to_string();
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;
 
-        let (start, end) = entry.boundaries(false);
+        let (start, end) = entry.boundaries();
         let new_chunk = self.cur_end != 0 && self.cur_end + self.params.chunksize < start;
 
         self.cur_chrom = check_chrom;
