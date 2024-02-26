@@ -103,6 +103,13 @@ impl ArgParser {
             is_ok = false;
         }
 
+        if let Some(bed_file) = &self.io.bed {
+            if !bed_file.exists() {
+                error!("--bed does not exist");
+                is_ok = false;
+            }
+        }
+
         if self.kd.sizemin < 20 {
             warn!("--sizemin is recommended to be at least 20");
         }

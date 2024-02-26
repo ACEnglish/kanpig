@@ -21,7 +21,7 @@ use crate::bamparser::BamParser;
 use crate::chunker::VcfChunker;
 use crate::cli::ArgParser;
 use crate::regions::build_region_tree;
-use crate::vargraph::vars_to_graph;
+use crate::vargraph::Variants;
 
 fn main() {
     pretty_env_logger::formatted_timed_builder()
@@ -69,13 +69,13 @@ fn main() {
     let mut m_input = VcfChunker::new(input_vcf, input_header, tree, args.kd.clone());
     let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
     for chunk in &mut m_input {
-        cnt += 1;
-        let m_graph = vars_to_graph(chunk, args.kd.kmer);
-        // This should be m_bam.apply_coverage(m_graph), each read is placed on
-        // the graph. instead, we'll get the haps and then pass them
-        // Or m_graph.apply_coverage(m_bam)
-        m_bam.find_haps(m_graph.chrom, m_graph.start, m_graph.dn_pos);
+        let m_graph = Variants::new(chunk, args.kd.kmer);
+        println!("{}:{}-{}", m_graph.chrom, m_graph.start, m_graph.end);
+        let (h1, h2) = m_bam.find_haps(m_graph.chrom, m_graph.start, m_graph.end);
+        //m_graph.apply_coverage(h1, h2);
+        //output
     }
+
     //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };
 
     info!("finished");
