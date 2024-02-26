@@ -28,39 +28,51 @@ use std::path::PathBuf;
 pub struct BamParser {
     pub bam_name: PathBuf,
     pub ref_name: PathBuf,
-    bam: IndexedReader,
-    reference: faidx::Reader,
+    bam: Option<IndexedReader>,
+    reference: Option<faidx::Reader>,
     params: KDParams,
+    is_open: bool,
 }
 
 impl BamParser {
     pub fn new(bam_name: PathBuf, ref_name: PathBuf, params: KDParams) -> Self {
-        // Open the BAM or CRAM file
-        let mut bam = IndexedReader::from_path(&bam_name).unwrap();
-        let mut reference = faidx::Reader::from_path(&ref_name).unwrap();
         BamParser {
             bam_name,
             ref_name,
-            bam,
-            reference,
+            bam: None,
+            reference: None,
             params,
+            is_open: false,
         }
     }
 
+    // Open the BAM or CRAM file
+    // Put this in a separate method so threads can have their own file handler
+    pub fn open(&mut self) {
+        self.bam = Some(IndexedReader::from_path(&self.bam_name).unwrap());
+        self.reference = Some(faidx::Reader::from_path(&self.ref_name).unwrap());
+        self.is_open = true;
+    }
+
     pub fn find_haps(&mut self, chrom: String, start: u64, end: u64) -> (Haplotype, Haplotype) {
+        if !self.is_open {
+            self.open();
+        }
         // We pileup a little outside the region for variants
         let window_start = start - self.params.chunksize;
         let window_end = end + self.params.chunksize;
 
         let mut tot_cov: u64 = 0;
-        self.bam.fetch((
+        if let Err(e) = self.bam.as_mut().expect("Must be opened").fetch((
             &chrom,
             start - self.params.chunksize,
             end + self.params.chunksize,
-        ));
+        )) {
+            panic!("Unable to fetch bam {}:{}-{}\n{:?}", chrom, start, end, e)
+        };
 
         let mut m_haps = HashMap::<Vec<u8>, Vec<PileupVariant>>::new();
-        for pileup in self.bam.pileup() {
+        for pileup in self.bam.as_mut().expect("Must be opened").pileup() {
             if !pileup.is_ok() {
                 continue;
             }
@@ -102,7 +114,10 @@ impl BamParser {
         }
 
         let coverage = tot_cov / (window_end - window_start + (2 * self.params.chunksize));
-        (Haplotype::blank(3, coverage), Haplotype::blank(3, coverage))
+        (
+            Haplotype::blank(self.params.kmer, coverage),
+            Haplotype::blank(self.params.kmer, coverage),
+        )
     }
 
     // fn hap_deduplicate {}
@@ -137,6 +152,5 @@ impl PileupVariant {
             indel: indel,
         }
     }
-
     // pub fn to_hap(&self) -> Haplotype going to need reference
 }

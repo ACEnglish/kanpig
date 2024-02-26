@@ -68,9 +68,17 @@ fn main() {
 
     let mut m_input = VcfChunker::new(input_vcf, input_header, tree, args.kd.clone());
     let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
+    /*
+     * threading strategy: m_input should be windowed and each is sent to a thread
+     * Because m_bam.open(), each thread will then have its own file handler to the bam/reference
+     * The information I'm missing is how many variants go to each thread. I could send them
+     * independentally, but that'll make a lot of opens. And since I don't know.. wait, I do know
+     * how many parts there are because of the region tree. So the tree total size / threads is how
+     * approximately how many parts I'll have. I might end up with some idle threads. But lets not
+     * over optimize, yet.
+     */
     for chunk in &mut m_input {
         let m_graph = Variants::new(chunk, args.kd.kmer);
-        println!("{}:{}-{}", m_graph.chrom, m_graph.start, m_graph.end);
         let (h1, h2) = m_bam.find_haps(m_graph.chrom, m_graph.start, m_graph.end);
         //m_graph.apply_coverage(h1, h2);
         //output
