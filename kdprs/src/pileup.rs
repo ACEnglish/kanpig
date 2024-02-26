@@ -3,7 +3,6 @@
  */
 use crate::vcf_traits::Svtype;
 use rust_htslib::bam::pileup::{Alignment, Indel};
-use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone)]

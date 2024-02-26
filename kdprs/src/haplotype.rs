@@ -1,10 +1,11 @@
 use crate::kmer::seq_to_kmer;
 
+#[derive(Debug, Clone)]
 pub struct Haplotype {
-    kfeat: Vec<f32>,
-    size: i64,
-    n: u64,
-    coverage: u64,
+    pub kfeat: Vec<f32>,
+    pub size: i64,
+    pub n: u64,
+    pub coverage: u64,
 }
 
 impl Haplotype {

@@ -21,11 +21,10 @@ use crate::kmer::seq_to_kmer;
 use crate::pileup::PileupVariant;
 use crate::vcf_traits::Svtype;
 use rust_htslib::bam::ext::BamRecordExtensions;
-use rust_htslib::bam::pileup::{Alignment, Indel};
+use rust_htslib::bam::pileup::Indel;
 use rust_htslib::bam::{IndexedReader, Read};
 use rust_htslib::faidx;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 pub struct BamParser {
@@ -120,16 +119,28 @@ impl BamParser {
             }
         }
 
-        let m_haps = self.reads_to_haps(m_reads, p_variants, chrom, start, end);
-
+        let mut m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
         let coverage = tot_cov / (window_end - window_start + (2 * self.params.chunksize));
-        //if coverage == 0 || m_reads.is_empty() {
-        //return
-        (
-            Haplotype::blank(self.params.kmer, coverage),
-            Haplotype::blank(self.params.kmer, coverage),
-        ) //;
-          //}
+        if coverage == 0 || m_haps.is_empty() {
+            return (
+                Haplotype::blank(self.params.kmer, coverage),
+                Haplotype::blank(self.params.kmer, coverage),
+            ) 
+        };
+
+        let REFTHRESHOLD = 0.85;
+
+        if m_haps.len() == 1 {
+            let hap2 = m_haps.pop().unwrap();
+            let hap1 = if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
+                Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
+            } else {
+                hap2.clone()
+            };
+            return (hap1, hap2);
+        }
+
+        self.read_cluster(m_haps, coverage)
     }
 
     fn reads_to_haps(
@@ -137,37 +148,22 @@ impl BamParser {
         reads: HashMap<Vec<u8>, Vec<PileupVariant>>,
         pileups: HashMap<PileupVariant, u64>,
         chrom: String,
-        start: u64,
-        end: u64,
     ) -> Vec<Haplotype> {
-        let mut refspan: Option<Vec<u8>> = None;
-
-        // We grab pileups within chunksize of the region's start/end
-        let start = start - self.params.chunksize;
-        let end = end + self.params.chunksize;
-
         let mut hap_parts = HashMap::<PileupVariant, Haplotype>::new();
 
         for (mut p, _) in pileups.into_iter() {
             // Need to fill in deleted sequence
             if p.indel == Svtype::Del {
-                if refspan.is_none() {
-                    refspan = Some(
-                        self.reference
-                            .as_ref()
-                            .expect("Can't call reads_to_haps before open()")
-                            .fetch_seq(&chrom, start as usize, end as usize)
-                            .unwrap()
-                            .to_vec(),
-                    );
-                }
-                let d_start = (p.position - start) as usize;
-                // I'm finding deletions that span outside of the region...
-                // So I have to prevent those early, or I can give up on
-                // the dream of only a single reference fetch per-region
-                // Or I can keep that single if I stretch the end further downstream
-                let d_end = (d_start + (p.size.abs() as usize)) as usize;
-                p.sequence = Some(refspan.clone().unwrap()[d_start..d_end].to_vec());
+                let d_start = p.position;
+                let d_end = d_start + p.size.abs() as u64;
+                p.sequence = Some(
+                    self.reference
+                        .as_ref()
+                        .unwrap()
+                        .fetch_seq(&chrom, d_start as usize, d_end as usize)
+                        .unwrap()
+                        .to_vec(),
+                );
             }
 
             let n_hap = Haplotype::new(
@@ -182,13 +178,43 @@ impl BamParser {
         let mut ret = Vec::<Haplotype>::new();
         for read_pileups in reads.into_values() {
             let mut cur_hap = Haplotype::blank(self.params.kmer, 1);
-            for p in read_pileups {
+            for p in &read_pileups {
                 cur_hap.add(&hap_parts[&p]);
             }
+            cur_hap.coverage = read_pileups.len() as u64;
             ret.push(cur_hap);
         }
 
         ret
     }
-    // fn read_cluster {}
+    
+    /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
+    fn read_cluster(&self, m_haps: Vec<Haplotype>, coverage: u64) -> (Haplotype, Haplotype) {
+        
+        /* Step 1 - run kmeans
+        kmeans = Kmeans(n_clusters=2 random_state=0, n_init="auto");
+        weight = [_.coverage for _ in m_haps];
+        grps = kmeans.fit_predict([_.kfeat for _ in m_haps], sample_weight=weight);
+        n_grps = len(set(grps));
+        alt_cov = sum(weight);
+        let (sample_cnt, sample_dims, k, max_iter) = (m_haps.len(), m_haps[0].len(), 2, 10);
+        
+        let chained_kfeat: Vec<f32> = m_haps
+                .iter()
+                .flat_map(|obj| obj.kfeat.iter())
+                .collect();
+                //.cloned()
+        let kmean = KMeans::new(samples, sample_cnt, sample_dims);
+        let result = kmean.kmeans_lloyd(k, max_iter, KMeans::init_kmeanplusplus, &KMeansConfig::default());
+        println!("Cluster-Assignments: {:?}", result.assignments);
+        */
+
+        (Haplotype::blank(3, 0), Haplotype::blank(3, 0))
+        
+        // REF &  HET
+        
+        // HOM ALT
+
+        // Compound Het or slightly different Hom?
+    }
 }
