@@ -20,6 +20,7 @@ use crate::haplotype::Haplotype;
 use crate::vcf_traits::Svtype;
 use rust_htslib::bam::pileup::{Alignment, Indel};
 use rust_htslib::bam::{IndexedReader, Read};
+use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::faidx;
 use std::path::PathBuf;
 
@@ -46,32 +47,54 @@ impl BamParser {
     }
 
     pub fn find_haps(&mut self, chrom: String, start: u64, end: u64) -> (Haplotype, Haplotype) {
-        // Seek to the region of interest
-        self.bam.fetch((&chrom, start, end));
+        // We pileup a little outside the region for variants
+        let window_start = start - self.params.chunksize;
+        let window_end = end + self.params.chunksize;
 
-        // Iterate over the pileup for the region
+        let mut tot_cov: u64 = 0;
+        self.bam.fetch((&chrom, start - self.params.chunksize, end + self.params.chunksize));
+
         for pileup in self.bam.pileup() {
+            if !pileup.is_ok() {
+                continue;
+            }
+            
             let pileup = pileup.unwrap();
+
+
+
             let m_pos: u64 = pileup.pos().into();
-            // We got to truncate
-            if m_pos < start || end < m_pos {
+            // We got to truncate the pileup
+            if m_pos < window_start || window_end < m_pos {
                 continue;
             }
 
-            println!("Position: {}, Depth: {}", m_pos, pileup.depth());
+            tot_cov += pileup.depth() as u64;
 
-            // Access additional pileup information as needed
             for alignment in pileup.alignments() {
-                // https://docs.rs/rust-htslib/latest/rust_htslib/bam/pileup/struct.Alignment.html
-                let m_hap = match alignment.indel() {
+                // None if either is_del or is_refskip, we we don't need it
+                if alignment.qpos().is_none() {
+                    continue;
+                }
+
+                // Guard against partial alignments which mess up the kfeat 
+                // Will revisit when I can turn a Haplotype into a single-path graph
+                if !((alignment.record().reference_start() as u64) < start && (alignment.record().reference_end() as u64) > end) {
+                    continue;
+                }
+
+                let m_var = match alignment.indel() {
                     Indel::Ins(size) | Indel::Del(size) if size as u64 >= self.params.sizemin => {
-                        PileupVariant::new(alignment, size)
+                        PileupVariant::new(alignment, size, window_start)
                     }
                     _ => continue,
                 };
+                // m_haps[alignment.record.query_name].push(m_var)
             }
         }
-        (Haplotype::blank(3, 0), Haplotype::blank(3, 0))
+
+        let coverage = tot_cov / (window_end - window_start + (2 * self.params.chunksize));
+        (Haplotype::blank(3, coverage), Haplotype::blank(3, coverage))
     }
 
     // fn hap_deduplicate {}
@@ -86,7 +109,9 @@ struct PileupVariant {
 }
 
 impl PileupVariant {
-    pub fn new(alignment: Alignment, size: u32) -> Self {
+    // https://docs.rs/rust-htslib/latest/rust_htslib/bam/pileup/struct.Alignment.html
+    // Need to figure out how to 
+    pub fn new(alignment: Alignment, size: u32, offset: u64) -> Self {
         PileupVariant {
             position: 0,
             size: size as i64,
@@ -94,4 +119,6 @@ impl PileupVariant {
             indel: Svtype::Del,
         }
     }
+
+    // pub fn to_hap(&self) -> Haplotype going to need 
 }
