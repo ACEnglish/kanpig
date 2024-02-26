@@ -8,18 +8,19 @@
  *  if query position is none and read.indel not within sizemin/sizemax --
  *  The bam pileup is a little different.. in rust htslib... so going to have to deal with that
  *  but lets just assume we make it all just fine. No optimizations, just a string of Haplotypes
- * 
+ *
  * We'll also need a hap_deduplicate.. though I think that won't be a thing once we refactor
  * And then we got the noreads or no alts and single read stuff
  * Then there's a read cluster - which isn't too bad with a decent kmeans library
  * just gotta work on the consolidate with best
  */
 
-use rust_htslib::bam::{IndexedReader, Read};
-use rust_htslib::bam::pileup::Indel;
-use rust_htslib::faidx;
-use crate::haplotype::Haplotype;
 use crate::cli::KDParams;
+use crate::haplotype::Haplotype;
+use crate::vcf_traits::Svtype;
+use rust_htslib::bam::pileup::{Alignment, Indel};
+use rust_htslib::bam::{IndexedReader, Read};
+use rust_htslib::faidx;
 use std::path::PathBuf;
 
 pub struct BamParser {
@@ -45,7 +46,6 @@ impl BamParser {
     }
 
     pub fn find_haps(&mut self, chrom: String, start: u64, end: u64) -> (Haplotype, Haplotype) {
-
         // Seek to the region of interest
         self.bam.fetch((&chrom, start, end));
 
@@ -59,16 +59,16 @@ impl BamParser {
             }
 
             println!("Position: {}, Depth: {}", m_pos, pileup.depth());
-            
+
             // Access additional pileup information as needed
             for alignment in pileup.alignments() {
                 // https://docs.rs/rust-htslib/latest/rust_htslib/bam/pileup/struct.Alignment.html
-                let m_size = match alignment.indel() {
-                    Indel::Ins(size) if size as u64 >= self.params.sizemin => size as i64, // self.make_insertion
-                    Indel::Del(size) if size as u64 >= self.params.sizemin => -(size as i64), // self.make_deletion
+                let m_hap = match alignment.indel() {
+                    Indel::Ins(size) | Indel::Del(size) if size as u64 >= self.params.sizemin => {
+                        PileupVariant::new(alignment, size)
+                    }
                     _ => continue,
                 };
-                println!("indel: {:?}", m_size);
             }
         }
         (Haplotype::blank(3, 0), Haplotype::blank(3, 0))
@@ -76,4 +76,22 @@ impl BamParser {
 
     // fn hap_deduplicate {}
     // fn read_cluster {}
+}
+
+struct PileupVariant {
+    position: u64,
+    size: i64,
+    sequence: Option<String>,
+    indel: Svtype,
+}
+
+impl PileupVariant {
+    pub fn new(alignment: Alignment, size: u32) -> Self {
+        PileupVariant {
+            position: 0,
+            size: size as i64,
+            sequence: None,
+            indel: Svtype::Del,
+        }
+    }
 }

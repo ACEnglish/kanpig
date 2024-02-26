@@ -17,11 +17,11 @@ mod regions;
 mod vargraph;
 mod vcf_traits;
 
+use crate::bamparser::BamParser;
 use crate::chunker::VcfChunker;
 use crate::cli::ArgParser;
 use crate::regions::build_region_tree;
 use crate::vargraph::vars_to_graph;
-use crate::bamparser::BamParser;
 
 fn main() {
     pretty_env_logger::formatted_timed_builder()
