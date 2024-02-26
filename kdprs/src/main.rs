@@ -65,20 +65,18 @@ fn main() {
     let tree = build_region_tree(&m_contigs, args.io.bed);
 
     //let guard = pprof::ProfilerGuardBuilder::default().frequency(1000).blocklist(&["libc", "libgcc", "pthread", "vdso"]).build().unwrap();
+
     let mut m_input = VcfChunker::new(input_vcf, input_header, tree, args.kd.clone());
-    /*let mut cnt = 0;
+    let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
     for chunk in &mut m_input {
         cnt += 1;
         let m_graph = vars_to_graph(chunk, args.kd.kmer);
-        println!("{:?}", m_graph);
-        //println!("{}", cnt);
-        //for i in chunk {
-        //println!("{} {}", i.chromosome(), i.position());
-        //}
+        // This should be m_bam.apply_coverage(m_graph), each read is placed on
+        // the graph. instead, we'll get the haps and then pass them
+        // Or m_graph.apply_coverage(m_bam)
+        m_bam.find_haps(m_graph.chrom, m_graph.start, m_graph.dn_pos);
     }
     //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };
-    println!("parsed {} entries", cnt);*/
-    let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
-    m_bam.find_haps("chr20".to_string(), 393037, 393163);
+
     info!("finished");
 }
