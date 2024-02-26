@@ -6,6 +6,7 @@ extern crate log;
 use clap::Parser;
 use noodles_vcf::{self as vcf};
 
+mod bamparser;
 mod bedparser;
 mod chunker;
 mod cli;
@@ -20,6 +21,7 @@ use crate::chunker::VcfChunker;
 use crate::cli::ArgParser;
 use crate::regions::build_region_tree;
 use crate::vargraph::vars_to_graph;
+use crate::bamparser::BamParser;
 
 fn main() {
     pretty_env_logger::formatted_timed_builder()
@@ -64,7 +66,7 @@ fn main() {
 
     //let guard = pprof::ProfilerGuardBuilder::default().frequency(1000).blocklist(&["libc", "libgcc", "pthread", "vdso"]).build().unwrap();
     let mut m_input = VcfChunker::new(input_vcf, input_header, tree, args.kd.clone());
-    let mut cnt = 0;
+    /*let mut cnt = 0;
     for chunk in &mut m_input {
         cnt += 1;
         let m_graph = vars_to_graph(chunk, args.kd.kmer);
@@ -75,6 +77,8 @@ fn main() {
         //}
     }
     //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };
-    println!("parsed {} entries", cnt);
+    println!("parsed {} entries", cnt);*/
+    let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
+    m_bam.find_haps("chr20".to_string(), 393037, 393163);
     info!("finished");
 }

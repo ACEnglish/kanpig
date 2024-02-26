@@ -15,22 +15,26 @@
  * just gotta work on the consolidate with best
  */
 
-use htslib::{Bam, bam::Read, faidx};
+use rust_htslib::bam::{IndexedReader, Read};
+use rust_htslib::bam::pileup::Indel;
+use rust_htslib::faidx;
 use crate::haplotype::Haplotype;
+use crate::cli::KDParams;
+use std::path::PathBuf;
 
 pub struct BamParser {
-    pub bam_name: std::path::PathBuf,
-    pub ref_name: std::path::PathBuf,
-    bam: mut Bam,
+    pub bam_name: PathBuf,
+    pub ref_name: PathBuf,
+    bam: IndexedReader,
     reference: faidx::Reader,
     params: KDParams,
 }
 
 impl BamParser {
-    pub fn new (bam_name, ref_name, params) -> Self {
+    pub fn new(bam_name: PathBuf, ref_name: PathBuf, params: KDParams) -> Self {
         // Open the BAM or CRAM file
-        let mut bam = Bam::from_path(bam_path).unwrap();
-        let mut reference = faidx::Reader::from_path(ref_name);
+        let mut bam = IndexedReader::from_path(&bam_name).unwrap();
+        let mut reference = faidx::Reader::from_path(&ref_name).unwrap();
         BamParser {
             bam_name,
             ref_name,
@@ -40,27 +44,36 @@ impl BamParser {
         }
     }
 
-    fn find_haps(&self, chrom: String, start: u64, end: u64) -> (Haplotype, Haplotype) {
-        // Region of interest (e.g., chromosome:start-end)
-        let region = format!("{chrom}:{start}-{end}");
+    pub fn find_haps(&mut self, chrom: String, start: u64, end: u64) -> (Haplotype, Haplotype) {
 
         // Seek to the region of interest
-        self.bam.seek(region).unwrap();
+        self.bam.fetch((&chrom, start, end));
 
         // Iterate over the pileup for the region
-        for pileup in bam.pileup() {
+        for pileup in self.bam.pileup() {
             let pileup = pileup.unwrap();
-            println!("Position: {}, Depth: {}", pileup.pos(), pileup.depth());
+            let m_pos: u64 = pileup.pos().into();
+            // We got to truncate
+            if m_pos < start || end < m_pos {
+                continue;
+            }
+
+            println!("Position: {}, Depth: {}", m_pos, pileup.depth());
             
             // Access additional pileup information as needed
             for alignment in pileup.alignments() {
-                println!("Alignment: {:?}", alignment);
+                // https://docs.rs/rust-htslib/latest/rust_htslib/bam/pileup/struct.Alignment.html
+                let m_size = match alignment.indel() {
+                    Indel::Ins(size) if size as u64 >= self.params.sizemin => size as i64, // self.make_insertion
+                    Indel::Del(size) if size as u64 >= self.params.sizemin => -(size as i64), // self.make_deletion
+                    _ => continue,
+                };
+                println!("indel: {:?}", m_size);
             }
         }
-
+        (Haplotype::blank(3, 0), Haplotype::blank(3, 0))
     }
 
     // fn hap_deduplicate {}
     // fn read_cluster {}
-
 }
