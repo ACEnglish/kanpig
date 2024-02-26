@@ -13,6 +13,7 @@ mod cli;
 mod haplotype;
 mod kmer;
 mod metrics;
+mod pileup;
 mod regions;
 mod vargraph;
 mod vcf_traits;

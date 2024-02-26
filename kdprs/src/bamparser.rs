@@ -17,12 +17,15 @@
 
 use crate::cli::KDParams;
 use crate::haplotype::Haplotype;
+use crate::kmer::seq_to_kmer;
+use crate::pileup::PileupVariant;
 use crate::vcf_traits::Svtype;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::pileup::{Alignment, Indel};
 use rust_htslib::bam::{IndexedReader, Read};
 use rust_htslib::faidx;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 pub struct BamParser {
@@ -117,72 +120,75 @@ impl BamParser {
             }
         }
 
-        // for key,value in p_variants: new_dict[key] = key.to_haplotype(value, reference)
-        // for k, v in m_reads: this_reads_hap = sum(new_dict[pvar] for pvar in v)
-        // And be aware here that we don't need to fetch on the reference until we need to fetch on
-        // the reference, nah,mean
-        // At this poing we'll have all the m_haps that can be sent to read_cluster
+        let m_haps = self.reads_to_haps(m_reads, p_variants, chrom, start, end);
 
         let coverage = tot_cov / (window_end - window_start + (2 * self.params.chunksize));
         //if coverage == 0 || m_reads.is_empty() {
-            //return 
-            (
-                Haplotype::blank(self.params.kmer, coverage),
-                Haplotype::blank(self.params.kmer, coverage),
-            )//;
-        //}
-
-        //let m_haps = BamParser::hap_deduplicate(m_reads);
+        //return
+        (
+            Haplotype::blank(self.params.kmer, coverage),
+            Haplotype::blank(self.params.kmer, coverage),
+        ) //;
+          //}
     }
 
-    // fn hap_consolidate {}
-    // Need a way to compare Vec<PileupVariants>. If two of them are the same, drop one and
-    // increase the other's coverage by 1.
-    // Then we only need to do conversion of Vec<PileupVariants> to Haplotype a single time,
-    // Thus reducing the fa fetch for DEL
-    // This will return a Vec<Haplotype>
-    // Okay, so we make a pre-haplotype with all the changes a read describes
-    // And if those PileupVariants are identical to another, we consolidate
-    // Then we send it to hap_cluster()
-    // For each read, turn its first PileupVariant into a Haplotype if that variant hasn't been
-    // seen
-    // Add that PileupVariant to a lookup so I don't have to do it again (important for fetch)
-    // Continue through all the PileupVariants, summing them together
-    // Next, we want to deduplicate on Haplotypes that are identical, adding together their
-    // coverage.
-    //
-    // and coverage is added.
-    // though I don't want to let within reads consolidate
-    // fn read_cluster {}
-}
+    fn reads_to_haps(
+        &self,
+        reads: HashMap<Vec<u8>, Vec<PileupVariant>>,
+        pileups: HashMap<PileupVariant, u64>,
+        chrom: String,
+        start: u64,
+        end: u64,
+    ) -> Vec<Haplotype> {
+        let mut refspan: Option<Vec<u8>> = None;
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
-struct PileupVariant {
-    position: u64,
-    size: i64,
-    sequence: Option<Vec<u8>>,
-    indel: Svtype,
-}
+        // We grab pileups within chunksize of the region's start/end
+        let start = start - self.params.chunksize;
+        let end = end + self.params.chunksize;
 
-impl PileupVariant {
-    pub fn new(alignment: &Alignment, position: u64) -> Self {
-        let (indel, size, sequence) = match alignment.indel() {
-            Indel::Del(size) => (Svtype::Del, -(size as i64), None),
-            Indel::Ins(size) => {
-                let qpos = alignment.qpos().unwrap();
-                let seq =
-                    alignment.record().seq().as_bytes()[qpos..(qpos + size as usize)].to_vec();
-                (Svtype::Ins, size as i64, Some(seq))
+        let mut hap_parts = HashMap::<PileupVariant, Haplotype>::new();
+
+        for (mut p, _) in pileups.into_iter() {
+            // Need to fill in deleted sequence
+            if p.indel == Svtype::Del {
+                if refspan.is_none() {
+                    refspan = Some(
+                        self.reference
+                            .as_ref()
+                            .expect("Can't call reads_to_haps before open()")
+                            .fetch_seq(&chrom, start as usize, end as usize)
+                            .unwrap()
+                            .to_vec(),
+                    );
+                }
+                let d_start = (p.position - start) as usize;
+                // I'm finding deletions that span outside of the region...
+                // So I have to prevent those early, or I can give up on
+                // the dream of only a single reference fetch per-region
+                // Or I can keep that single if I stretch the end further downstream
+                let d_end = (d_start + (p.size.abs() as usize)) as usize;
+                p.sequence = Some(refspan.clone().unwrap()[d_start..d_end].to_vec());
             }
-            _ => panic!("this can't happen"),
-        };
 
-        PileupVariant {
-            position: position,
-            size: size,
-            sequence: sequence,
-            indel: indel,
+            let n_hap = Haplotype::new(
+                seq_to_kmer(p.sequence.as_ref().unwrap(), self.params.kmer),
+                p.size,
+                1,
+                1,
+            );
+            hap_parts.insert(p, n_hap);
         }
+
+        let mut ret = Vec::<Haplotype>::new();
+        for read_pileups in reads.into_values() {
+            let mut cur_hap = Haplotype::blank(self.params.kmer, 1);
+            for p in read_pileups {
+                cur_hap.add(&hap_parts[&p]);
+            }
+            ret.push(cur_hap);
+        }
+
+        ret
     }
-    // pub fn to_hap(&self) -> Haplotype going to need reference
+    // fn read_cluster {}
 }
