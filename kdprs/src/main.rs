@@ -75,7 +75,7 @@ fn main() {
      * independentally, but that'll make a lot of opens. And since I don't know.. wait, I do know
      * how many parts there are because of the region tree. So the tree total size / threads is how
      * approximately how many parts I'll have. I might end up with some idle threads. But lets not
-     * over optimize, yet.
+     * over optimize, yet. iter.chunks() works, I guess. But I'll have to 'magic number' the size
      */
     for chunk in &mut m_input {
         let m_graph = Variants::new(chunk, args.kd.kmer);

@@ -4,7 +4,7 @@ use noodles_vcf::{
 };
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub enum Svtype {
     Ins,
     Del,

@@ -22,7 +22,7 @@ use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::pileup::{Alignment, Indel};
 use rust_htslib::bam::{IndexedReader, Read};
 use rust_htslib::faidx;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 pub struct BamParser {
@@ -71,7 +71,10 @@ impl BamParser {
             panic!("Unable to fetch bam {}:{}-{}\n{:?}", chrom, start, end, e)
         };
 
-        let mut m_haps = HashMap::<Vec<u8>, Vec<PileupVariant>>::new();
+        // track the changes made by each read
+        let mut m_reads = HashMap::<Vec<u8>, Vec<PileupVariant>>::new();
+        // consolidate common variants
+        let mut p_variants = HashMap::<PileupVariant, u64>::new();
         for pileup in self.bam.as_mut().expect("Must be opened").pileup() {
             if !pileup.is_ok() {
                 continue;
@@ -107,24 +110,53 @@ impl BamParser {
                     }
                     _ => continue,
                 };
-                println!("{:?}", m_var);
+
+                *p_variants.entry(m_var.clone()).or_insert(0) += 1;
                 let qname = alignment.record().qname().to_owned();
-                m_haps.entry(qname).or_insert_with(Vec::new).push(m_var);
+                m_reads.entry(qname).or_insert_with(Vec::new).push(m_var);
             }
         }
 
+        // for key,value in p_variants: new_dict[key] = key.to_haplotype(value, reference)
+        // for k, v in m_reads: this_reads_hap = sum(new_dict[pvar] for pvar in v)
+        // And be aware here that we don't need to fetch on the reference until we need to fetch on
+        // the reference, nah,mean
+        // At this poing we'll have all the m_haps that can be sent to read_cluster
+
         let coverage = tot_cov / (window_end - window_start + (2 * self.params.chunksize));
-        (
-            Haplotype::blank(self.params.kmer, coverage),
-            Haplotype::blank(self.params.kmer, coverage),
-        )
+        //if coverage == 0 || m_reads.is_empty() {
+            //return 
+            (
+                Haplotype::blank(self.params.kmer, coverage),
+                Haplotype::blank(self.params.kmer, coverage),
+            )//;
+        //}
+
+        //let m_haps = BamParser::hap_deduplicate(m_reads);
     }
 
-    // fn hap_deduplicate {}
+    // fn hap_consolidate {}
+    // Need a way to compare Vec<PileupVariants>. If two of them are the same, drop one and
+    // increase the other's coverage by 1.
+    // Then we only need to do conversion of Vec<PileupVariants> to Haplotype a single time,
+    // Thus reducing the fa fetch for DEL
+    // This will return a Vec<Haplotype>
+    // Okay, so we make a pre-haplotype with all the changes a read describes
+    // And if those PileupVariants are identical to another, we consolidate
+    // Then we send it to hap_cluster()
+    // For each read, turn its first PileupVariant into a Haplotype if that variant hasn't been
+    // seen
+    // Add that PileupVariant to a lookup so I don't have to do it again (important for fetch)
+    // Continue through all the PileupVariants, summing them together
+    // Next, we want to deduplicate on Haplotypes that are identical, adding together their
+    // coverage.
+    //
+    // and coverage is added.
+    // though I don't want to let within reads consolidate
     // fn read_cluster {}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 struct PileupVariant {
     position: u64,
     size: i64,
