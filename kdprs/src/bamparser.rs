@@ -22,6 +22,7 @@ use rust_htslib::bam::pileup::{Alignment, Indel};
 use rust_htslib::bam::{IndexedReader, Read};
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::faidx;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub struct BamParser {
@@ -53,7 +54,8 @@ impl BamParser {
 
         let mut tot_cov: u64 = 0;
         self.bam.fetch((&chrom, start - self.params.chunksize, end + self.params.chunksize));
-
+        
+        let mut m_haps = HashMap::<Vec<u8>, Vec<PileupVariant>>::new();
         for pileup in self.bam.pileup() {
             if !pileup.is_ok() {
                 continue;
@@ -85,11 +87,13 @@ impl BamParser {
 
                 let m_var = match alignment.indel() {
                     Indel::Ins(size) | Indel::Del(size) if size as u64 >= self.params.sizemin => {
-                        PileupVariant::new(alignment, size, window_start)
+                        PileupVariant::new(&alignment, size, window_start)
                     }
                     _ => continue,
                 };
-                // m_haps[alignment.record.query_name].push(m_var)
+
+                let qname = alignment.record().qname().to_owned();
+                m_haps.entry(qname).or_insert_with(Vec::new).push(m_var);
             }
         }
 
@@ -111,7 +115,7 @@ struct PileupVariant {
 impl PileupVariant {
     // https://docs.rs/rust-htslib/latest/rust_htslib/bam/pileup/struct.Alignment.html
     // Need to figure out how to 
-    pub fn new(alignment: Alignment, size: u32, offset: u64) -> Self {
+    pub fn new(alignment: &Alignment, size: u32, offset: u64) -> Self {
         PileupVariant {
             position: 0,
             size: size as i64,
@@ -120,5 +124,5 @@ impl PileupVariant {
         }
     }
 
-    // pub fn to_hap(&self) -> Haplotype going to need 
+    // pub fn to_hap(&self) -> Haplotype going to need reference
 }
