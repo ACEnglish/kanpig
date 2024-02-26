@@ -9,6 +9,7 @@ use noodles_vcf::{self as vcf};
 mod bedparser;
 mod chunker;
 mod cli;
+mod haplotype;
 mod kmer;
 mod metrics;
 mod regions;
