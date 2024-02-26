@@ -15,13 +15,14 @@
  * just gotta work on the consolidate with best
  */
 
-use htslib::{Bam, bam::Read};
+use htslib::{Bam, bam::Read, faidx};
+use crate::haplotype::Haplotype;
 
 pub struct BamParser {
     pub bam_name: std::path::PathBuf,
     pub ref_name: std::path::PathBuf,
-    bam: something,
-    reference: something,
+    bam: mut Bam,
+    reference: faidx::Reader,
     params: KDParams,
 }
 
@@ -29,12 +30,22 @@ impl BamParser {
     pub fn new (bam_name, ref_name, params) -> Self {
         // Open the BAM or CRAM file
         let mut bam = Bam::from_path(bam_path).unwrap();
+        let mut reference = faidx::Reader::from_path(ref_name);
+        BamParser {
+            bam_name,
+            ref_name,
+            bam,
+            reference,
+            params,
+        }
+    }
 
+    fn find_haps(&self, chrom: String, start: u64, end: u64) -> (Haplotype, Haplotype) {
         // Region of interest (e.g., chromosome:start-end)
-        let region = "chr1:1000-2000";
+        let region = format!("{chrom}:{start}-{end}");
 
         // Seek to the region of interest
-        bam.seek(region).unwrap();
+        self.bam.seek(region).unwrap();
 
         // Iterate over the pileup for the region
         for pileup in bam.pileup() {
@@ -49,12 +60,7 @@ impl BamParser {
 
     }
 
-    fn find_haps(&self, chrom, start, end) -> Two haplotypes {
-
-    }
-
-    fn hap_deduplicate {}
-
-    fn read_cluster {}
+    // fn hap_deduplicate {}
+    // fn read_cluster {}
 
 }
