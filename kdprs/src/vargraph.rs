@@ -1,7 +1,8 @@
 use crate::cli::KDParams;
 use crate::haplotype::Haplotype;
 use crate::metrics::overlaps;
-use crate::traverse::{find_path, PathScore};
+use crate::pathscore::PathScore;
+use crate::traverse::find_path;
 use crate::vcf_traits::KdpVcf;
 use itertools::Itertools;
 use noodles_vcf::{self as vcf};

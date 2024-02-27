@@ -226,7 +226,8 @@ impl BamParser {
             let mut hap_t = hap_b.pop().unwrap();
             // Now we need to check if its Compound Het or highly similar and should be Hom
             if (hap_t.size.signum() == hap2.size.signum())
-                && sizesim(hap_t.size.unsigned_abs(), hap2.size.unsigned_abs()) > self.params.pctsize
+                && sizesim(hap_t.size.unsigned_abs(), hap2.size.unsigned_abs())
+                    > self.params.pctsize
             {
                 // Very similar, see if we need to make a reference haplotype
                 if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {

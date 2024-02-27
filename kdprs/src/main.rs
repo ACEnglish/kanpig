@@ -19,6 +19,7 @@ mod haplotype;
 mod kmeans;
 mod kmer;
 mod metrics;
+mod pathscore;
 mod pileup;
 mod regions;
 mod traverse;
