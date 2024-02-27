@@ -19,6 +19,7 @@ use crate::cli::KDParams;
 use crate::haplotype::Haplotype;
 use crate::kmeans::kmeans;
 use crate::kmer::seq_to_kmer;
+use crate::metrics::sizesim;
 use crate::pileup::PileupVariant;
 use crate::vcf_traits::Svtype;
 use rust_htslib::bam::ext::BamRecordExtensions;
@@ -198,12 +199,14 @@ impl BamParser {
 
     /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
     fn read_cluster(&self, mut m_haps: Vec<Haplotype>, coverage: u64) -> (Haplotype, Haplotype) {
+        let REFTHRESHOLD = 0.85;
+
         let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
         let clusts = kmeans(&allk, 2);
 
         let mut hapA = Vec::<Haplotype>::new();
         let mut hapB = Vec::<Haplotype>::new();
-        
+
         // Sort them so we can pick the highest covered haplotype
         for (idx, hap) in m_haps.drain(..).enumerate() {
             if clusts[0].points_idx.contains(&idx) {
@@ -220,22 +223,31 @@ impl BamParser {
         hap2.coverage += hapA.iter().map(|i| i.coverage).sum::<u64>();
 
         let mut hap1 = if !hapB.is_empty() {
-            hapB.pop().unwrap()
-            // Now we need to check if its Compound Het or sequencing error should be Hom
+            let mut hap_t = hapB.pop().unwrap();
+            // Now we need to check if its Compound Het or highly similar and should be Hom
+            if (hap_t.size.signum() == hap2.size.signum())
+                && sizesim(hap_t.size.abs() as u64, hap2.size.abs() as u64) > self.params.pctsize
+            {
+                // Very similar, see if we need to make a reference haplotype
+                if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
+                    Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
+                } else {
+                    hap2.clone()
+                }
+            } else {
+                // Compound Het
+                hap_t.coverage += hapB.iter().map(|i| i.coverage).sum::<u64>();
+                hap_t
+            }
         } else {
             // Need to check if its REF & Het or just Hom, if REF, need to set the Coverage correct
-            Haplotype::blank(self.params.kmer, 0)
+            if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
+                Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
+            } else {
+                hap2.clone()
+            }
         };
-        
-        // Consolidate the coverage
-        hap1.coverage += hapB.iter().map(|i| i.coverage).sum::<u64>();
 
-        (hap1.clone(), hap2.clone())
-
-        // REF &  HET
-
-        // HOM ALT
-
-        // Compound Het or slightly different Hom?
+        (hap1, hap2)
     }
 }
