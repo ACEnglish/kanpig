@@ -11,6 +11,7 @@ mod bedparser;
 mod chunker;
 mod cli;
 mod haplotype;
+mod kmeans;
 mod kmer;
 mod metrics;
 mod pileup;

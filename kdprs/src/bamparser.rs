@@ -17,6 +17,7 @@
 
 use crate::cli::KDParams;
 use crate::haplotype::Haplotype;
+use crate::kmeans::kmeans;
 use crate::kmer::seq_to_kmer;
 use crate::pileup::PileupVariant;
 use crate::vcf_traits::Svtype;
@@ -125,7 +126,7 @@ impl BamParser {
             return (
                 Haplotype::blank(self.params.kmer, coverage),
                 Haplotype::blank(self.params.kmer, coverage),
-            ) 
+            );
         };
 
         let REFTHRESHOLD = 0.85;
@@ -167,7 +168,7 @@ impl BamParser {
             }
 
             let n_hap = Haplotype::new(
-                seq_to_kmer(p.sequence.as_ref().unwrap(), self.params.kmer),
+                seq_to_kmer(&p.sequence.clone().unwrap(), self.params.kmer),
                 p.size,
                 1,
                 1,
@@ -176,9 +177,9 @@ impl BamParser {
         }
 
         let mut ret = Vec::<Haplotype>::new();
-        for read_pileups in reads.into_values() {
+        for read_pileups in reads.values() {
             let mut cur_hap = Haplotype::blank(self.params.kmer, 1);
-            for p in &read_pileups {
+            for p in read_pileups {
                 cur_hap.add(&hap_parts[&p]);
             }
             cur_hap.coverage = read_pileups.len() as u64;
@@ -187,32 +188,38 @@ impl BamParser {
 
         ret
     }
-    
-    /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
-    fn read_cluster(&self, m_haps: Vec<Haplotype>, coverage: u64) -> (Haplotype, Haplotype) {
-        
-        /* Step 1 - run kmeans
-        kmeans = Kmeans(n_clusters=2 random_state=0, n_init="auto");
-        weight = [_.coverage for _ in m_haps];
-        grps = kmeans.fit_predict([_.kfeat for _ in m_haps], sample_weight=weight);
-        n_grps = len(set(grps));
-        alt_cov = sum(weight);
-        let (sample_cnt, sample_dims, k, max_iter) = (m_haps.len(), m_haps[0].len(), 2, 10);
-        
-        let chained_kfeat: Vec<f32> = m_haps
-                .iter()
-                .flat_map(|obj| obj.kfeat.iter())
-                .collect();
-                //.cloned()
-        let kmean = KMeans::new(samples, sample_cnt, sample_dims);
-        let result = kmean.kmeans_lloyd(k, max_iter, KMeans::init_kmeanplusplus, &KMeansConfig::default());
-        println!("Cluster-Assignments: {:?}", result.assignments);
-        */
 
-        (Haplotype::blank(3, 0), Haplotype::blank(3, 0))
+    /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
+    fn read_cluster(&self, mut m_haps: Vec<Haplotype>, coverage: u64) -> (Haplotype, Haplotype) {
+        let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
+        let clusts = kmeans(&allk, 2);
+
+        let mut hapA = Vec::<Haplotype>::new();
+        let mut hapB = Vec::<Haplotype>::new();
         
+        println!("len: {} - A: {:?} B: {:?}", m_haps.len(), clusts[0].points_idx, clusts[1].points_idx);
+        for (idx, hap) in m_haps.drain(..).enumerate() {
+            if clusts[0].points_idx.contains(&idx) {
+                hapA.push(hap);
+            } else {
+                hapB.push(hap);
+            }
+        }
+        hapA.sort();
+        hapB.sort();
+        println!("A->{:?}", hapA);
+        println!("B->{:?}", hapB);
+        let mut hap1 = hapA.pop().unwrap();
+        let mut hap2 = hapB.pop().unwrap();
+
+        hap1.coverage += hapA.iter().map(|i| i.coverage).sum::<u64>();
+        hap2.coverage += hapB.iter().map(|i| i.coverage).sum::<u64>();
+
+        println!("{:?}-----{:?}", hap1, hap2);
+        (hap1.clone(), hap2.clone())
+
         // REF &  HET
-        
+
         // HOM ALT
 
         // Compound Het or slightly different Hom?

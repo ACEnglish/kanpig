@@ -11,5 +11,6 @@ log = { version = "0.4", features = ["std", "serde"] }
 noodles-vcf = { version = "0.49.0" }
 petgraph = { version = "0.6.2" }
 pretty_env_logger = { version = "0.4.0" }
+rand = "0.8.5"
 rust-htslib = "0.46.0"
 simsimd = { version = "3.8.0" }
