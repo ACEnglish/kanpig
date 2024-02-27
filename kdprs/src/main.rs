@@ -22,7 +22,6 @@ mod metrics;
 mod pathscore;
 mod pileup;
 mod regions;
-mod traverse;
 mod vargraph;
 mod vcf_traits;
 
