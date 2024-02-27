@@ -4,7 +4,12 @@ extern crate pretty_env_logger;
 extern crate log;
 
 use clap::Parser;
-use noodles_vcf::{self as vcf};
+use noodles_vcf::{
+    self as vcf,
+    record::genotypes::{sample::Value, Genotypes},
+};
+use std::fs::File;
+use std::io::BufWriter;
 
 mod bamparser;
 mod bedparser;
@@ -69,7 +74,11 @@ fn main() {
 
     //let guard = pprof::ProfilerGuardBuilder::default().frequency(1000).blocklist(&["libc", "libgcc", "pthread", "vdso"]).build().unwrap();
 
-    let mut m_input = VcfChunker::new(input_vcf, input_header, tree, args.kd.clone());
+    let out_buf = BufWriter::new(File::create(&args.io.out).expect("Error Creating Kmers"));
+    let mut writer = vcf::Writer::new(out_buf);
+    writer.write_header(&input_header);
+
+    let mut m_input = VcfChunker::new(input_vcf, input_header.clone(), tree, args.kd.clone());
     let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
     /*
      * threading strategy: m_input should be windowed and each is sent to a thread
@@ -80,15 +89,38 @@ fn main() {
      * approximately how many parts I'll have. I might end up with some idle threads. But lets not
      * over optimize, yet. iter.chunks() works, I guess. But I'll have to 'magic number' the size
      */
+    //
     for chunk in &mut m_input {
         let m_graph = Variants::new(chunk, args.kd.kmer);
         let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
         let p1 = m_graph.apply_coverage(&h1, &args.kd);
         let p2 = m_graph.apply_coverage(&h2, &args.kd);
-        println!("Graph: {:?}", m_graph);
-        println!("P1: {:?}", p1);
-        println!("P2: {:?}", p2);
-        //output
+        for var_idx in m_graph.node_indices {
+            let mut cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
+                Some(var) => var.clone(),
+                None => {
+                    continue;
+                }
+            };
+            let keys = "GT:GQ".parse().unwrap();
+            let genotypes = Genotypes::new(
+                keys,
+                vec![vec![Some(Value::from("0|0")), Some(Value::from(13))]],
+            );
+
+            *cur_var.genotypes_mut() = genotypes.clone();
+            // Should be handling
+            let _ = writer.write_record(&input_header, &cur_var);
+            /*if var_idx == 0 || var_idx == m_graph.graph.node_count() - 1 {
+                continue
+            }
+            gt = var in p1.path + | + var in p2.path
+            m_graph.nodes[var_idx].variant.unwrap()
+            if var in p1
+            */
+        }
+        //println!("Graph: {:?}", m_graph);
+
         // nodes that have None for both coverage are 0/0
         // nodes that have None for half shouldn't happen...? They will, actually.
         // So I need to change the sim to just a Vec and I'll push the coverages on

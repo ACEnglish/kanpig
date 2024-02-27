@@ -33,8 +33,7 @@ impl Haplotype {
         if !self.kfeat.len() == other.kfeat.len() {
             panic!("Cannot add haplotypes of different kmer size");
         }
-        let _ = self
-            .kfeat
+        self.kfeat
             .iter_mut()
             .zip(other.kfeat.iter())
             .for_each(|(x, y)| *x += y);

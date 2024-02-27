@@ -36,7 +36,7 @@ impl PathScore {
             };
         }
 
-        let sizesim = metrics::sizesim(path_size.abs() as u64, target.size.abs() as u64);
+        let sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
         // No need for cossim because sizesim is alredy a failure
         if sizesim < params.pctsize {
             return PathScore {
@@ -61,7 +61,7 @@ impl PathScore {
             );
 
         // I might have messedup these signs
-        let cossim = if (std::cmp::max(target.size.abs(), path_size.abs()) as u64) < params.wcoslen
+        let cossim = if std::cmp::max(target.size.unsigned_abs(), path_size.unsigned_abs()) < params.wcoslen
         {
             metrics::weighted_cosinesim(&path_k, &target.kfeat)
         } else {
@@ -123,8 +123,7 @@ pub fn find_path(
     diffs.sort_by_key(|&(len_diff, _)| len_diff);
     for (_, next_node) in diffs {
         // stop case - snk node
-        if next_node.index() == graph.node_count() - 1
-        {
+        if next_node.index() == graph.node_count() - 1 {
             // Let the PathScore have the path
             let n_best_path = PathScore::new(graph, path.clone(), target, params);
             best_path = if n_best_path > best_path {
@@ -154,9 +153,8 @@ pub fn find_path(
                         (best_path, mp)
                     }
                 }
-                (None, mp) => (best_path, mp)
+                (None, mp) => (best_path, mp),
             };
-
         }
         if npaths > params.maxpaths {
             break;

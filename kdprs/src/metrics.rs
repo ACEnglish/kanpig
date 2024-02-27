@@ -16,7 +16,7 @@ pub fn weighted_cosinesim(a: &[f32], b: &[f32]) -> f32 {
             .map(|(x, y)| (x - y).abs())
             .sum::<f32>();
 
-    cos / (dist.powf(2.0) + cos)
+    cos / (dist.powi(2) + cos)
 }
 
 /// size similarity of two variant sizes

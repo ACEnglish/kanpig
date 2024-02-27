@@ -32,7 +32,7 @@ impl VarNode {
             start,
             end,
             size,
-            kfeat: kfeat,
+            kfeat,
             entry: Some(entry),
             coverage: (None, None),
             cossim: (None, None),
@@ -132,16 +132,6 @@ impl Variants {
     // Find the path through this graph that best fits
     // the haplotype push coverage onto the VarNodes
     pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> Option<PathScore> {
-        find_path(
-            &self.graph,
-            hap,
-            params,
-            0,
-            0,
-            None,
-            None,
-            None,
-        )
-        .0
+        find_path(&self.graph, hap, params, 0, 0, None, None, None).0
     }
 }

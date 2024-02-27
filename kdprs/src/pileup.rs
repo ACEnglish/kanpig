@@ -27,10 +27,10 @@ impl PileupVariant {
         };
 
         PileupVariant {
-            position: position,
-            size: size,
-            sequence: sequence,
-            indel: indel,
+            position,
+            size,
+            sequence,
+            indel,
         }
     }
     // pub fn to_hap(&self) -> Haplotype going to need reference

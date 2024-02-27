@@ -80,7 +80,7 @@ impl BamParser {
         // consolidate common variants
         let mut p_variants = HashMap::<PileupVariant, u64>::new();
         for pileup in self.bam.as_mut().expect("Must be opened").pileup() {
-            if !pileup.is_ok() {
+            if pileup.is_err() {
                 continue;
             }
 
@@ -117,11 +117,11 @@ impl BamParser {
 
                 *p_variants.entry(m_var.clone()).or_insert(0) += 1;
                 let qname = alignment.record().qname().to_owned();
-                m_reads.entry(qname).or_insert_with(Vec::new).push(m_var);
+                m_reads.entry(qname).or_default().push(m_var);
             }
         }
 
-        let mut m_haps = self.reads_to_haps(m_reads, p_variants, &chrom);
+        let mut m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
         let coverage = tot_cov / (window_end - window_start + (2 * self.params.chunksize));
         if coverage == 0 || m_haps.is_empty() {
             return (
@@ -157,12 +157,12 @@ impl BamParser {
             // Need to fill in deleted sequence
             if p.indel == Svtype::Del {
                 let d_start = p.position;
-                let d_end = d_start + p.size.abs() as u64;
+                let d_end = d_start + p.size.unsigned_abs();
                 p.sequence = Some(
                     self.reference
                         .as_ref()
                         .unwrap()
-                        .fetch_seq(&chrom, d_start as usize, d_end as usize)
+                        .fetch_seq(chrom, d_start as usize, d_end as usize)
                         .unwrap()
                         .to_vec(),
                 );
@@ -226,7 +226,7 @@ impl BamParser {
             let mut hap_t = hap_b.pop().unwrap();
             // Now we need to check if its Compound Het or highly similar and should be Hom
             if (hap_t.size.signum() == hap2.size.signum())
-                && sizesim(hap_t.size.abs() as u64, hap2.size.abs() as u64) > self.params.pctsize
+                && sizesim(hap_t.size.unsigned_abs(), hap2.size.unsigned_abs()) > self.params.pctsize
             {
                 // Very similar, see if we need to make a reference haplotype
                 if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
