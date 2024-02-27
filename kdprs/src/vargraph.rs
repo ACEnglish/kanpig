@@ -78,10 +78,17 @@ impl Variants {
 
         let (chrom, start, end) = Variants::get_region(&variants);
 
-        let mut node_indices: Vec<NodeIndex<_>> = variants
-            .drain(..) // drain lets us move the entry without a clone
-            .map(|entry| graph.add_node(VarNode::new(entry, kmer)))
-            .collect();
+        let mut node_indices = Vec::<NodeIndex<_>>::with_capacity(variants.len() + 2);
+        node_indices.push(graph.add_node(VarNode::new_anchor("src")));
+
+        node_indices.append(
+            &mut variants
+                .drain(..) // drain lets us move the entry without a clone
+                .map(|entry| graph.add_node(VarNode::new(entry, kmer)))
+                .collect(),
+        );
+
+        node_indices.push(graph.add_node(VarNode::new_anchor("snk")));
 
         for pair in node_indices.iter().combinations(2) {
             if let [Some(up_node), Some(dn_node)] =
@@ -92,23 +99,6 @@ impl Variants {
                 }
             }
         }
-
-        // Do I want to have the src/sink placed somewhere special?
-        // Like, can I node_indices[-2], [-1] if I need it?
-        let src_node = graph.add_node(VarNode::new_anchor("src"));
-        let snk_node = graph.add_node(VarNode::new_anchor("snk"));
-
-        // Add edges between 'src' node and all other nodes
-        for node_index in &node_indices {
-            graph.add_edge(src_node, *node_index, ());
-        }
-        node_indices.push(src_node);
-
-        // Add edges between all nodes and 'snk' node
-        for node_index in &node_indices {
-            graph.add_edge(*node_index, snk_node, ());
-        }
-        node_indices.push(snk_node);
 
         Variants {
             chrom,
@@ -137,9 +127,10 @@ impl Variants {
         (chrom, min_start, max_end)
     }
 
-    // Find the path through this graph that best fits 
+    // Find the path through this graph that best fits
     // the haplotype push coverage onto the VarNodes
     pub fn apply_coverage(&self, hap: Haplotype, params: &KDParams) {
-
+        // DFS upto params.maxpaths keeping track of the sims of the best path
+        // Once you have it, update the nodes with the sims and the hap's coverage
     }
 }

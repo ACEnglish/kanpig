@@ -85,6 +85,12 @@ fn main() {
         m_graph.apply_coverage(h1, &args.kd);
         m_graph.apply_coverage(h2, &args.kd);
         //output
+        // nodes that have None for both coverage are 0/0
+        // nodes that have None for half shouldn't happen...? They will, actually.
+        // So I need to change the sim to just a Vec and I'll push the coverages on
+        // If it has one, then ... well I guess I don't know
+        // Maybe I shouldn't be applying coverage but returning the best path
+        // Then I can m_graph.pull_variants(path1, path2, coverage)
     }
 
     //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };
