@@ -14,7 +14,7 @@ pub struct VarNode {
     pub start: u64,
     pub end: u64,
     pub size: i64,
-    pub kfeat: Option<Vec<f32>>,
+    pub kfeat: Vec<f32>,
     pub entry: Option<vcf::Record>,
     pub coverage: (Option<u64>, Option<u64>),
     pub cossim: (Option<f32>, Option<f32>),
@@ -32,7 +32,7 @@ impl VarNode {
             start,
             end,
             size,
-            kfeat: Some(kfeat),
+            kfeat: kfeat,
             entry: Some(entry),
             coverage: (None, None),
             cossim: (None, None),
@@ -41,13 +41,13 @@ impl VarNode {
     }
 
     /// For the 'src' and 'snk' nodes, just need the name
-    pub fn new_anchor(name: &str) -> Self {
+    pub fn new_anchor(name: &str, kmer: u8) -> Self {
         Self {
             name: name.to_string(),
             start: 0,
             end: 0,
             size: 0,
-            kfeat: None,
+            kfeat: vec![0f32; 4_usize.pow(kmer.into())],
             entry: None,
             coverage: (None, None),
             cossim: (None, None),
@@ -56,6 +56,7 @@ impl VarNode {
     }
 }
 
+#[derive(Debug)]
 pub struct Variants {
     pub chrom: String,
     pub start: u64,
@@ -80,7 +81,7 @@ impl Variants {
         let (chrom, start, end) = Variants::get_region(&variants);
 
         let mut node_indices = Vec::<NodeIndex<_>>::with_capacity(variants.len() + 2);
-        node_indices.push(graph.add_node(VarNode::new_anchor("src")));
+        node_indices.push(graph.add_node(VarNode::new_anchor("src", kmer)));
 
         node_indices.append(
             &mut variants
@@ -89,7 +90,7 @@ impl Variants {
                 .collect(),
         );
 
-        node_indices.push(graph.add_node(VarNode::new_anchor("snk")));
+        node_indices.push(graph.add_node(VarNode::new_anchor("snk", kmer)));
 
         for pair in node_indices.iter().combinations(2) {
             if let [Some(up_node), Some(dn_node)] =
@@ -131,9 +132,16 @@ impl Variants {
     // Find the path through this graph that best fits
     // the haplotype push coverage onto the VarNodes
     pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> Option<PathScore> {
-        println!("using {:?}, {:?}", hap, params);
-        find_path(&self.graph, hap, params, params.maxpaths, 0, None, None, None)
-        // DFS upto params.maxpaths keeping track of the sims of the best path
-        // Once you have it, update the nodes with the sims and the hap's coverage
+        find_path(
+            &self.graph,
+            hap,
+            params,
+            0,
+            0,
+            None,
+            None,
+            None,
+        )
+        .0
     }
 }

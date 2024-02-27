@@ -5,7 +5,7 @@ use crate::vargraph::VarNode;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 
-#[derive(Clone, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct PathScore {
     path: Vec<NodeIndex>,
     sizesim: f32,
@@ -49,13 +49,16 @@ impl PathScore {
         let path_k: Vec<f32> = path
             .iter()
             .filter_map(|&node_index| graph.node_weight(node_index))
-            .map(|x| x.kfeat.as_ref().unwrap())
-            .fold(vec![0f32; 4_usize.pow(params.kmer.into())], |acc, other| {
-                acc.iter()
-                    .zip(other)
-                    .map(|(x, y)| x + y) // This line sums corresponding elements
-                    .collect()
-            });
+            .map(|x| x.kfeat.as_ref())
+            .fold(
+                vec![0f32; 4_usize.pow(params.kmer.into())],
+                |acc: Vec<f32>, other: &Vec<f32>| {
+                    acc.iter()
+                        .zip(other)
+                        .map(|(x, y)| x + y) // This line sums corresponding elements
+                        .collect()
+                },
+            );
 
         // I might have messedup these signs
         let cossim = if (std::cmp::max(target.size.abs(), path_size.abs()) as u64) < params.wcoslen
@@ -81,35 +84,36 @@ pub fn find_path(
     graph: &DiGraph<VarNode, ()>,
     target: &Haplotype,
     params: &KDParams,
-    mut maxpaths: u64,
+    mut npaths: u64,
     cur_len: i64,
     i_cur_node: Option<NodeIndex>,
     mut i_path: Option<Vec<NodeIndex>>,
     i_best_path: Option<PathScore>,
-) -> Option<PathScore> {
+) -> (Option<PathScore>, u64) {
     // First call, setup the snk
     // Either way, unwrap the i_*
-    let (path, mut best_path, cur_len) = match i_cur_node {
+    let (path, mut best_path, cur_len, cur_node) = match i_cur_node {
         Some(node) => {
             i_path.as_mut().expect("How?").push(node);
-            (i_path.unwrap(), i_best_path.unwrap(), cur_len)
+            (i_path.unwrap(), i_best_path.unwrap(), cur_len, node)
         }
         None => (
-            vec![NodeIndex::new(0)],
+            vec![],
             PathScore {
                 path: vec![],
                 sizesim: 0.0,
                 cossim: 0.0,
             },
             0,
+            NodeIndex::new(0),
         ),
     };
 
-    let cur_len = cur_len + graph.node_weight(*path.last().unwrap()).unwrap().size;
+    let cur_len = cur_len + graph.node_weight(cur_node).unwrap().size;
 
     // Order next nodes by how close they get us to the haplotype's length
     let mut diffs: Vec<_> = graph
-        .edges(*path.last().unwrap())
+        .edges(cur_node)
         .map(|edge| {
             let target_node = edge.target();
             let size = graph.node_weight(target_node).unwrap().size;
@@ -117,53 +121,47 @@ pub fn find_path(
         })
         .collect();
     diffs.sort_by_key(|&(len_diff, _)| len_diff);
-
     for (_, next_node) in diffs {
-        // I don't know if I need this, anymore
-        if next_node.index() == graph.node_count()
         // stop case - snk node
+        if next_node.index() == graph.node_count() - 1
         {
             // Let the PathScore have the path
             let n_best_path = PathScore::new(graph, path.clone(), target, params);
-            best_path = if best_path > n_best_path {
+            best_path = if n_best_path > best_path {
                 n_best_path
             } else {
                 best_path
             };
-            maxpaths -= 1;
+            npaths += 1;
         } else {
             let n_path = path.clone();
             // Best path if we go to the next node
             // I'm not getting the max path update, its going in, but not coming out
-            best_path = match find_path(
+            (best_path, npaths) = match find_path(
                 graph,
                 target,
                 params,
-                maxpaths,
+                npaths,
                 cur_len,
-                i_cur_node,
+                Some(next_node),
                 Some(n_path),
                 Some(best_path.clone()),
             ) {
-                Some(new_best) => {
-                    if best_path > new_best {
-                        new_best
+                (Some(new_best), mp) => {
+                    if new_best > best_path {
+                        (new_best, mp)
                     } else {
-                        best_path
+                        (best_path, mp)
                     }
                 }
-                None => best_path,
+                (None, mp) => (best_path, mp)
             };
 
-            maxpaths -= 1;
-            if maxpaths <= 0 {
-                break;
-            }
         }
-        if maxpaths <= 0 {
+        if npaths > params.maxpaths {
             break;
         }
     }
 
-    Some(best_path)
+    (Some(best_path), npaths)
 }

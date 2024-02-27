@@ -83,8 +83,11 @@ fn main() {
     for chunk in &mut m_input {
         let m_graph = Variants::new(chunk, args.kd.kmer);
         let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-        m_graph.apply_coverage(&h1, &args.kd);
-        m_graph.apply_coverage(&h2, &args.kd);
+        let p1 = m_graph.apply_coverage(&h1, &args.kd);
+        let p2 = m_graph.apply_coverage(&h2, &args.kd);
+        println!("Graph: {:?}", m_graph);
+        println!("P1: {:?}", p1);
+        println!("P2: {:?}", p2);
         //output
         // nodes that have None for both coverage are 0/0
         // nodes that have None for half shouldn't happen...? They will, actually.
