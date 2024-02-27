@@ -1,39 +1,75 @@
+use crate::cli::KDParams;
+use crate::haplotype::Haplotype;
+use crate::metrics::{self as metrics};
+use crate::vargraph::VarNode;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
-use crate::cli::KDParams;
-use crate::vargraph::VarNode;
-use crate::haplotype::Haplotype;
 
-struct PathScore {
+#[derive(Clone, PartialEq, PartialOrd)]
+pub struct PathScore {
     path: Vec<NodeIndex>,
     sizesim: f32,
     cossim: f32,
 }
 
 impl PathScore {
-    pub fn new(graph: DiGraph<VarNode, ()>, path: Vec<NodeIndex>, target: Haplotype, params: KDParams) -> Self {
+    pub fn new(
+        graph: &DiGraph<VarNode, ()>,
+        path: Vec<NodeIndex>,
+        target: &Haplotype,
+        params: &KDParams,
+    ) -> Self {
         // This is essentially find best path and find all paths where
         // I'm going to sum the path VarNodes and then do size/cos similarity
         // PathScores will be comparable
-        let path_size = [graph.nodes[i].size for i in path].sum();
+        let path_size: i64 = path
+            .iter()
+            .filter_map(|&node_index| graph.node_weight(node_index))
+            .map(|x| x.size)
+            .sum();
+
         if path_size.signum() != target.size.signum() {
-            return PathScore { path, sizesim: 0.0, cossim: 0.0 };
+            return PathScore {
+                path,
+                sizesim: 0.0,
+                cossim: 0.0,
+            };
         }
-        
-        let sizesim =  sizesimilarity(path_size.abs(), target.size.abs());
+
+        let sizesim = metrics::sizesim(path_size.abs() as u64, target.size.abs() as u64);
         // No need for cossim because sizesim is alredy a failure
         if sizesim < params.pctsize {
-            return PathScore { path, sizesim, cossim: 0.0 };
+            return PathScore {
+                path,
+                sizesim,
+                cossim: 0.0,
+            };
         }
 
-        let path_k = [graph.nodes[i].kfeat for i in path].sum();
-        let cossim = if wcoslen < std::cmp::max(target.size.abs(), path_size.abs()) {
-            weighted_cosinesime(path_k, target.kfeat)
+        let path_k: Vec<f32> = path
+            .iter()
+            .filter_map(|&node_index| graph.node_weight(node_index))
+            .map(|x| x.kfeat.as_ref().unwrap())
+            .fold(vec![0f32; 4_usize.pow(params.kmer.into())], |acc, other| {
+                acc.iter()
+                    .zip(other)
+                    .map(|(x, y)| x + y) // This line sums corresponding elements
+                    .collect()
+            });
+
+        // I might have messedup these signs
+        let cossim = if (std::cmp::max(target.size.abs(), path_size.abs()) as u64) < params.wcoslen
+        {
+            metrics::weighted_cosinesim(&path_k, &target.kfeat)
         } else {
-            cosinesim(path_k, target.kfeat)
+            metrics::cosinesim(&path_k, &target.kfeat)
         };
 
-        PathScore { path, sizesim, cossim }
+        PathScore {
+            path,
+            sizesim,
+            cossim,
+        }
     }
 }
 
@@ -42,8 +78,9 @@ impl PathScore {
 /// Assumes NodeIndex 0 is src node and NodeIndex -1 is snk
 /// Returns a PathScore just has the NodeIndex of nodes covred
 pub fn find_path(
-    graph: DiGraph<VarNode, ()>,
-    target: Haplotype,
+    graph: &DiGraph<VarNode, ()>,
+    target: &Haplotype,
+    params: &KDParams,
     mut maxpaths: u64,
     cur_len: i64,
     i_cur_node: Option<NodeIndex>,
@@ -51,38 +88,43 @@ pub fn find_path(
     i_best_path: Option<PathScore>,
 ) -> Option<PathScore> {
     // First call, setup the snk
-    let (mut path, mut best_path, mut cur_len) = match i_cur_node {
+    // Either way, unwrap the i_*
+    let (path, mut best_path, cur_len) = match i_cur_node {
         Some(node) => {
             i_path.as_mut().expect("How?").push(node);
-            (i_path, i_best_path, cur_len)
+            (i_path.unwrap(), i_best_path.unwrap(), cur_len)
         }
-        None => {
-            (Some(vec![NodeIndex::new(0)]), Some(PathScore { path: vec![], sizesim:0.0, cossim:0.0 }), 0)
-        }
+        None => (
+            vec![NodeIndex::new(0)],
+            PathScore {
+                path: vec![],
+                sizesim: 0.0,
+                cossim: 0.0,
+            },
+            0,
+        ),
     };
 
-    let cur_len = cur_len + graph.node_weight(*path.as_ref().expect("How?").last().unwrap()).unwrap().size;
+    let cur_len = cur_len + graph.node_weight(*path.last().unwrap()).unwrap().size;
 
     // Order next nodes by how close they get us to the haplotype's length
     let mut diffs: Vec<_> = graph
-        .edges(*path.as_ref().expect("How?").last().unwrap())
+        .edges(*path.last().unwrap())
         .map(|edge| {
             let target_node = edge.target();
             let size = graph.node_weight(target_node).unwrap().size;
-            (
-                (target.size - (cur_len + size)).abs(),
-                target_node,
-            )
+            ((target.size - (cur_len + size)).abs(), target_node)
         })
         .collect();
     diffs.sort_by_key(|&(len_diff, _)| len_diff);
 
     for (_, next_node) in diffs {
         // I don't know if I need this, anymore
-        if next_node.index() == graph.node_count() // stop case - snk node
+        if next_node.index() == graph.node_count()
+        // stop case - snk node
         {
             // Let the PathScore have the path
-            let n_best_path = Some(PathScore::new(graph, path.clone().unwrap(), target, params));
+            let n_best_path = PathScore::new(graph, path.clone(), target, params);
             best_path = if best_path > n_best_path {
                 n_best_path
             } else {
@@ -93,12 +135,24 @@ pub fn find_path(
             let n_path = path.clone();
             // Best path if we go to the next node
             // I'm not getting the max path update, its going in, but not coming out
-            let n_best_path = find_path(graph, target, maxpaths, cur_len, i_cur_node, n_path, best_path);
-
-            best_path = if best_path > n_best_path {
-                n_best_path
-            } else {
-                best_path
+            best_path = match find_path(
+                graph,
+                target,
+                params,
+                maxpaths,
+                cur_len,
+                i_cur_node,
+                Some(n_path),
+                Some(best_path.clone()),
+            ) {
+                Some(new_best) => {
+                    if best_path > new_best {
+                        new_best
+                    } else {
+                        best_path
+                    }
+                }
+                None => best_path,
             };
 
             maxpaths -= 1;
@@ -111,5 +165,5 @@ pub fn find_path(
         }
     }
 
-    best_path
+    Some(best_path)
 }

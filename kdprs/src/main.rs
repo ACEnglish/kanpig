@@ -81,10 +81,10 @@ fn main() {
      * over optimize, yet. iter.chunks() works, I guess. But I'll have to 'magic number' the size
      */
     for chunk in &mut m_input {
-        let mut m_graph = Variants::new(chunk, args.kd.kmer);
+        let m_graph = Variants::new(chunk, args.kd.kmer);
         let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-        m_graph.apply_coverage(h1, &args.kd);
-        m_graph.apply_coverage(h2, &args.kd);
+        m_graph.apply_coverage(&h1, &args.kd);
+        m_graph.apply_coverage(&h2, &args.kd);
         //output
         // nodes that have None for both coverage are 0/0
         // nodes that have None for half shouldn't happen...? They will, actually.

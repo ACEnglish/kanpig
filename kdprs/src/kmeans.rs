@@ -83,7 +83,7 @@ pub fn kmeans(data: &[Point], k: usize) -> Vec<Cluster> {
 
         // Update cluster centroids
         let old_centroids: Vec<Centroid> = clusters.iter().map(|c| c.centroid.clone()).collect();
-        for (cluster, centroid) in clusters.iter_mut().zip(&old_centroids) {
+        for (cluster, _centroid) in clusters.iter_mut().zip(&old_centroids) {
             cluster.update_centroid();
         }
 

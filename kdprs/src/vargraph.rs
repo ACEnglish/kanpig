@@ -1,6 +1,7 @@
 use crate::cli::KDParams;
 use crate::haplotype::Haplotype;
 use crate::metrics::overlaps;
+use crate::traverse::{find_path, PathScore};
 use crate::vcf_traits::KdpVcf;
 use itertools::Itertools;
 use noodles_vcf::{self as vcf};
@@ -129,7 +130,9 @@ impl Variants {
 
     // Find the path through this graph that best fits
     // the haplotype push coverage onto the VarNodes
-    pub fn apply_coverage(&self, hap: Haplotype, params: &KDParams) {
+    pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> Option<PathScore> {
+        println!("using {:?}, {:?}", hap, params);
+        find_path(&self.graph, hap, params, params.maxpaths, 0, None, None, None)
         // DFS upto params.maxpaths keeping track of the sims of the best path
         // Once you have it, update the nodes with the sims and the hap's coverage
     }

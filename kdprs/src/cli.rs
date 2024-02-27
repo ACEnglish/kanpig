@@ -64,7 +64,7 @@ pub struct KDParams {
 
     /// Maximum number of paths in a graph to traverse
     #[arg(long, default_value_t = 1000)]
-    pub maxpaths: usize,
+    pub maxpaths: u64,
 
     /// Minimum cosine similarity for paths
     #[arg(long, default_value_t = 0.90)]
@@ -76,7 +76,7 @@ pub struct KDParams {
 
     /// Size threshold above which weighted cosine similarity is used
     #[arg(long, default_value_t = 2000)]
-    pub wcoslen: usize,
+    pub wcoslen: u64,
 
     /// Number of attempts through the graph (experimental)
     #[arg(long, default_value_t = 5)]

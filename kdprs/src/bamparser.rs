@@ -204,26 +204,26 @@ impl BamParser {
         let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
         let clusts = kmeans(&allk, 2);
 
-        let mut hapA = Vec::<Haplotype>::new();
-        let mut hapB = Vec::<Haplotype>::new();
+        let mut hap_a = Vec::<Haplotype>::new();
+        let mut hap_b = Vec::<Haplotype>::new();
 
         // Sort them so we can pick the highest covered haplotype
         for (idx, hap) in m_haps.drain(..).enumerate() {
             if clusts[0].points_idx.contains(&idx) {
-                hapA.push(hap);
+                hap_a.push(hap);
             } else {
-                hapB.push(hap);
+                hap_b.push(hap);
             }
         }
-        hapA.sort();
-        hapB.sort();
+        hap_a.sort();
+        hap_b.sort();
 
         // Guaranteed to have one, it is going to be the alternate in a 0/1
-        let mut hap2 = hapA.pop().unwrap();
-        hap2.coverage += hapA.iter().map(|i| i.coverage).sum::<u64>();
+        let mut hap2 = hap_a.pop().unwrap();
+        hap2.coverage += hap_b.iter().map(|i| i.coverage).sum::<u64>();
 
-        let hap1 = if !hapB.is_empty() {
-            let mut hap_t = hapB.pop().unwrap();
+        let hap1 = if !hap_b.is_empty() {
+            let mut hap_t = hap_b.pop().unwrap();
             // Now we need to check if its Compound Het or highly similar and should be Hom
             if (hap_t.size.signum() == hap2.size.signum())
                 && sizesim(hap_t.size.abs() as u64, hap2.size.abs() as u64) > self.params.pctsize
@@ -236,7 +236,7 @@ impl BamParser {
                 }
             } else {
                 // Compound Het
-                hap_t.coverage += hapB.iter().map(|i| i.coverage).sum::<u64>();
+                hap_t.coverage += hap_b.iter().map(|i| i.coverage).sum::<u64>();
                 hap_t
             }
         } else {
