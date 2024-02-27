@@ -9,15 +9,15 @@ use petgraph::graph::{DiGraph, NodeIndex};
 /// Every --input variant is placed inside a node is turned into a graph.
 #[derive(Debug)]
 pub struct VarNode {
-    name: String,
-    start: u64,
-    end: u64,
-    size: i64,
-    kfeat: Option<Vec<f32>>,
-    entry: Option<vcf::Record>,
-    coverage: (Option<u64>, Option<u64>),
-    cossim: (Option<f32>, Option<f32>),
-    sizesim: (Option<f32>, Option<f32>),
+    pub name: String,
+    pub start: u64,
+    pub end: u64,
+    pub size: i64,
+    pub kfeat: Option<Vec<f32>>,
+    pub entry: Option<vcf::Record>,
+    pub coverage: (Option<u64>, Option<u64>),
+    pub cossim: (Option<f32>, Option<f32>),
+    pub sizesim: (Option<f32>, Option<f32>),
 }
 
 impl VarNode {

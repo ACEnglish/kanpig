@@ -222,7 +222,7 @@ impl BamParser {
         let mut hap2 = hapA.pop().unwrap();
         hap2.coverage += hapA.iter().map(|i| i.coverage).sum::<u64>();
 
-        let mut hap1 = if !hapB.is_empty() {
+        let hap1 = if !hapB.is_empty() {
             let mut hap_t = hapB.pop().unwrap();
             // Now we need to check if its Compound Het or highly similar and should be Hom
             if (hap_t.size.signum() == hap2.size.signum())
