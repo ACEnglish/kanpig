@@ -4,12 +4,49 @@ use crate::metrics::{self as metrics};
 use crate::vargraph::VarNode;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
+use std::cmp::Ordering;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct PathScore {
     path: Vec<NodeIndex>,
     sizesim: f32,
     cossim: f32,
+}
+
+impl Eq for PathScore {}
+
+impl PartialEq for PathScore {
+    fn eq(&self, other: &Self) -> bool {
+        self.sizesim == other.sizesim && self.cossim == other.cossim
+    }
+}
+
+impl Ord for PathScore {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.sizesim < other.sizesim {
+            Ordering::Less
+        } else if self.sizesim > other.sizesim {
+            Ordering::Greater
+        } else {
+            self.cossim.partial_cmp(&other.cossim).unwrap_or(Ordering::Equal)
+        }
+    }
+}
+
+impl PartialOrd for PathScore {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Default for PathScore {
+    fn default() -> PathScore {
+        PathScore {
+            path: vec![],
+                sizesim: 0.0,
+                cossim: 0.0,
+        }
+    }
 }
 
 impl PathScore {
@@ -94,16 +131,12 @@ pub fn find_path(
     // Either way, unwrap the i_*
     let (path, mut best_path, cur_len, cur_node) = match i_cur_node {
         Some(node) => {
-            i_path.as_mut().expect("How?").push(node);
+            i_path.as_mut().unwrap().push(node);
             (i_path.unwrap(), i_best_path.unwrap(), cur_len, node)
         }
         None => (
             vec![],
-            PathScore {
-                path: vec![],
-                sizesim: 0.0,
-                cossim: 0.0,
-            },
+            PathScore::default(),
             0,
             NodeIndex::new(0),
         ),
@@ -121,22 +154,18 @@ pub fn find_path(
         })
         .collect();
     diffs.sort_by_key(|&(len_diff, _)| len_diff);
+
     for (_, next_node) in diffs {
-        // stop case - snk node
         if next_node.index() == graph.node_count() - 1 {
             // Let the PathScore have the path
             let n_best_path = PathScore::new(graph, path.clone(), target, params);
-            best_path = if n_best_path > best_path {
-                n_best_path
-            } else {
-                best_path
-            };
+            best_path = best_path.max(n_best_path);
             npaths += 1;
         } else {
             let n_path = path.clone();
             // Best path if we go to the next node
             // I'm not getting the max path update, its going in, but not coming out
-            (best_path, npaths) = match find_path(
+            let (new_best, mp) = find_path(
                 graph,
                 target,
                 params,
@@ -145,16 +174,12 @@ pub fn find_path(
                 Some(next_node),
                 Some(n_path),
                 Some(best_path.clone()),
-            ) {
-                (Some(new_best), mp) => {
-                    if new_best > best_path {
-                        (new_best, mp)
-                    } else {
-                        (best_path, mp)
-                    }
-                }
-                (None, mp) => (best_path, mp),
-            };
+            );
+            
+            if let Some(new_best) = new_best {
+                best_path = best_path.max(new_best);
+            }
+            npaths = mp;
         }
         if npaths > params.maxpaths {
             break;
