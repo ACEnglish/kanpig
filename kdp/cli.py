@@ -38,7 +38,7 @@ def parse_args(args):
                         help="Minimum size similarity between a path and haplotype (%(default)s)")
     parser.add_argument("--wcoslen", type=truvari.restricted_int, default=2000,
                         help="Size threshold to switch to weighted cossim (%(default)s)")
-    parser.add_argument("--n_tries", type=truvari.restricted_int, default=5,
+    parser.add_argument("--n_tries", type=truvari.restricted_int, default=1,
                         help="Number of attempts to find variants (%(default)s)")
     parser.add_argument("--pg", action="store_true",
                         help="Allow multiple phase groups (don't use) (%(default)s)")

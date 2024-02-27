@@ -1,3 +1,5 @@
+use crate::cli::KDParams;
+use crate::haplotype::Haplotype;
 use crate::metrics::overlaps;
 use crate::vcf_traits::KdpVcf;
 use itertools::Itertools;
@@ -13,6 +15,9 @@ pub struct VarNode {
     size: i64,
     kfeat: Option<Vec<f32>>,
     entry: Option<vcf::Record>,
+    coverage: (Option<u64>, Option<u64>),
+    cossim: (Option<f32>, Option<f32>),
+    sizesim: (Option<f32>, Option<f32>),
 }
 
 impl VarNode {
@@ -28,6 +33,9 @@ impl VarNode {
             size,
             kfeat: Some(kfeat),
             entry: Some(entry),
+            coverage: (None, None),
+            cossim: (None, None),
+            sizesim: (None, None),
         }
     }
 
@@ -40,6 +48,9 @@ impl VarNode {
             size: 0,
             kfeat: None,
             entry: None,
+            coverage: (None, None),
+            cossim: (None, None),
+            sizesim: (None, None),
         }
     }
 }
@@ -124,5 +135,11 @@ impl Variants {
         }
 
         (chrom, min_start, max_end)
+    }
+
+    // Find the path through this graph that best fits 
+    // the haplotype push coverage onto the VarNodes
+    pub fn apply_coverage(&self, hap: Haplotype, params: &KDParams) {
+
     }
 }

@@ -80,9 +80,10 @@ fn main() {
      * over optimize, yet. iter.chunks() works, I guess. But I'll have to 'magic number' the size
      */
     for chunk in &mut m_input {
-        let m_graph = Variants::new(chunk, args.kd.kmer);
-        let (h1, h2) = m_bam.find_haps(m_graph.chrom, m_graph.start, m_graph.end);
-        //m_graph.apply_coverage(h1, h2, args.kd);
+        let mut m_graph = Variants::new(chunk, args.kd.kmer);
+        let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
+        m_graph.apply_coverage(h1, &args.kd);
+        m_graph.apply_coverage(h2, &args.kd);
         //output
     }
 

@@ -58,7 +58,7 @@ impl BamParser {
         self.is_open = true;
     }
 
-    pub fn find_haps(&mut self, chrom: String, start: u64, end: u64) -> (Haplotype, Haplotype) {
+    pub fn find_haps(&mut self, chrom: &String, start: u64, end: u64) -> (Haplotype, Haplotype) {
         if !self.is_open {
             self.open();
         }
@@ -121,7 +121,7 @@ impl BamParser {
             }
         }
 
-        let mut m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
+        let mut m_haps = self.reads_to_haps(m_reads, p_variants, &chrom);
         let coverage = tot_cov / (window_end - window_start + (2 * self.params.chunksize));
         if coverage == 0 || m_haps.is_empty() {
             return (
@@ -149,7 +149,7 @@ impl BamParser {
         &self,
         reads: HashMap<Vec<u8>, Vec<PileupVariant>>,
         pileups: HashMap<PileupVariant, u64>,
-        chrom: String,
+        chrom: &String,
     ) -> Vec<Haplotype> {
         let mut hap_parts = HashMap::<PileupVariant, Haplotype>::new();
 

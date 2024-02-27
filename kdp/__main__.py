@@ -22,7 +22,7 @@ def unify_chromosomes(tree, bam_fn, ref_fn):
     ref_rm = vcf_names - ref_names
     if bam_rm or ref_rm:
         logging.warning("VCF has %d references not in BAM and %d not in REF. Removing", len(bam_rm), len(ref_rm))
-        for i in bam_rm + ref_rm:
+        for i in bam_rm & ref_rm:
             del(tree[i])
     return tree
             
