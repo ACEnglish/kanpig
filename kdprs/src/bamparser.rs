@@ -176,13 +176,20 @@ impl BamParser {
             hap_parts.insert(p, n_hap);
         }
 
+        // Deduplicate reads
+        let mut unique_reads: HashMap<&Vec<PileupVariant>, u64> = HashMap::new();
+        for m_plups in reads.values() {
+            *unique_reads.entry(m_plups).or_insert(0) += 1;
+        }
+
+        // Turn variants into haplotypes
         let mut ret = Vec::<Haplotype>::new();
-        for read_pileups in reads.values() {
+        for (read_pileups, coverage) in unique_reads {
             let mut cur_hap = Haplotype::blank(self.params.kmer, 1);
             for p in read_pileups {
                 cur_hap.add(&hap_parts[&p]);
             }
-            cur_hap.coverage = read_pileups.len() as u64;
+            cur_hap.coverage = coverage;
             ret.push(cur_hap);
         }
 
@@ -197,7 +204,7 @@ impl BamParser {
         let mut hapA = Vec::<Haplotype>::new();
         let mut hapB = Vec::<Haplotype>::new();
         
-        println!("len: {} - A: {:?} B: {:?}", m_haps.len(), clusts[0].points_idx, clusts[1].points_idx);
+        // Sort them so we can pick the highest covered haplotype
         for (idx, hap) in m_haps.drain(..).enumerate() {
             if clusts[0].points_idx.contains(&idx) {
                 hapA.push(hap);
@@ -207,15 +214,22 @@ impl BamParser {
         }
         hapA.sort();
         hapB.sort();
-        println!("A->{:?}", hapA);
-        println!("B->{:?}", hapB);
-        let mut hap1 = hapA.pop().unwrap();
-        let mut hap2 = hapB.pop().unwrap();
 
-        hap1.coverage += hapA.iter().map(|i| i.coverage).sum::<u64>();
-        hap2.coverage += hapB.iter().map(|i| i.coverage).sum::<u64>();
+        // Guaranteed to have one, it is going to be the alternate in a 0/1
+        let mut hap2 = hapA.pop().unwrap();
+        hap2.coverage += hapA.iter().map(|i| i.coverage).sum::<u64>();
 
-        println!("{:?}-----{:?}", hap1, hap2);
+        let mut hap1 = if !hapB.is_empty() {
+            hapB.pop().unwrap()
+            // Now we need to check if its Compound Het or sequencing error should be Hom
+        } else {
+            // Need to check if its REF & Het or just Hom, if REF, need to set the Coverage correct
+            Haplotype::blank(self.params.kmer, 0)
+        };
+        
+        // Consolidate the coverage
+        hap1.coverage += hapB.iter().map(|i| i.coverage).sum::<u64>();
+
         (hap1.clone(), hap2.clone())
 
         // REF &  HET
