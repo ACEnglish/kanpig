@@ -102,10 +102,17 @@ fn main() {
                     continue;
                 }
             };
+            //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
+            let gt = match (p1.as_ref().unwrap().path.contains(&var_idx), p2.as_ref().unwrap().path.contains(&var_idx)) {
+                (true, true) => "1|1",
+                (true, false) => "1|0",
+                (false, true) => "0|1",
+                (false, false) => "0|0",
+            };
             let keys = "GT:GQ".parse().unwrap();
             let genotypes = Genotypes::new(
                 keys,
-                vec![vec![Some(Value::from("0|0")), Some(Value::from(13))]],
+                vec![vec![Some(Value::from(gt)), Some(Value::from(13))]],
             );
 
             *cur_var.genotypes_mut() = genotypes.clone();

@@ -7,9 +7,9 @@ use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
 pub struct PathScore {
-    path: Vec<NodeIndex>,
-    sizesim: f32,
-    cossim: f32,
+    pub path: Vec<NodeIndex>,
+    pub sizesim: f32,
+    pub cossim: f32,
 }
 
 impl Eq for PathScore {}
@@ -98,14 +98,17 @@ impl PathScore {
                 },
             );
 
-        // I might have messedup these signs
-        let cossim = if std::cmp::max(target.size.unsigned_abs(), path_size.unsigned_abs())
+        let mut cossim = if std::cmp::max(target.size.unsigned_abs(), path_size.unsigned_abs())
             < params.wcoslen
         {
             metrics::weighted_cosinesim(&path_k, &target.kfeat)
         } else {
             metrics::cosinesim(&path_k, &target.kfeat)
         };
+        // thing about the logic
+        if cossim < params.cossim {
+            cossim = 0.0;
+        }
 
         PathScore {
             path,
