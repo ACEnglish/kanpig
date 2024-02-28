@@ -153,8 +153,6 @@ fn find_path(
     mut i_path: Option<Vec<NodeIndex>>,
     i_best_path: Option<PathScore>,
 ) -> (Option<PathScore>, u64) {
-    // First call, setup the snk
-    // Either way, unwrap the i_*
     let (path, mut best_path, cur_len, cur_node) = match i_cur_node {
         Some(node) => {
             i_path.as_mut().unwrap().push(node);
@@ -178,14 +176,10 @@ fn find_path(
 
     for (_, next_node) in diffs {
         if next_node.index() == graph.node_count() - 1 {
-            // Let the PathScore have the path
             let n_best_path = PathScore::new(graph, path.clone(), target, params);
             best_path = best_path.max(n_best_path);
             npaths += 1;
         } else {
-            let n_path = path.clone();
-            // Best path if we go to the next node
-            // I'm not getting the max path update, its going in, but not coming out
             let (new_best, mp) = find_path(
                 graph,
                 target,
@@ -193,7 +187,7 @@ fn find_path(
                 npaths,
                 cur_len,
                 Some(next_node),
-                Some(n_path),
+                Some(path.clone()),
                 Some(best_path.clone()),
             );
 
