@@ -65,8 +65,9 @@ impl PathScore {
             .filter_map(|&node_index| graph.node_weight(node_index))
             .map(|x| x.size)
             .sum();
-
+        println!("path size {} sig p:{} t:{}", path_size, path_size.signum(), target.size.signum());
         if path_size.signum() != target.size.signum() {
+            println!("I know this isn't it");
             return PathScore {
                 path,
                 sizesim: 0.0,
@@ -74,9 +75,10 @@ impl PathScore {
             };
         }
 
-        let sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
+        let mut sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
         // No need for cossim because sizesim is alredy a failure
         if sizesim < params.pctsize {
+            println!("size sim is broken? {}", sizesim);
             return PathScore {
                 path,
                 sizesim,
@@ -98,16 +100,21 @@ impl PathScore {
                 },
             );
 
-        let mut cossim = if std::cmp::max(target.size.unsigned_abs(), path_size.unsigned_abs())
+        //let mut cossim = metrics::cosinesim(&path_k, &target.kfeat);
+        // weighted is broken now, I guess
+        let mut cossim = metrics::seqsim(&path_k, &target.kfeat);
+        /*let mut cossim = if std::cmp::max(target.size.unsigned_abs(), path_size.unsigned_abs())
             < params.wcoslen
         {
             metrics::weighted_cosinesim(&path_k, &target.kfeat)
         } else {
             metrics::cosinesim(&path_k, &target.kfeat)
-        };
+        };*/
+        println!("cossim is broken...{}", cossim);
         // thing about the logic
         if cossim < params.cossim {
             cossim = 0.0;
+            sizesim = 0.0;
         }
 
         PathScore {

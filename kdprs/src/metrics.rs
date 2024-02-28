@@ -2,7 +2,19 @@ use simsimd::SimSIMD;
 
 /// Cosine similarity
 pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
-    1.0 - f32::cosine(a, b).unwrap()
+    (1.0 - f32::cosine(a, b).unwrap()).abs()
+}
+
+/// Experimental jaccard-like similarity
+pub fn seqsim(a: &[f32], b:&[f32]) -> f32 {
+    // can probably combine these
+    if a == b {
+        return 1.0;
+    }
+    let neum = a.iter().zip(b.iter()).map(|(x,y)| (x - y).abs()).sum::<f32>();
+    let deno = a.iter().zip(b.iter()).map(|(x,y)| x.abs() + y.abs()).sum::<f32>();
+    println!("{} - {}", neum, deno);
+    1.0 - (neum / deno)
 }
 
 /// Weighted cosine similarity

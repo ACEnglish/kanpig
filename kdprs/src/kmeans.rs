@@ -1,5 +1,5 @@
 // Written by chatgpt because the kmeans crate is broken because simd is??
-use rand::seq::SliceRandom;
+//use rand::seq::SliceRandom;
 use std::cmp::Ordering;
 
 // Define a point in multidimensional space
@@ -55,9 +55,10 @@ fn distance(p1: &Point, p2: &Point) -> f32 {
 
 pub fn kmeans(data: &[Point], k: usize) -> Vec<Cluster> {
     // Initialize clusters with random centroids
-    let mut rng = rand::thread_rng();
-    // Should probably choose highest covered
-    let mut centroids: Vec<Point> = data.choose_multiple(&mut rng, k).cloned().collect();
+    //let mut rng = rand::thread_rng();
+    // Should probably choose highest covered - or at least be able to seed
+    //let mut centroids: Vec<Point> = data.choose_multiple(&mut rng, k).cloned().collect();
+    let mut centroids: Vec<Point> = data.iter().take(k).cloned().collect();
     let mut clusters: Vec<Cluster> = centroids
         .iter()
         .map(|centroid| Cluster::new(centroid.clone()))

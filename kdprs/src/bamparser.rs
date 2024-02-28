@@ -114,7 +114,7 @@ impl BamParser {
                     }
                     _ => continue,
                 };
-
+                println!("Pileup {:?}", m_var);
                 *p_variants.entry(m_var.clone()).or_insert(0) += 1;
                 let qname = alignment.record().qname().to_owned();
                 m_reads.entry(qname).or_default().push(m_var);
@@ -122,8 +122,9 @@ impl BamParser {
         }
 
         let mut m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
-        let coverage = tot_cov / (window_end - window_start + (2 * self.params.chunksize));
+        let coverage = tot_cov / (window_end - window_start);
         if coverage == 0 || m_haps.is_empty() {
+            println!("We're not getting out?");
             return (
                 Haplotype::blank(self.params.kmer, coverage),
                 Haplotype::blank(self.params.kmer, coverage),
@@ -133,6 +134,7 @@ impl BamParser {
         let REFTHRESHOLD = 0.85;
 
         if m_haps.len() == 1 {
+            println!("Okay, only one thing hapening");
             let hap2 = m_haps.pop().unwrap();
             let hap1 = if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
                 Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
@@ -194,61 +196,80 @@ impl BamParser {
             ret.push(cur_hap);
         }
 
+        // Sort so higher coverage haplotypes are preferred as centroids
+        ret.sort_by_key(|i| std::cmp::Reverse(i.coverage));
         ret
     }
 
     /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
+    /// This is 'actually' the genotyper. Whatever come out of here is mapped to the variants
+    /// So inaccurate descriptions of the two haplotypes can not produce good genotypes.
     fn read_cluster(&self, mut m_haps: Vec<Haplotype>, coverage: u64) -> (Haplotype, Haplotype) {
         let REFTHRESHOLD = 0.85;
 
         let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
         let clusts = kmeans(&allk, 2);
 
-        let mut hap_a = Vec::<Haplotype>::new();
-        let mut hap_b = Vec::<Haplotype>::new();
+        let mut hap_alt = Vec::<Haplotype>::new();
+        let mut hap_base = Vec::<Haplotype>::new();
 
         // Sort them so we can pick the highest covered haplotype
         for (idx, hap) in m_haps.drain(..).enumerate() {
             if clusts[0].points_idx.contains(&idx) {
-                hap_a.push(hap);
+                println!("Assigning A {:?}", hap);
+                hap_alt.push(hap);
             } else {
-                hap_b.push(hap);
+                println!("Assigning B {:?}", hap);
+                hap_base.push(hap);
             }
         }
-        hap_a.sort();
-        hap_b.sort();
-
+        hap_alt.sort();
+        hap_base.sort();
+        println!("Total coverage: {}", coverage);
         // Guaranteed to have one, it is going to be the alternate in a 0/1
-        let mut hap2 = hap_a.pop().unwrap();
-        hap2.coverage += hap_b.iter().map(|i| i.coverage).sum::<u64>();
+        let mut hap2 = hap_alt.pop().unwrap();
+        hap2.coverage += hap_alt.iter().map(|i| i.coverage).sum::<u64>();
 
-        let hap1 = if !hap_b.is_empty() {
-            let mut hap_t = hap_b.pop().unwrap();
+        let hap1 = if !hap_base.is_empty() {
+            let mut hap_t = hap_base.pop().unwrap();
+            hap_t.coverage = hap_base.iter().map(|i| i.coverage).sum::<u64>();
+            
             // Now we need to check if its Compound Het or highly similar and should be Hom
             if (hap_t.size.signum() == hap2.size.signum())
                 && sizesim(hap_t.size.unsigned_abs(), hap2.size.unsigned_abs())
                     > self.params.pctsize
             {
-                // Very similar, see if we need to make a reference haplotype
+                // Highly similar, we're probably looking at one variant
+                // Make hap2 the hap with higher coverage
+                if hap2.coverage > hap_t.coverage {
+                    std::mem::swap(&mut hap2, &mut hap_t);
+                }
+                // assign base to hap2 and see if we need to make a reference haplotype
+                hap2.coverage += hap_t.coverage;
                 if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
+                    println!("Creating highsim REFHET");
                     Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
                 } else {
+                    println!("Creating highsim HOMALT");
                     hap2.clone()
                 }
             } else {
                 // Compound Het
-                hap_t.coverage += hap_b.iter().map(|i| i.coverage).sum::<u64>();
+                println!("Creating compound HET");
                 hap_t
             }
         } else {
-            // Need to check if its REF & Het or just Hom, if REF, need to set the Coverage correct
+            // Don't have a hap_base, so now we figure out if its REFHET or identical HOMALT
             if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
+                println!("Creating unsep REFHET");
                 Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
             } else {
+                println!("Creating ident HOMALT");
                 hap2.clone()
             }
         };
 
+        println!("Total coverage: {} - {}:{}", coverage, hap1.coverage, hap2.coverage);
         (hap1, hap2)
     }
 }

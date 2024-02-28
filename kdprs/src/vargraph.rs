@@ -162,14 +162,14 @@ fn find_path(
     };
 
     let cur_len = cur_len + graph.node_weight(cur_node).unwrap().size;
-
+    println!("{} {}", target.size, cur_len);
     // Order next nodes by how close they get us to the haplotype's length
     let mut diffs: Vec<_> = graph
         .edges(cur_node)
         .map(|edge| {
             let target_node = edge.target();
             let size = graph.node_weight(target_node).unwrap().size;
-            ((target.size - (cur_len + size)).abs(), target_node)
+            ((target.size.abs_diff(cur_len + size)), target_node)
         })
         .collect();
     diffs.sort_by_key(|&(len_diff, _)| len_diff);
@@ -177,6 +177,7 @@ fn find_path(
     for (_, next_node) in diffs {
         if next_node.index() == graph.node_count() - 1 {
             let n_best_path = PathScore::new(graph, path.clone(), target, params);
+            println!("Found Path {:?}", n_best_path);
             best_path = best_path.max(n_best_path);
             npaths += 1;
         } else {
