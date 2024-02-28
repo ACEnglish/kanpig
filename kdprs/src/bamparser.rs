@@ -19,7 +19,7 @@ use crate::cli::KDParams;
 use crate::haplotype::Haplotype;
 use crate::kmeans::kmeans;
 use crate::kmer::seq_to_kmer;
-use crate::metrics::sizesim;
+use crate::metrics;
 use crate::pileup::PileupVariant;
 use crate::vcf_traits::Svtype;
 use rust_htslib::bam::ext::BamRecordExtensions;
@@ -136,7 +136,8 @@ impl BamParser {
         if m_haps.len() == 1 {
             println!("Okay, only one thing hapening");
             let hap2 = m_haps.pop().unwrap();
-            let hap1 = if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
+            // Het at best
+            let hap1 = if metrics::genotyper(coverage as f64, hap2.coverage as f64) != metrics::GTstate::Hom {
                 Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
             } else {
                 hap2.clone()
@@ -232,11 +233,11 @@ impl BamParser {
 
         let hap1 = if !hap_base.is_empty() {
             let mut hap_t = hap_base.pop().unwrap();
-            hap_t.coverage = hap_base.iter().map(|i| i.coverage).sum::<u64>();
+            hap_t.coverage += hap_base.iter().map(|i| i.coverage).sum::<u64>();
             
             // Now we need to check if its Compound Het or highly similar and should be Hom
             if (hap_t.size.signum() == hap2.size.signum())
-                && sizesim(hap_t.size.unsigned_abs(), hap2.size.unsigned_abs())
+                && metrics::sizesim(hap_t.size.unsigned_abs(), hap2.size.unsigned_abs())
                     > self.params.pctsize
             {
                 // Highly similar, we're probably looking at one variant
@@ -246,7 +247,7 @@ impl BamParser {
                 }
                 // assign base to hap2 and see if we need to make a reference haplotype
                 hap2.coverage += hap_t.coverage;
-                if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
+                if metrics::genotyper(coverage as f64, hap2.coverage as f64) != metrics::GTstate::Hom {
                     println!("Creating highsim REFHET");
                     Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
                 } else {
@@ -260,7 +261,7 @@ impl BamParser {
             }
         } else {
             // Don't have a hap_base, so now we figure out if its REFHET or identical HOMALT
-            if (hap2.coverage as f64 / coverage as f64) < REFTHRESHOLD {
+            if metrics::genotyper(coverage as f64, hap2.coverage as f64) != metrics::GTstate::Hom {
                 println!("Creating unsep REFHET");
                 Haplotype::blank(self.params.kmer, coverage - hap2.coverage)
             } else {

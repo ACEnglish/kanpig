@@ -1,4 +1,5 @@
 use simsimd::SimSIMD;
+use ordered_float::OrderedFloat;
 
 /// Cosine similarity
 pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
@@ -65,17 +66,27 @@ pub fn overlaps(s1: u64, e1: u64, s2: u64, e2: u64) -> bool {
 
 use std::f64::consts::LN_10;
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum GTstate {
+    Ref,
+    Het,
+    Hom,
+    Non,
+    Unk,
+    //Hemi should be a thing
+}
+
 /// Generate probabilities of genotypes
 /// Smallest value is most likely genotype
 /// I need this to return GT::REF,GT::HET,GT::HOM
 /// Then, instead of relying on the hard threshold, we can check if genotyper(coverage, alt_cov) ==
 /// GT::HOM
-pub fn genotyper(tot_cov: f64, alt_cov: f64, priors: Option<&[f64]>) -> Option<Vec<f64>> {
+pub fn genotyper(tot_cov: f64, alt_cov: f64) -> GTstate {
     if tot_cov == 0.0 {
-        return None;
+        return GTstate::Unk;
     }
 
-    let priors = priors.unwrap_or(&[0.05, 0.5, 0.95]);
+    let priors: &[f64] = &[0.05, 0.5, 0.95];
 
     let mut gt_list = Vec::new();
 
@@ -89,8 +100,17 @@ pub fn genotyper(tot_cov: f64, alt_cov: f64, priors: Option<&[f64]>) -> Option<V
         comb += non_alt * (1.0 - p_alt).ln();
         gt_list.push(comb);
     }
+    
+    // Some(gt_list) What I should be returning for a GQ
+    let ret = match gt_list.iter().enumerate().max_by_key(|&(_, &x)| OrderedFloat(x)).map(|(i, _)| i) {
+        Some(0) => GTstate::Ref,
+        Some(1) => GTstate::Het,
+        Some(2) => GTstate::Hom,
+        _ => panic!("not possible"),
+    };
+    println!("GENOTYPER: {:?}", ret);
+    ret
 
-    Some(gt_list)
 }
 
 fn log_choose(n: f64, k: f64) -> f64 {
