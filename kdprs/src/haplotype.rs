@@ -21,7 +21,7 @@ impl Haplotype {
     // Create an empty haplotype
     pub fn blank(kmer: u8, coverage: u64) -> Haplotype {
         Haplotype {
-            kfeat: seq_to_kmer(&[], kmer),
+            kfeat: seq_to_kmer(&[], kmer, false),
             size: 0,
             n: 0,
             coverage,

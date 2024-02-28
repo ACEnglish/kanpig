@@ -104,7 +104,7 @@ fn main() {
                 }
             };
             //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
-            let gt = match (p1.as_ref().unwrap().path.contains(&var_idx), p2.as_ref().unwrap().path.contains(&var_idx)) {
+            let gt = match (p1.path.contains(&var_idx), p2.path.contains(&var_idx)) {
                 (true, true) => "1|1",
                 (true, false) => "1|0",
                 (false, true) => "0|1",

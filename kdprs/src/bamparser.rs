@@ -171,7 +171,7 @@ impl BamParser {
             }
 
             let n_hap = Haplotype::new(
-                seq_to_kmer(&p.sequence.clone().unwrap(), self.params.kmer),
+                seq_to_kmer(&p.sequence.clone().unwrap(), self.params.kmer, p.indel == Svtype::Del),
                 p.size,
                 1,
                 1,

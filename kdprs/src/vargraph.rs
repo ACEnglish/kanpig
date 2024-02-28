@@ -133,8 +133,17 @@ impl Variants {
 
     // Find the path through this graph that best fits
     // the haplotype push coverage onto the VarNodes
-    pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> Option<PathScore> {
-        find_path(&self.graph, hap, params, 0, 0, None, None, None).0
+    pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
+        // if there are no variants in the hap, we don't want to apply the coverage.
+        if hap.n == 0 {
+            PathScore::default()
+        } else {
+            // if - for some reason find_score returns None (I don't think this can happen
+            match find_path(&self.graph, hap, params, 0, 0, None, None, None).0 {
+                Some(pscore) => pscore,
+                None => PathScore::default(),
+            }
+        }
     }
 }
 
@@ -179,6 +188,7 @@ fn find_path(
             let n_best_path = PathScore::new(graph, path.clone(), target, params);
             println!("Found Path {:?}", n_best_path);
             best_path = best_path.max(n_best_path);
+            println!("New Best Path {:?}", best_path);
             npaths += 1;
         } else {
             let (new_best, mp) = find_path(
