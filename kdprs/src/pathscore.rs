@@ -9,14 +9,14 @@ use std::cmp::Ordering;
 pub struct PathScore {
     pub path: Vec<NodeIndex>,
     pub sizesim: f32,
-    pub cossim: f32,
+    pub seqsim: f32,
 }
 
 impl Eq for PathScore {}
 
 impl PartialEq for PathScore {
     fn eq(&self, other: &Self) -> bool {
-        self.sizesim == other.sizesim && self.cossim == other.cossim
+        self.sizesim == other.sizesim && self.seqsim == other.seqsim
     }
 }
 
@@ -27,8 +27,8 @@ impl Ord for PathScore {
         } else if self.sizesim > other.sizesim {
             Ordering::Greater
         } else {
-            self.cossim
-                .partial_cmp(&other.cossim)
+            self.seqsim
+                .partial_cmp(&other.seqsim)
                 .unwrap_or(Ordering::Equal)
         }
     }
@@ -45,7 +45,7 @@ impl Default for PathScore {
         PathScore {
             path: vec![],
             sizesim: 0.0,
-            cossim: 0.0,
+            seqsim: 0.0,
         }
     }
 }
@@ -70,18 +70,18 @@ impl PathScore {
             return PathScore {
                 path,
                 sizesim: -1.0, // ew
-                cossim: -1.0,
+                seqsim: -1.0,
             };
         }
 
         let mut sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
-        // No need for cossim because sizesim is alredy a failure
-        if sizesim < params.pctsize {
+        // No need for seqsim because sizesim is alredy a failure
+        if sizesim < params.sizesim {
             println!("size sim is broken? {}", sizesim);
             return PathScore {
                 path,
                 sizesim: -1.0,
-                cossim: -1.0,
+                seqsim: -1.0,
             };
         }
 
@@ -99,27 +99,17 @@ impl PathScore {
                 },
             );
 
-        //let mut cossim = metrics::cosinesim(&path_k, &target.kfeat);
-        // weighted is broken now, I guess
-        let mut cossim = metrics::seqsim(&path_k, &target.kfeat);
-        /*let mut cossim = if std::cmp::max(target.size.unsigned_abs(), path_size.unsigned_abs())
-            < params.wcoslen
-        {
-            metrics::weighted_cosinesim(&path_k, &target.kfeat)
-        } else {
-            metrics::cosinesim(&path_k, &target.kfeat)
-        };*/
-        println!("cossim is broken...{}", cossim);
-        // thing about the logic
-        if cossim < params.cossim {
-            cossim = -1.0;
+        let mut seqsim = metrics::seqsim(&path_k, &target.kfeat, params.minkfreq as f32);
+
+        if seqsim < params.seqsim {
+            seqsim = -1.0;
             sizesim = -1.0;
         }
 
         PathScore {
             path,
             sizesim,
-            cossim,
+            seqsim,
         }
     }
 }

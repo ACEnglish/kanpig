@@ -131,8 +131,6 @@ impl BamParser {
             );
         };
 
-        let REFTHRESHOLD = 0.85;
-
         if m_haps.len() == 1 {
             println!("Okay, only one thing hapening");
             let hap2 = m_haps.pop().unwrap();
@@ -206,8 +204,6 @@ impl BamParser {
     /// This is 'actually' the genotyper. Whatever come out of here is mapped to the variants
     /// So inaccurate descriptions of the two haplotypes can not produce good genotypes.
     fn read_cluster(&self, mut m_haps: Vec<Haplotype>, coverage: u64) -> (Haplotype, Haplotype) {
-        let REFTHRESHOLD = 0.85;
-
         let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
         let clusts = kmeans(&allk, 2);
 
@@ -238,7 +234,7 @@ impl BamParser {
             // Now we need to check if its Compound Het or highly similar and should be Hom
             if (hap_t.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap_t.size.unsigned_abs(), hap2.size.unsigned_abs())
-                    > self.params.pctsize
+                    > self.params.sizesim
             {
                 // Highly similar, we're probably looking at one variant
                 // Make hap2 the hap with higher coverage

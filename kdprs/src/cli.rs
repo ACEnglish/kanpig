@@ -66,21 +66,17 @@ pub struct KDParams {
     #[arg(long, default_value_t = 1000)]
     pub maxpaths: u64,
 
-    /// Minimum cosine similarity for paths
+    /// Minimum sequence similarity for paths
     #[arg(long, default_value_t = 0.90)]
-    pub cossim: f32,
+    pub seqsim: f32,
 
     /// Minimum size similarity for paths
     #[arg(long, default_value_t = 0.90)]
-    pub pctsize: f32,
+    pub sizesim: f32,
 
-    /// Size threshold above which weighted cosine similarity is used
-    #[arg(long, default_value_t = 2000)]
-    pub wcoslen: u64,
-
-    /// Number of attempts through the graph (experimental)
-    #[arg(long, default_value_t = 5)]
-    pub n_tries: usize,
+    /// Minimum frequency of kmer
+    #[arg(long, default_value_t = 1)]
+    pub minkfreq: u64,
 }
 
 impl ArgParser {

@@ -6,33 +6,30 @@ pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
     (1.0 - f32::cosine(a, b).unwrap()).abs()
 }
 
-/// Experimental jaccard-like similarity - it actually might just be a normalized euclidean
-/// distance
-pub fn seqsim(a: &[f32], b:&[f32]) -> f32 {
+/// Canberra distance of featurized kmers
+pub fn seqsim(a: &[f32], b:&[f32], mink: f32) -> f32 {
     println!("comparing {:?} {:?}", a, b);
-    let deno = a.iter().zip(b.iter()).map(|(x,y)| x.abs() + y.abs()).sum::<f32>();
+    let mut deno: f32 = 0.0;
+    let mut neum: f32 = 0.0;
+    for (x,y) in a.iter().zip(b.iter()) {
+        let d = x.abs() + y.abs();
+        if d <= mink {
+            continue;
+        }
+        deno += d;
+
+        neum += (x - y).abs();
+    }
+
     if deno == 0.0 { // no kmers
-        println!("nokmers");
         return 0.0;
     }
 
-    let neum = a.iter().zip(b.iter()).map(|(x,y)| (x - y).abs()).sum::<f32>();
     if neum == 0.0 { // identical
-        println!("identical");
         return 1.0;
     }
-    let ret = 1.0 - (neum / deno);
-    // Argument for 1.0 - 4446660
-    // 4809 4810
-    // path size 4810 sig p:1 t:1
-    // 17 over 9613 equals 0.9982316
-
-    // Argument against 1.0 - 6170297
-    //-332 -332
-    // path size -332 sig p:-1 t:-1
-    // 659 over 659 equals 0
-    println!("{} over {} equals {}", neum, deno, ret);
-    ret
+    //println!("{} over {} equals {}", neum, deno, ret);
+    1.0 - (neum / deno)
 }
 
 /// Weighted cosine similarity
