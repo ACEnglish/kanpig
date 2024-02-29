@@ -1,5 +1,6 @@
 use ordered_float::OrderedFloat;
 use simsimd::SimSIMD;
+use std::f64::consts::LN_10;
 
 /// Cosine similarity
 pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
@@ -62,7 +63,6 @@ pub fn overlaps(s1: u64, e1: u64, s2: u64, e2: u64) -> bool {
     std::cmp::max(s1, s2) < std::cmp::min(e1, e2)
 }
 
-use std::f64::consts::LN_10;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum GTstate {
@@ -76,9 +76,6 @@ pub enum GTstate {
 
 /// Generate probabilities of genotypes
 /// Smallest value is most likely genotype
-/// I need this to return GT::REF,GT::HET,GT::HOM
-/// Then, instead of relying on the hard threshold, we can check if genotyper(coverage, alt_cov) ==
-/// GT::HOM
 pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
     let total = alt1_cov + alt2_cov;
     if total == 0.0 {

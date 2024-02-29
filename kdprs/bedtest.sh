@@ -5,6 +5,7 @@ cargo run --release -- \
     --bam /Users/english/code/kfdphase/test/NA24385.chr20.bam \
     --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
     --bed test/test.chr20.bed \
+    --sizesim 0.95 --seqsim 0.95 \
     -o test/nope.vcf
 
 cut -f1-10 test/nope.vcf | bcftools sort -O z -o  test/nope.vcf.gz
