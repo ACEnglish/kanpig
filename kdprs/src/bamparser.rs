@@ -85,11 +85,14 @@ impl BamParser {
             }
 
             let pileup = pileup.unwrap();
-
             let m_pos: u64 = pileup.pos().into();
+
             // We got to truncate the pileup
-            if m_pos < window_start || window_end < m_pos {
+            if m_pos < window_start {
                 continue;
+            }
+            if  window_end < m_pos {
+                break;
             }
 
             tot_cov += pileup.depth() as u64;

@@ -421,7 +421,6 @@ dependencies = [
  "pretty_env_logger",
  "rand",
  "rust-htslib",
- "simsimd",
 ]
 
 [[package]]
@@ -781,15 +780,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.50",
-]
-
-[[package]]
-name = "simsimd"
-version = "3.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdb478b1bf2945bc29c68236f447451dd499075533b98e3a1395d6b28779ce6b"
-dependencies = [
- "cc",
 ]
 
 [[package]]

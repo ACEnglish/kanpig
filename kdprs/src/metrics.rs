@@ -1,11 +1,5 @@
 use ordered_float::OrderedFloat;
-use simsimd::SimSIMD;
 use std::f64::consts::LN_10;
-
-/// Cosine similarity
-pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
-    (1.0 - f32::cosine(a, b).unwrap()).abs()
-}
 
 /// Canberra distance of featurized kmers
 pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
@@ -34,20 +28,6 @@ pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
     1.0 - (neum / deno)
 }
 
-/// Weighted cosine similarity
-/// Cosine similarity seems to be influenced by large outlier values. By weighing by frequency,
-/// long sequences' cosine similarity behaves more consistently with small sequences
-pub fn weighted_cosinesim(a: &[f32], b: &[f32]) -> f32 {
-    let cos: f32 = cosinesim(a, b);
-    let dist: f32 = (1.0 / a.len() as f32)
-        * a.iter()
-            .zip(b.iter())
-            .map(|(x, y)| (x - y).abs())
-            .sum::<f32>();
-
-    cos / (dist.powi(2) + cos)
-}
-
 /// size similarity of two variant sizes
 /// sizes must be positive
 pub fn sizesim(size_a: u64, size_b: u64) -> f32 {
@@ -62,7 +42,6 @@ pub fn sizesim(size_a: u64, size_b: u64) -> f32 {
 pub fn overlaps(s1: u64, e1: u64, s2: u64, e2: u64) -> bool {
     std::cmp::max(s1, s2) < std::cmp::min(e1, e2)
 }
-
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum GTstate {
@@ -126,3 +105,25 @@ fn log_choose(n: f64, k: f64) -> f64 {
 
     r / LN_10 // Convert to base 10 logarithm
 }
+
+/* Deprecated
+// use simsimd::SimSIMD; Deprecating
+/// Cosine similarity
+pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
+    (1.0 - f32::cosine(a, b).unwrap()).abs()
+}
+
+
+/// Weighted cosine similarity
+/// Cosine similarity seems to be influenced by large outlier values. By weighing by frequency,
+/// long sequences' cosine similarity behaves more consistently with small sequences
+pub fn weighted_cosinesim(a: &[f32], b: &[f32]) -> f32 {
+    let cos: f32 = cosinesim(a, b);
+    let dist: f32 = (1.0 / a.len() as f32)
+        * a.iter()
+            .zip(b.iter())
+            .map(|(x, y)| (x - y).abs())
+            .sum::<f32>();
+
+    cos / (dist.powi(2) + cos)
+}*/
