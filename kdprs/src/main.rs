@@ -95,7 +95,10 @@ fn main() {
         println!("Analyzing {:?}", m_graph);
         let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
         let p1 = m_graph.apply_coverage(&h1, &args.kd);
+        println!("H1 Best Path {:?}", p1);
         let p2 = m_graph.apply_coverage(&h2, &args.kd);
+        println!("H2 Best Path {:?}", p2);
+        // Hmm.. I wonder if I could check the similarity of the two paths and combine if high..
         for var_idx in m_graph.node_indices {
             let mut cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
                 Some(var) => var.clone(),

@@ -51,6 +51,7 @@ impl PartialOrd for Haplotype {
         }
 
         // If coverage is equal, compare by number of variants
+        // We prefer 'simplier' changes, but this will not choose that.
         Some(self.n.cmp(&other.n))
     }
 }

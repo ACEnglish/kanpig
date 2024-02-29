@@ -1,3 +1,4 @@
+set -e
 #./target/release/kdprs \
 cargo run --release -- \
     --input test/test2.vcf.gz \
@@ -13,3 +14,6 @@ truvari bench --includebed test/test.chr20.bed -b ../test/GRCh38_HG002-T2TQ100-V
 
 rm -rf test/new_noref
 truvari bench --includebed test/test.chr20.bed -b ../test/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz -c test/nope.vcf.gz --no-ref a -o test/new_noref
+
+
+# truvari refine -f ~/code/references/grch38/GRCh38_1kg_mainchrs.fa -U -u -R --regions new_noref/candidate.refine.bed new_noref

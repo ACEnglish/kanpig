@@ -1,5 +1,5 @@
-use simsimd::SimSIMD;
 use ordered_float::OrderedFloat;
+use simsimd::SimSIMD;
 
 /// Cosine similarity
 pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
@@ -7,11 +7,10 @@ pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Canberra distance of featurized kmers
-pub fn seqsim(a: &[f32], b:&[f32], mink: f32) -> f32 {
-    println!("comparing {:?} {:?}", a, b);
+pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
     let mut deno: f32 = 0.0;
     let mut neum: f32 = 0.0;
-    for (x,y) in a.iter().zip(b.iter()) {
+    for (x, y) in a.iter().zip(b.iter()) {
         let d = x.abs() + y.abs();
         if d <= mink {
             continue;
@@ -21,14 +20,16 @@ pub fn seqsim(a: &[f32], b:&[f32], mink: f32) -> f32 {
         neum += (x - y).abs();
     }
 
-    if deno == 0.0 { // no kmers
+    // no kmers
+    if deno == 0.0 {
         return 0.0;
     }
 
-    if neum == 0.0 { // identical
+    // identical
+    if neum == 0.0 {
         return 1.0;
     }
-    //println!("{} over {} equals {}", neum, deno, ret);
+
     1.0 - (neum / deno)
 }
 
@@ -78,8 +79,9 @@ pub enum GTstate {
 /// I need this to return GT::REF,GT::HET,GT::HOM
 /// Then, instead of relying on the hard threshold, we can check if genotyper(coverage, alt_cov) ==
 /// GT::HOM
-pub fn genotyper(tot_cov: f64, alt_cov: f64) -> GTstate {
-    if tot_cov == 0.0 {
+pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
+    let total = alt1_cov + alt2_cov;
+    if total == 0.0 {
         return GTstate::Unk;
     }
 
@@ -87,19 +89,20 @@ pub fn genotyper(tot_cov: f64, alt_cov: f64) -> GTstate {
 
     let mut gt_list = Vec::new();
 
-    let total = tot_cov;
-    let alt = alt_cov;
-    let non_alt = total - alt;
-
     for &p_alt in priors {
-        let mut comb = log_choose(total, alt);
-        comb += alt * p_alt.ln();
-        comb += non_alt * (1.0 - p_alt).ln();
+        let mut comb = log_choose(total, alt1_cov);
+        comb += alt2_cov * p_alt.ln();
+        comb += alt1_cov * (1.0 - p_alt).ln();
         gt_list.push(comb);
     }
-    
+
     // Some(gt_list) What I should be returning for a GQ
-    let ret = match gt_list.iter().enumerate().max_by_key(|&(_, &x)| OrderedFloat(x)).map(|(i, _)| i) {
+    let ret = match gt_list
+        .iter()
+        .enumerate()
+        .max_by_key(|&(_, &x)| OrderedFloat(x))
+        .map(|(i, _)| i)
+    {
         Some(0) => GTstate::Ref,
         Some(1) => GTstate::Het,
         Some(2) => GTstate::Hom,
@@ -107,7 +110,6 @@ pub fn genotyper(tot_cov: f64, alt_cov: f64) -> GTstate {
     };
     println!("GENOTYPER: {:?}", ret);
     ret
-
 }
 
 fn log_choose(n: f64, k: f64) -> f64 {

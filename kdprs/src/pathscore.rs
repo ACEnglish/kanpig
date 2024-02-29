@@ -65,7 +65,7 @@ impl PathScore {
             .filter_map(|&node_index| graph.node_weight(node_index))
             .map(|x| x.size)
             .sum();
-        println!("path size {} sig p:{} t:{}", path_size, path_size.signum(), target.size.signum());
+
         if path_size.signum() != target.size.signum() {
             return PathScore {
                 path,
@@ -77,7 +77,6 @@ impl PathScore {
         let mut sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
         // No need for seqsim because sizesim is alredy a failure
         if sizesim < params.sizesim {
-            println!("size sim is broken? {}", sizesim);
             return PathScore {
                 path,
                 sizesim: -1.0,

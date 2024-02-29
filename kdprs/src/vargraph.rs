@@ -8,7 +8,6 @@ use noodles_vcf::{self as vcf};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 
-
 /// Every --input variant is placed inside a node is turned into a graph.
 #[derive(Debug)]
 pub struct VarNode {
@@ -171,7 +170,6 @@ fn find_path(
     };
 
     let cur_len = cur_len + graph.node_weight(cur_node).unwrap().size;
-    println!("{} {}", target.size, cur_len);
     // Order next nodes by how close they get us to the haplotype's length
     let mut diffs: Vec<_> = graph
         .edges(cur_node)
@@ -186,9 +184,7 @@ fn find_path(
     for (_, next_node) in diffs {
         if next_node.index() == graph.node_count() - 1 {
             let n_best_path = PathScore::new(graph, path.clone(), target, params);
-            println!("Found Path {:?}", n_best_path);
             best_path = best_path.max(n_best_path);
-            println!("New Best Path {:?}", best_path);
             npaths += 1;
         } else {
             let (new_best, mp) = find_path(
