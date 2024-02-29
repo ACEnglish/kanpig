@@ -67,11 +67,10 @@ impl PathScore {
             .sum();
         println!("path size {} sig p:{} t:{}", path_size, path_size.signum(), target.size.signum());
         if path_size.signum() != target.size.signum() {
-            println!("I know this isn't it");
             return PathScore {
                 path,
-                sizesim: 0.0,
-                cossim: 0.0,
+                sizesim: -1.0, // ew
+                cossim: -1.0,
             };
         }
 
@@ -81,8 +80,8 @@ impl PathScore {
             println!("size sim is broken? {}", sizesim);
             return PathScore {
                 path,
-                sizesim,
-                cossim: 0.0,
+                sizesim: -1.0,
+                cossim: -1.0,
             };
         }
 
@@ -113,8 +112,8 @@ impl PathScore {
         println!("cossim is broken...{}", cossim);
         // thing about the logic
         if cossim < params.cossim {
-            cossim = 0.0;
-            sizesim = 0.0;
+            cossim = -1.0;
+            sizesim = -1.0;
         }
 
         PathScore {
