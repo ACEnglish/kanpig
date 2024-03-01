@@ -4,11 +4,11 @@ extern crate pretty_env_logger;
 extern crate log;
 
 use clap::Parser;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use noodles_vcf::{
     self as vcf,
     record::genotypes::{sample::Value, Genotypes},
 };
-use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::fs::File;
 use std::io::BufWriter;
 use std::thread;
@@ -34,7 +34,6 @@ use crate::pathscore::PathScore;
 use crate::regions::build_region_tree;
 use crate::vargraph::Variants;
 
-// What are the channels going to be transferring?
 type InputType = (ArgParser, Vec<vcf::Record>);
 type OutputType = (Variants, PathScore, PathScore);
 
@@ -94,9 +93,17 @@ fn main() {
         let receiver = receiver.clone();
         let result_sender = result_sender.clone();
         thread::spawn(move || {
-            for item in receiver.into_iter().flatten() {
-                let result = process_item(item);
-                result_sender.send(result).unwrap();
+            for (m_args, chunk) in receiver.into_iter().flatten() {
+                let mut m_bam =
+                    BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
+                let m_graph = Variants::new(chunk, m_args.kd.kmer);
+
+                let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
+
+                let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
+                let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
+
+                result_sender.send((m_graph, p1, p2)).unwrap();
             }
         });
     }
@@ -144,19 +151,4 @@ fn main() {
     }
 
     info!("finished");
-}
-
-fn process_item(chunk_in: InputType) -> OutputType {
-    let (args, chunk) = chunk_in;
-    let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
-    let m_graph = Variants::new(chunk, args.kd.kmer);
-    //println!("Analyzing {:?}", m_graph);
-    let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-    // If the haplotypes are identical, we only need to traverse once
-    // And it holds the overall coverage
-    let p1 = m_graph.apply_coverage(&h1, &args.kd);
-    //println!("H1 Best Path {:?}", p1);
-    let p2 = m_graph.apply_coverage(&h2, &args.kd);
-    //println!("H2 Best Path {:?}", p2);
-    (m_graph, p1, p2)
 }
