@@ -8,10 +8,10 @@ use noodles_vcf::{
     self as vcf,
     record::genotypes::{sample::Value, Genotypes},
 };
-use rayon::prelude::*;
+//use rayon::prelude::*;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::fs::File;
-use std::io::{BufRead, BufWriter};
+use std::io::BufWriter;
 use std::thread;
 
 mod bamparser;
@@ -91,10 +91,9 @@ fn main() {
     // Create channels for communication between threads
     let (sender, receiver): (Sender<Option<InputType>>, Receiver<Option<InputType>>) = unbounded();
     let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) = unbounded();
-    let num_threads = 3;
 
     // Spawn worker threads
-    for _ in 0..num_threads {
+    for _ in 0..args.io.threads {
         let receiver = receiver.clone();
         let result_sender = result_sender.clone();
         thread::spawn(move || {
@@ -115,7 +114,7 @@ fn main() {
     }
     
     // Signal worker threads to exit
-    for _ in 0..num_threads {
+    for _ in 0..args.io.threads {
         sender.send(None).unwrap();
     }
     

@@ -37,6 +37,10 @@ pub struct IOParams {
     /// Sample to apply genotypes to, default first column
     #[arg(long)]
     pub sample: Option<String>,
+
+    /// Number of threads
+    #[arg(long, default_value_t = 1)]
+    pub threads: usize,
 }
 
 #[derive(clap::Args, Clone, Debug)]
