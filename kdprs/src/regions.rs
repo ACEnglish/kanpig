@@ -12,7 +12,7 @@ use crate::bedparser::BedParser;
 /// which should be ananlyzed
 pub fn build_region_tree(
     vcf_contigs: &ContigMap,
-    includebed: Option<std::path::PathBuf>,
+    includebed: &Option<std::path::PathBuf>,
 ) -> Regions {
     let mut m_contigs = HashMap::new();
     for (k, v) in vcf_contigs {
@@ -32,7 +32,7 @@ pub fn build_region_tree(
 
     // Parse the Bed Lines and return them as the IndexMap.
     let mut ret = HashMap::new();
-    let mut m_parser = BedParser::new(&includebed.unwrap());
+    let mut m_parser = BedParser::new(&includebed.clone().unwrap());
     let mut prev_chrom = String::new();
     let mut prev_start: u64 = 0;
 

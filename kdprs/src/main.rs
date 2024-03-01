@@ -8,8 +8,11 @@ use noodles_vcf::{
     self as vcf,
     record::genotypes::{sample::Value, Genotypes},
 };
+use rayon::prelude::*;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufRead, BufWriter};
+use std::thread;
 
 mod bamparser;
 mod bedparser;
@@ -28,8 +31,13 @@ mod vcf_traits;
 use crate::bamparser::BamParser;
 use crate::chunker::VcfChunker;
 use crate::cli::ArgParser;
+use crate::pathscore::PathScore;
 use crate::regions::build_region_tree;
 use crate::vargraph::Variants;
+
+// What are the channels going to be transferring?
+type InputType = (ArgParser, Vec<vcf::Record>);
+type OutputType = (Variants, PathScore, PathScore);
 
 fn main() {
     pretty_env_logger::formatted_timed_builder()
@@ -70,7 +78,7 @@ fn main() {
     info!("params: {:?}", args);
 
     let m_contigs = input_header.contigs().clone();
-    let tree = build_region_tree(&m_contigs, args.io.bed);
+    let tree = build_region_tree(&m_contigs, &args.io.bed);
 
     //let guard = pprof::ProfilerGuardBuilder::default().frequency(1000).blocklist(&["libc", "libgcc", "pthread", "vdso"]).build().unwrap();
 
@@ -79,26 +87,42 @@ fn main() {
     writer.write_header(&input_header);
 
     let mut m_input = VcfChunker::new(input_vcf, input_header.clone(), tree, args.kd.clone());
-    let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
-    /*
-     * threading strategy: m_input should be windowed and each is sent to a thread
-     * Because m_bam.open(), each thread will then have its own file handler to the bam/reference
-     * The information I'm missing is how many variants go to each thread. I could send them
-     * independentally, but that'll make a lot of opens. And since I don't know.. wait, I do know
-     * how many parts there are because of the region tree. So the tree total size / threads is how
-     * approximately how many parts I'll have. I might end up with some idle threads. But lets not
-     * over optimize, yet. iter.chunks() works, I guess. But I'll have to 'magic number' the size
-     */
-    //
-    for chunk in &mut m_input {
-        let m_graph = Variants::new(chunk, args.kd.kmer);
-        println!("Analyzing {:?}", m_graph);
-        let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-        let p1 = m_graph.apply_coverage(&h1, &args.kd);
-        println!("H1 Best Path {:?}", p1);
-        let p2 = m_graph.apply_coverage(&h2, &args.kd);
-        println!("H2 Best Path {:?}", p2);
-        // Hmm.. I wonder if I could check the similarity of the two paths and combine if high..
+    
+    // Create channels for communication between threads
+    let (sender, receiver): (Sender<Option<InputType>>, Receiver<Option<InputType>>) = unbounded();
+    let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) = unbounded();
+    let num_threads = 3;
+
+    // Spawn worker threads
+    for _ in 0..num_threads {
+        let receiver = receiver.clone();
+        let result_sender = result_sender.clone();
+        thread::spawn(move || {
+            for item in receiver {
+                if let Some(item) = item {
+                    let result = process_item(item);
+                    result_sender.send(result).unwrap();
+                }
+            }
+        });
+    }
+    
+    // Send items to worker threads
+    let mut num_chunks = 0;
+    for i in &mut m_input {
+        sender.send(Some((args.clone(), i))).unwrap();
+        num_chunks += 1;
+    }
+    
+    // Signal worker threads to exit
+    for _ in 0..num_threads {
+        sender.send(None).unwrap();
+    }
+    
+    // Collect results from worker threads
+    for _ in 0..num_chunks {
+        let (m_graph, p1, p2) = result_receiver.recv().unwrap();
+
         for var_idx in m_graph.node_indices {
             let mut cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
                 Some(var) => var.clone(),
@@ -120,27 +144,27 @@ fn main() {
             );
 
             *cur_var.genotypes_mut() = genotypes.clone();
-            // Should be handling
             let _ = writer.write_record(&input_header, &cur_var);
-            /*if var_idx == 0 || var_idx == m_graph.graph.node_count() - 1 {
-                continue
-            }
-            gt = var in p1.path + | + var in p2.path
-            m_graph.nodes[var_idx].variant.unwrap()
-            if var in p1
-            */
         }
-        //println!("Graph: {:?}", m_graph);
-
-        // nodes that have None for both coverage are 0/0
-        // nodes that have None for half shouldn't happen...? They will, actually.
-        // So I need to change the sim to just a Vec and I'll push the coverages on
-        // If it has one, then ... well I guess I don't know
-        // Maybe I shouldn't be applying coverage but returning the best path
-        // Then I can m_graph.pull_variants(path1, path2, coverage)
     }
-
-    //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };
 
     info!("finished");
 }
+
+fn process_item(chunk_in: InputType) -> OutputType {
+    let (args, chunk) = chunk_in;
+    let mut m_bam = BamParser::new(args.io.bam, args.io.reference, args.kd.clone());
+    let m_graph = Variants::new(chunk, args.kd.kmer);
+    //println!("Analyzing {:?}", m_graph);
+    let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
+    // If the haplotypes are identical, we only need to traverse once
+    // And it holds the overall coverage
+    let p1 = m_graph.apply_coverage(&h1, &args.kd);
+    //println!("H1 Best Path {:?}", p1);
+    let p2 = m_graph.apply_coverage(&h2, &args.kd);
+    //println!("H2 Best Path {:?}", p2);
+    (m_graph, p1, p2)
+}
+
+    //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };
+
