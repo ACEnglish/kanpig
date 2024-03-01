@@ -91,7 +91,11 @@ impl BamParser {
                 m_reads.entry(qname).or_default().push(m_var);
             }
         }
-
+        
+        // This stuff should be moved to a read_cluster procedure
+        // bamparser just creates the pileups and feeds it to something that
+        // creates expected haplotypes.
+        // The actual cut point is actually somewhere inside reads_to_haps.
         let mut m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
         let coverage = tot_cov / (window_end - window_start);
         // println!("Total coverage: {}", coverage);

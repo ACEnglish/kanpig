@@ -55,6 +55,10 @@ fn main() {
     let input_header = input_vcf.read_header().expect("Unable to parse header");
 
     // Ensure sample is correctly setup
+    // This goes into the new vcfwriter
+    // if the sample isn't present, we'll warn
+    // if the sample is present, we'll preserve its format fields
+    // But all the other samples are getting stripped out in the first version
     if args.io.sample.is_none() {
         if input_header.sample_names().is_empty() {
             error!("--input contains no samples");
@@ -124,7 +128,7 @@ fn main() {
     info!("collecting output");
     for _ in 0..num_chunks {
         let (m_graph, p1, p2) = result_receiver.recv().unwrap();
-
+        //just vcfwriter.anno_write(m_graph, p1, pw)
         for var_idx in m_graph.node_indices {
             let mut cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
                 Some(var) => var.clone(),
@@ -132,13 +136,13 @@ fn main() {
                     continue;
                 }
             };
-            //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
             let gt = match (p1.path.contains(&var_idx), p2.path.contains(&var_idx)) {
                 (true, true) => "1|1",
                 (true, false) => "1|0",
                 (false, true) => "0|1",
                 (false, false) => "0|0",
             };
+            //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
             let keys = "GT:GQ".parse().unwrap();
             let genotypes = Genotypes::new(
                 keys,

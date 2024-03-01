@@ -12,17 +12,17 @@ cargo run --release -- \
 #--bed /Users/english/code/kfdphase/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \
 # --bam test/GIABHG002.bam \
 
-cut -f1-10 test/hc.vcf | bcftools sort -O z -o  test/hc.vcf.gz
-tabix test/hc.vcf.gz
-rm -rf test/hcbench_all
-truvari bench --includebed $bed \
-        -b ../test/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz \
-        -c test/hc.vcf.gz -o test/hcbench_all/
+#cut -f1-10 test/hc.vcf | bcftools sort -O z -o  test/hc.vcf.gz
+#tabix test/hc.vcf.gz
+#rm -rf test/hcbench_all
+#truvari bench --includebed $bed \
+        #-b ../test/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz \
+        #-c test/hc.vcf.gz -o test/hcbench_all/
 
-rm -rf test/hcbench_noref
-truvari bench --includebed $bed \
-        -b ../test/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz \
-        -c test/hc.vcf.gz --no-ref a -o test/hcbench_noref/
+#rm -rf test/hcbench_noref
+#truvari bench --includebed $bed \
+        #-b ../test/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz \
+        #-c test/hc.vcf.gz --no-ref a -o test/hcbench_noref/
 
-truvari refine -f ~/code/references/grch38/GRCh38_1kg_mainchrs.fa -U -u -R \
-        --regions test/hcbench_noref/candidate.refine.bed test/hcbench_noref
+#truvari refine -f ~/code/references/grch38/GRCh38_1kg_mainchrs.fa -U -u -R \
+        #--regions test/hcbench_noref/candidate.refine.bed test/hcbench_noref
