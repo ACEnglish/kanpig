@@ -89,7 +89,7 @@ fn main() {
     let (sender, receiver): (Sender<Option<InputType>>, Receiver<Option<InputType>>) = unbounded();
     let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) = unbounded();
 
-    // Spawn worker threads
+    info!("spawning {} threads", args.io.threads);
     for _ in 0..args.io.threads {
         let receiver = receiver.clone();
         let result_sender = result_sender.clone();
@@ -103,6 +103,7 @@ fn main() {
 
     // Send items to worker threads
     let mut num_chunks = 0;
+    info!("parsing input");
     for i in &mut m_input {
         sender.send(Some((args.clone(), i))).unwrap();
         num_chunks += 1;
@@ -113,7 +114,7 @@ fn main() {
         sender.send(None).unwrap();
     }
 
-    // Collect results from worker threads
+    info!("collecting output");
     for _ in 0..num_chunks {
         let (m_graph, p1, p2) = result_receiver.recv().unwrap();
 
