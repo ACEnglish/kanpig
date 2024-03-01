@@ -8,7 +8,6 @@ use noodles_vcf::{
     self as vcf,
     record::genotypes::{sample::Value, Genotypes},
 };
-//use rayon::prelude::*;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::fs::File;
 use std::io::BufWriter;

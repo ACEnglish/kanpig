@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
-crossbeam-channel = "0.5.12"
+crossbeam-channel = { version = "0.5.12" }
 indexmap = { version = "2.2.3" }
 itertools = { version = "0.12.1" }
 log = { version = "0.4", features = ["std", "serde"] }
@@ -13,5 +13,4 @@ noodles-vcf = { version = "0.49.0" }
 ordered-float = { version = "4.0", default-features = false }
 petgraph = { version = "0.6.2" }
 pretty_env_logger = { version = "0.4.0" }
-rayon = "1.9.0"
-rust-htslib = "0.46.0"
+rust-htslib = { version = "0.46.0" }
