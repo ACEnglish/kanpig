@@ -1,20 +1,3 @@
-/*
- * Okay, so this thing is going to hold the bam and reference and kdparams
- * Its query is a find_haps method that will take chrom, reg_start, reg_end
- * find_haps will pull the reference sequence (don't always need to...)
- * find_haps will pileup over the regions ±chunksize min_base_quality=0, truncate=true
- * keep track of the total coverage
- * for read in column.pileups:
- *  if query position is none and read.indel not within sizemin/sizemax --
- *  The bam pileup is a little different.. in rust htslib... so going to have to deal with that
- *  but lets just assume we make it all just fine. No optimizations, just a string of Haplotypes
- *
- * We'll also need a hap_deduplicate.. though I think that won't be a thing once we refactor
- * And then we got the noreads or no alts and single read stuff
- * Then there's a read cluster - which isn't too bad with a decent kmeans library
- * just gotta work on the consolidate with best
- */
-
 use crate::cli::KDParams;
 use crate::haplotype::Haplotype;
 use crate::kmeans::kmeans;
@@ -30,44 +13,29 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub struct BamParser {
-    pub bam_name: PathBuf,
-    pub ref_name: PathBuf,
-    bam: Option<IndexedReader>,
-    reference: Option<faidx::Reader>,
+    bam: IndexedReader,
+    reference: faidx::Reader,
     params: KDParams,
-    is_open: bool,
 }
 
 impl BamParser {
     pub fn new(bam_name: PathBuf, ref_name: PathBuf, params: KDParams) -> Self {
+        let bam = IndexedReader::from_path(&bam_name).unwrap();
+        let reference = faidx::Reader::from_path(&ref_name).unwrap();
         BamParser {
-            bam_name,
-            ref_name,
-            bam: None,
-            reference: None,
+            bam: bam,
+            reference: reference,
             params,
-            is_open: false,
         }
-    }
-
-    // Open the BAM or CRAM file
-    // Put this in a separate method so threads can have their own file handler
-    pub fn open(&mut self) {
-        self.bam = Some(IndexedReader::from_path(&self.bam_name).unwrap());
-        self.reference = Some(faidx::Reader::from_path(&self.ref_name).unwrap());
-        self.is_open = true;
     }
 
     pub fn find_haps(&mut self, chrom: &String, start: u64, end: u64) -> (Haplotype, Haplotype) {
-        if !self.is_open {
-            self.open();
-        }
         // We pileup a little outside the region for variants
         let window_start = start - self.params.chunksize;
         let window_end = end + self.params.chunksize;
 
         let mut tot_cov: u64 = 0;
-        if let Err(e) = self.bam.as_mut().expect("Must be opened").fetch((
+        if let Err(e) = self.bam.fetch((
             &chrom,
             start - self.params.chunksize,
             end + self.params.chunksize,
@@ -79,7 +47,7 @@ impl BamParser {
         let mut m_reads = HashMap::<Vec<u8>, Vec<PileupVariant>>::new();
         // consolidate common variants
         let mut p_variants = HashMap::<PileupVariant, u64>::new();
-        for pileup in self.bam.as_mut().expect("Must be opened").pileup() {
+        for pileup in self.bam.pileup() {
             if pileup.is_err() {
                 continue;
             }
@@ -167,8 +135,6 @@ impl BamParser {
                 let d_end = d_start + p.size.unsigned_abs();
                 p.sequence = Some(
                     self.reference
-                        .as_ref()
-                        .unwrap()
                         .fetch_seq(chrom, d_start as usize, d_end as usize)
                         .unwrap()
                         .to_vec(),
