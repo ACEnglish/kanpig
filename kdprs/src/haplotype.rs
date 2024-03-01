@@ -44,21 +44,21 @@ impl Haplotype {
 
 impl PartialOrd for Haplotype {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // First, compare by coverage
-        let coverage_ordering = self.coverage.partial_cmp(&other.coverage)?;
-        if coverage_ordering != std::cmp::Ordering::Equal {
-            return Some(coverage_ordering);
-        }
-
-        // If coverage is equal, compare by number of variants
-        // We prefer 'simplier' changes, but this will not choose that.
-        Some(self.n.cmp(&other.n))
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Haplotype {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        // First, compare by coverage
+        let coverage_ordering = self.coverage.partial_cmp(&other.coverage).unwrap();
+        if coverage_ordering != std::cmp::Ordering::Equal {
+            return coverage_ordering;
+        }
+
+        // If coverage is equal, compare by number of variants
+        // We prefer 'simplier' changes, but this will not choose that.
+        self.n.cmp(&other.n)
     }
 }
 

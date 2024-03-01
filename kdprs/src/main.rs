@@ -80,14 +80,12 @@ fn main() {
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
 
-    //let guard = pprof::ProfilerGuardBuilder::default().frequency(1000).blocklist(&["libc", "libgcc", "pthread", "vdso"]).build().unwrap();
-
     let out_buf = BufWriter::new(File::create(&args.io.out).expect("Error Creating Kmers"));
     let mut writer = vcf::Writer::new(out_buf);
     writer.write_header(&input_header);
 
     let mut m_input = VcfChunker::new(input_vcf, input_header.clone(), tree, args.kd.clone());
-    
+
     // Create channels for communication between threads
     let (sender, receiver): (Sender<Option<InputType>>, Receiver<Option<InputType>>) = unbounded();
     let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) = unbounded();
@@ -97,27 +95,25 @@ fn main() {
         let receiver = receiver.clone();
         let result_sender = result_sender.clone();
         thread::spawn(move || {
-            for item in receiver {
-                if let Some(item) = item {
-                    let result = process_item(item);
-                    result_sender.send(result).unwrap();
-                }
+            for item in receiver.into_iter().flatten() {
+                let result = process_item(item);
+                result_sender.send(result).unwrap();
             }
         });
     }
-    
+
     // Send items to worker threads
     let mut num_chunks = 0;
     for i in &mut m_input {
         sender.send(Some((args.clone(), i))).unwrap();
         num_chunks += 1;
     }
-    
+
     // Signal worker threads to exit
     for _ in 0..args.io.threads {
         sender.send(None).unwrap();
     }
-    
+
     // Collect results from worker threads
     for _ in 0..num_chunks {
         let (m_graph, p1, p2) = result_receiver.recv().unwrap();
@@ -164,6 +160,3 @@ fn process_item(chunk_in: InputType) -> OutputType {
     //println!("H2 Best Path {:?}", p2);
     (m_graph, p1, p2)
 }
-
-    //if let Ok(report) = guard.report().build() { println!("report: {:?}", &report); };
-
