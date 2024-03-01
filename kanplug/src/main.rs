@@ -97,7 +97,7 @@ fn main() {
                 let mut m_bam =
                     BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
                 let m_graph = Variants::new(chunk, m_args.kd.kmer);
-
+                // We don't need to do both
                 let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
 
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
