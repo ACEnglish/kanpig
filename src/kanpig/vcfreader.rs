@@ -3,7 +3,7 @@ use std::io::BufRead;
 
 use noodles_vcf::{self as vcf};
 
-use crate::kanpig::{KDParams, Regions, KdpVcf};
+use crate::kanpig::{KDParams, KdpVcf, Regions};
 
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood

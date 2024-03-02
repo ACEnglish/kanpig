@@ -1,9 +1,6 @@
-use crate::kanpig::{Haplotype,
-    KDParams,
-    metrics::overlaps,
-    PathScore,
-    brute_force_find_path,
-    KdpVcf};
+use crate::kanpig::{
+    brute_force_find_path, metrics::overlaps, Haplotype, KDParams, KdpVcf, PathScore,
+};
 use itertools::Itertools;
 use noodles_vcf::{self as vcf};
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -141,7 +138,9 @@ impl Variants {
             }
         } else {
             // if - for some reason find_score returns None (I don't think this can happen)
-            let mut ret = brute_force_find_path(&self.graph, hap, params, 0, 0, None, None, None).0.unwrap();
+            let mut ret = brute_force_find_path(&self.graph, hap, params, 0, 0, None, None, None)
+                .0
+                .unwrap();
             ret.coverage = Some(hap.coverage);
             ret
         }

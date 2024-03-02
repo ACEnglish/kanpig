@@ -2,8 +2,7 @@
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 
-use crate::kanpig::{KDParams, Haplotype,
-    PathScore, VarNode};
+use crate::kanpig::{Haplotype, KDParams, PathScore, VarNode};
 
 /// Recursive depth first search of a VarGraph that's guided by size similarity
 /// Search stops after maxpaths have been checked

@@ -3,19 +3,16 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
+use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use noodles_vcf::{self as vcf};
 use std::thread;
-use clap::Parser;
 mod kanpig;
 
-use kanpig::{BamParser,
-            VcfChunker,
-            ArgParser,
-            PathScore,
-            build_region_tree,
-            Variants,
-            VcfWriter};
+use kanpig::{
+    build_region_tree, cluster_haplotypes, ArgParser, BamParser, PathScore, Variants, VcfChunker,
+    VcfWriter,
+};
 
 type InputType = (ArgParser, Vec<vcf::Record>);
 type OutputType = (Variants, PathScore, PathScore, u64);
@@ -55,11 +52,11 @@ fn main() {
         let result_sender = result_sender.clone();
         thread::spawn(move || {
             for (m_args, chunk) in receiver.into_iter().flatten() {
+                let m_graph = Variants::new(chunk, m_args.kd.kmer);
                 let mut m_bam =
                     BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
-                let m_graph = Variants::new(chunk, m_args.kd.kmer);
-                let (h1, h2, coverage) =
-                    m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
+                let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
+                let (h1, h2) = cluster_haplotypes(haps, coverage, &m_args.kd);
                 // so find_haps would be returning the Vec<Haplotype> read_cluster(the above) to make h1, h2
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
                 let p2 = m_graph.apply_coverage(&h2, &m_args.kd);

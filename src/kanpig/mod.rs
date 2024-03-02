@@ -14,7 +14,7 @@ mod haplotype;
 pub use crate::kanpig::haplotype::Haplotype;
 
 mod kmeans;
-pub use crate::kanpig::kmeans::{Centroid, Cluster, Point, kmeans};
+pub use crate::kanpig::kmeans::{kmeans, Centroid, Cluster, Point};
 
 mod kmer;
 pub use crate::kanpig::kmer::seq_to_kmer;
@@ -26,19 +26,20 @@ pub use crate::kanpig::pathscore::PathScore;
 
 mod pileup;
 
+mod cluster;
+pub use crate::kanpig::cluster::cluster_haplotypes;
+
 mod regions;
-pub use crate::kanpig::regions::{ContigMap, Regions, build_region_tree};
+pub use crate::kanpig::regions::{build_region_tree, ContigMap, Regions};
 
 mod traverse;
 pub use crate::kanpig::traverse::brute_force_find_path;
 
 mod vargraph;
-pub use crate::kanpig::vargraph::{Variants, VarNode};
+pub use crate::kanpig::vargraph::{VarNode, Variants};
 
 mod vcf_traits;
 pub use crate::kanpig::vcf_traits::{KdpVcf, Svtype};
 
 mod vcfwriter;
 pub use crate::kanpig::vcfwriter::VcfWriter;
-
-
