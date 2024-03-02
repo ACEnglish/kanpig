@@ -29,7 +29,13 @@ impl BamParser {
         }
     }
 
-    pub fn find_haps(&mut self, chrom: &String, start: u64, end: u64) -> (Haplotype, Haplotype) {
+    // Two possible haplotypes and coverage observed over the window
+    pub fn find_haps(
+        &mut self,
+        chrom: &String,
+        start: u64,
+        end: u64,
+    ) -> (Haplotype, Haplotype, u64) {
         // We pileup a little outside the region for variants
         let window_start = start - self.params.chunksize;
         let window_end = end + self.params.chunksize;
@@ -103,25 +109,32 @@ impl BamParser {
             return (
                 Haplotype::blank(self.params.kmer, coverage),
                 Haplotype::blank(self.params.kmer, coverage),
+                coverage,
             );
         };
 
         // Nothing to cluster
         if m_haps.len() == 1 {
-            let hap2 = m_haps.pop().unwrap();
+            let mut hap2 = m_haps.pop().unwrap();
             let ref_cov = (coverage - hap2.coverage) as f64;
             let ret = match metrics::genotyper(ref_cov, hap2.coverage as f64) {
                 // And if Ref, should probably be set to lowq
-                metrics::GTstate::Ref | metrics::GTstate::Het => {
-                    (Haplotype::blank(self.params.kmer, ref_cov as u64), hap2)
+                (metrics::GTstate::Ref | metrics::GTstate::Het, _) => (
+                    Haplotype::blank(self.params.kmer, ref_cov as u64),
+                    hap2,
+                    coverage,
+                ),
+                (metrics::GTstate::Hom, gq) => {
+                    hap2.gq = gq;
+                    (hap2.clone(), hap2, coverage)
                 }
-                metrics::GTstate::Hom => (hap2.clone(), hap2),
                 _ => panic!("The genotyper can't do this, yet"),
             };
             return ret;
         }
 
-        self.read_cluster(m_haps, coverage)
+        let (h1, h2) = self.read_cluster(m_haps, coverage);
+        (h1, h2, coverage)
     }
 
     fn reads_to_haps(
@@ -229,50 +242,50 @@ impl BamParser {
 
         // First we establish the two possible alt alleles
         // This is a dedup step for when the alt paths are highly similar
-        let (hap1, mut hap2) = match metrics::genotyper(hap1.coverage as f64, hap2.coverage as f64)
-        {
-            // if hap1 == ref, return hap1, hap2. else combine hap2 into hap1 and make return Hap::blank, hap2
-            metrics::GTstate::Ref => {
-                if hap1.n == 0 {
-                    // println!("Think hap2 is a better representative");
-                    hap2.coverage += hap1.coverage;
-                    (Haplotype::blank(self.params.kmer, 0), hap2)
-                } else {
-                    // println!("Think hap1 is a better representative");
-                    hap1.coverage += hap2.coverage;
-                    (Haplotype::blank(self.params.kmer, 0), hap1)
+        let (mut hap1, mut hap2) =
+            match metrics::genotyper(hap1.coverage as f64, hap2.coverage as f64) {
+                // if hap1 == ref, return hap1, hap2. else combine hap2 into hap1 and make return Hap::blank, hap2
+                (metrics::GTstate::Ref, _) => {
+                    if hap1.n == 0 {
+                        // println!("Think hap2 is a better representative");
+                        hap2.coverage += hap1.coverage;
+                        (Haplotype::blank(self.params.kmer, 0), hap2)
+                    } else {
+                        // println!("Think hap1 is a better representative");
+                        hap1.coverage += hap2.coverage;
+                        (Haplotype::blank(self.params.kmer, 0), hap1)
+                    }
                 }
-            }
-            // combine them (into hap2, the higher covered allele) return hap2 twice
-            metrics::GTstate::Hom => {
-                if (hap1.size.signum() == hap2.size.signum())
-                    && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
-                        > self.params.sizesim
-                {
-                    // println!("These should be consolidated");
-                    hap2.coverage += hap1.coverage;
-                    (Haplotype::blank(self.params.kmer, 0), hap2)
-                } else {
-                    // println!("Could be a compound het or a fp");
-                    (hap1, hap2)
+                // combine them (into hap2, the higher covered allele) return hap2 twice
+                (metrics::GTstate::Hom, _) => {
+                    if (hap1.size.signum() == hap2.size.signum())
+                        && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
+                            > self.params.sizesim
+                    {
+                        // println!("These should be consolidated");
+                        hap2.coverage += hap1.coverage;
+                        (Haplotype::blank(self.params.kmer, 0), hap2)
+                    } else {
+                        // println!("Could be a compound het or a fp");
+                        (hap1, hap2)
+                    }
                 }
-            }
-            // If they're highly similar, combine and assume it was a 'noisy' HOM. Otherwise compound het
-            metrics::GTstate::Het => {
-                if (hap1.size.signum() == hap2.size.signum())
-                    && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
-                        > self.params.sizesim
-                {
-                    // println!("Turning into Hom Alt");
-                    hap2.coverage += hap1.coverage;
-                    (Haplotype::blank(self.params.kmer, 0), hap2)
-                } else {
-                    // println!("Compound Het");
-                    (hap1, hap2)
+                // If they're highly similar, combine and assume it was a 'noisy' HOM. Otherwise compound het
+                (metrics::GTstate::Het, _) => {
+                    if (hap1.size.signum() == hap2.size.signum())
+                        && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
+                            > self.params.sizesim
+                    {
+                        // println!("Turning into Hom Alt");
+                        hap2.coverage += hap1.coverage;
+                        (Haplotype::blank(self.params.kmer, 0), hap2)
+                    } else {
+                        // println!("Compound Het");
+                        (hap1, hap2)
+                    }
                 }
-            }
-            _ => panic!("The genotyper can't do this, yet"),
-        };
+                _ => panic!("The genotyper can't do this, yet"),
+            };
         // Now we figure out if the we need two alt alleles or not
         // The reason this takes two steps is the above code is just trying to figure out if
         // there's 1 or 2 alts. Now we figure out if its Het/Hom
@@ -283,20 +296,23 @@ impl BamParser {
         match metrics::genotyper(remaining_coverage, applied_coverage) {
             // We need the one higher covered alt
             // and probably should assign this GT as lowq if REF
-            metrics::GTstate::Ref | metrics::GTstate::Het => {
+            (metrics::GTstate::Ref | metrics::GTstate::Het, gq) => {
                 hap2.coverage += hap1.coverage;
+                hap2.gq = gq;
                 (
                     Haplotype::blank(self.params.kmer, remaining_coverage as u64),
                     hap2,
                 )
             }
-            metrics::GTstate::Hom => {
+            (metrics::GTstate::Hom, gq) => {
                 // remaining coverage (if any) is lost here
+                hap2.gq = gq.clone();
                 if hap1.n == 0 {
                     // HOMALT
                     (hap2.clone(), hap2)
                 } else {
                     // Compound Het
+                    hap1.gq = gq;
                     (hap1, hap2)
                 }
             }

@@ -48,17 +48,16 @@ pub enum GTstate {
     Ref,
     Het,
     Hom,
-    Unk,
-    // Non, missing...
+    Non,
     //Hemi should be a thing
 }
 
 /// Generate probabilities of genotypes
 /// Smallest value is most likely genotype
-pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
+pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> (GTstate, Option<Vec<f64>>) {
     let total = alt1_cov + alt2_cov;
     if total == 0.0 {
-        return GTstate::Unk;
+        return (GTstate::Non, None);
     }
 
     let priors: &[f64] = &[0.05, 0.5, 0.95];
@@ -79,9 +78,9 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
         .max_by_key(|&(_, &x)| OrderedFloat(x))
         .map(|(i, _)| i)
     {
-        Some(0) => GTstate::Ref,
-        Some(1) => GTstate::Het,
-        Some(2) => GTstate::Hom,
+        Some(0) => (GTstate::Ref, Some(gt_list)),
+        Some(1) => (GTstate::Het, Some(gt_list)),
+        Some(2) => (GTstate::Hom, Some(gt_list)),
         _ => panic!("not possible"),
     };
     // println!("GENOTYPER: {:?}", ret);

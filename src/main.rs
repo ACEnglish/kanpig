@@ -32,7 +32,7 @@ use crate::vargraph::Variants;
 use crate::vcfwriter::VcfWriter;
 
 type InputType = (ArgParser, Vec<vcf::Record>);
-type OutputType = (Variants, PathScore, PathScore);
+type OutputType = (Variants, PathScore, PathScore, u64);
 
 fn main() {
     pretty_env_logger::formatted_timed_builder()
@@ -74,7 +74,7 @@ fn main() {
         );
         std::process::exit(1);
     }
-    info!("params: {:?}", args);
+    info!("params: {:#?}", args);
 
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
@@ -96,13 +96,12 @@ fn main() {
                 let mut m_bam =
                     BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
                 let m_graph = Variants::new(chunk, m_args.kd.kmer);
-                // We don't need to do both
-                let (h1, h2) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-
+                let (h1, h2, coverage) =
+                    m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
                 let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
 
-                result_sender.send((m_graph, p1, p2)).unwrap();
+                result_sender.send((m_graph, p1, p2, coverage)).unwrap();
             }
         });
     }
@@ -122,7 +121,7 @@ fn main() {
 
     info!("collecting output");
     for _ in 0..num_chunks {
-        let (m_graph, p1, p2) = result_receiver.recv().unwrap();
+        let (m_graph, p1, p2, coverage) = result_receiver.recv().unwrap();
 
         for var_idx in m_graph.node_indices {
             let cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
@@ -131,7 +130,7 @@ fn main() {
                     continue;
                 } // this never happens I could just let Some
             };
-            writer.anno_write(cur_var, &var_idx, &p1, &p2);
+            writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage);
         }
     }
 

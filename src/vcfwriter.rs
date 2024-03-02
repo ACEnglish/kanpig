@@ -68,8 +68,10 @@ impl VcfWriter {
         var_idx: &NodeIndex,
         path1: &PathScore,
         path2: &PathScore,
+        coverage: u64,
     ) {
-        let keys = "GT:PG:DP:AD".parse().unwrap(); // I shouldn't be making this each time?
+        //let keys = "GT:PG:DP:AD".parse().unwrap(); // I shouldn't be making this each time?
+        let keys = "GT:DP:AD".parse().unwrap(); // I shouldn't be making this each time?
 
         //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
         let gt = match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
@@ -79,13 +81,17 @@ impl VcfWriter {
             (false, false) => "0|0",
         };
         // https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/header/record/value/map/struct.Map.html
+        let ad = Value::from(vec![
+            Some(path1.coverage.unwrap() as i32),
+            Some(path2.coverage.unwrap() as i32),
+        ]);
         let genotypes = Genotypes::new(
             keys,
             vec![vec![
-                Some(Value::from(gt)),    // GT
-                Some(Value::from(13)),    // PG
-                Some(Value::from(13)),    // DP
-                Some(Value::from("1,2")), // AD
+                Some(Value::from(gt)), // GT
+                //Some(Value::from(0)),    // PG
+                Some(Value::from(coverage as i32)), // DP
+                Some(ad),
             ]],
         );
 

@@ -6,6 +6,7 @@ pub struct Haplotype {
     pub size: i64,
     pub n: u64,
     pub coverage: u64,
+    pub gq: Option<Vec<f64>>,
 }
 
 impl Haplotype {
@@ -15,6 +16,7 @@ impl Haplotype {
             size,
             n,
             coverage,
+            gq: None,
         }
     }
 
@@ -25,6 +27,7 @@ impl Haplotype {
             size: 0,
             n: 0,
             coverage,
+            gq: None,
         }
     }
 

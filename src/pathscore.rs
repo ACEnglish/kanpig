@@ -10,6 +10,7 @@ pub struct PathScore {
     pub path: Vec<NodeIndex>,
     pub sizesim: f32,
     pub seqsim: f32,
+    pub coverage: Option<u64>,
 }
 
 impl Eq for PathScore {}
@@ -46,6 +47,7 @@ impl Default for PathScore {
             path: vec![],
             sizesim: 0.0,
             seqsim: 0.0,
+            coverage: None,
         }
     }
 }
@@ -71,6 +73,7 @@ impl PathScore {
                 path,
                 sizesim: -1.0, // ew
                 seqsim: -1.0,
+                coverage: None,
             };
         }
 
@@ -81,6 +84,7 @@ impl PathScore {
                 path,
                 sizesim: -1.0,
                 seqsim: -1.0,
+                coverage: None,
             };
         }
 
@@ -109,6 +113,7 @@ impl PathScore {
             path,
             sizesim,
             seqsim,
+            coverage: None,
         }
     }
 }
