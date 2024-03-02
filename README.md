@@ -1,5 +1,4 @@
-![Logo](https://github.com/ACEnglish/kanpig/raw/develop/imgs/icon.png)
-kanpig
+kanpig <img src="https://github.com/ACEnglish/kanpig/raw/develop/imgs/icon.png/" style="width:50px;" align="middle"> 
 ------
 
 Kmer ANalysis of PIleups for Genotyping
