@@ -1,4 +1,4 @@
-kanpig <img src="https://github.com/ACEnglish/kanpig/raw/develop/imgs/icon.png/" style="width:50px;" align="middle"> 
+kanpig <img src="https://github.com/ACEnglish/kanpig/raw/develop/imgs/icon.png/" style="width:100px;" align="right" style="vertical-align: middle;"> 
 ------
 
 Kmer ANalysis of PIleups for Genotyping
