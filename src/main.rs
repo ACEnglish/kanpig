@@ -39,47 +39,23 @@ fn main() {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let mut args = ArgParser::parse();
+    let args = ArgParser::parse();
     info!("starting");
     if !args.validate() {
         error!("please fix arguments");
         std::process::exit(1);
     }
+    info!("params: {:#?}", args);
 
     let mut input_vcf = vcf::reader::Builder::default()
         .build_from_path(args.io.input.clone())
         .expect("Unable to parse vcf");
     let input_header = input_vcf.read_header().expect("Unable to parse header");
 
-    // Ensure sample is correctly setup
-    // This goes into the new vcfwriter
-    // if the sample isn't present, we'll warn
-    // if the sample is present, we'll preserve its format fields
-    // But all the other samples are getting stripped out in the first version
-    if args.io.sample.is_none() {
-        if input_header.sample_names().is_empty() {
-            error!("--input contains no samples");
-            std::process::exit(1);
-        }
-        args.io.sample = Some(input_header.sample_names()[0].clone());
-        info!("Setting sample to {}", args.io.sample.as_ref().unwrap());
-    } else if !input_header
-        .sample_names()
-        .contains(args.io.sample.as_ref().unwrap())
-    {
-        error!(
-            "--sample {} not in --input {}",
-            args.io.sample.unwrap(),
-            args.io.input.display()
-        );
-        std::process::exit(1);
-    }
-    info!("params: {:#?}", args);
-
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
 
-    let mut writer = VcfWriter::new(&args.io.out, input_header.clone());
+    let mut writer = VcfWriter::new(&args.io.out, input_header.clone(), &args.io.sample);
 
     let mut m_input = VcfChunker::new(input_vcf, input_header.clone(), tree, args.kd.clone());
 
@@ -120,6 +96,7 @@ fn main() {
     }
 
     info!("collecting output");
+    let mut phase_group: i32 = 0;
     for _ in 0..num_chunks {
         let (m_graph, p1, p2, coverage) = result_receiver.recv().unwrap();
 
@@ -130,8 +107,9 @@ fn main() {
                     continue;
                 } // this never happens I could just let Some
             };
-            writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage);
+            writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage, phase_group);
         }
+        phase_group += 1;
     }
 
     info!("finished");

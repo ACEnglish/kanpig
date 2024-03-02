@@ -135,7 +135,10 @@ impl Variants {
     pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
         // if there are no variants in the hap, we don't want to apply the coverage.
         if hap.n == 0 {
-            PathScore { coverage: Some(hap.coverage), ..Default::default() }
+            PathScore {
+                coverage: Some(hap.coverage),
+                ..Default::default()
+            }
         } else {
             // if - for some reason find_score returns None (I don't think this can happen)
             let mut ret = match find_path(&self.graph, hap, params, 0, 0, None, None, None).0 {
