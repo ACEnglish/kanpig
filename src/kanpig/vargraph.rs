@@ -1,4 +1,4 @@
-use crate::kanplug::{Haplotype,
+use crate::kanpig::{Haplotype,
     KDParams,
     metrics::overlaps,
     PathScore,

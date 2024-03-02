@@ -1,7 +1,7 @@
 /*
  * A pileup variant that's hashable / equatable
  */
-use crate::kanplug::Svtype;
+use crate::kanpig::Svtype;
 use rust_htslib::bam::pileup::{Alignment, Indel};
 use std::hash::{Hash, Hasher};
 

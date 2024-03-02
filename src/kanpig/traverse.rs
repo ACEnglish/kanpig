@@ -2,7 +2,7 @@
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 
-use crate::kanplug::{KDParams, Haplotype,
+use crate::kanpig::{KDParams, Haplotype,
     PathScore, VarNode};
 
 /// Recursive depth first search of a VarGraph that's guided by size similarity

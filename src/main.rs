@@ -7,9 +7,9 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use noodles_vcf::{self as vcf};
 use std::thread;
 use clap::Parser;
-mod kanplug;
+mod kanpig;
 
-use kanplug::{BamParser,
+use kanpig::{BamParser,
             VcfChunker,
             ArgParser,
             PathScore,

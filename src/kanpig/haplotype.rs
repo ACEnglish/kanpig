@@ -1,4 +1,4 @@
-use crate::kanplug::seq_to_kmer;
+use crate::kanpig::seq_to_kmer;
 
 #[derive(Clone, Debug)]
 pub struct Haplotype {
