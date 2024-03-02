@@ -60,6 +60,7 @@ fn main() {
                 let m_graph = Variants::new(chunk, m_args.kd.kmer);
                 let (h1, h2, coverage) =
                     m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
+                // so find_haps would be returning the Vec<Haplotype> read_cluster(the above) to make h1, h2
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
                 let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
 

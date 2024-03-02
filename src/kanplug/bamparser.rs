@@ -104,6 +104,8 @@ impl BamParser {
         // The actual cut point is actually somewhere inside reads_to_haps.
         let mut m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
         let coverage = tot_cov / (window_end - window_start);
+        // okay, this will be the return point the rest of it
+        // should go into the read_cluster method
         // println!("Total coverage: {}", coverage);
         if coverage == 0 || m_haps.is_empty() {
             return (

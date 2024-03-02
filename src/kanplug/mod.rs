@@ -4,8 +4,8 @@ pub use crate::kanplug::bamparser::BamParser;
 mod bedparser;
 pub use crate::kanplug::bedparser::BedParser;
 
-mod chunker;
-pub use crate::kanplug::chunker::VcfChunker;
+mod vcfreader;
+pub use crate::kanplug::vcfreader::VcfChunker;
 
 mod cli;
 pub use crate::kanplug::cli::{ArgParser, IOParams, KDParams};
