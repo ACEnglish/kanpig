@@ -1,5 +1,5 @@
 
-kanplug
+kanpig
 ---
 
 Kmer ANalysis of PIleups for Genotyping
