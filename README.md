@@ -2,7 +2,7 @@
 kanplug
 ---
 
-Kmer ANalysis of PiLeUPs for Genotyping
+Kmer ANalysis of PiLeUps for Genotyping
 
 A fast tool for genotyping structural variants with long-reads.
 
