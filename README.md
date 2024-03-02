@@ -1,3 +1,4 @@
+![Logo](https://github.com/ACEnglish/kanpig/raw/develop/imgs/icon.png)
 kanpig
 ------
 
