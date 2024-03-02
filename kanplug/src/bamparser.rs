@@ -20,11 +20,11 @@ pub struct BamParser {
 
 impl BamParser {
     pub fn new(bam_name: PathBuf, ref_name: PathBuf, params: KDParams) -> Self {
-        let bam = IndexedReader::from_path(&bam_name).unwrap();
-        let reference = faidx::Reader::from_path(&ref_name).unwrap();
+        let bam = IndexedReader::from_path(bam_name).unwrap();
+        let reference = faidx::Reader::from_path(ref_name).unwrap();
         BamParser {
-            bam: bam,
-            reference: reference,
+            bam,
+            reference,
             params,
         }
     }
