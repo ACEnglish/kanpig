@@ -11,7 +11,7 @@ Install
 ---
 ```
 git clone https://github.com/ACEnglish/kanplup
-cd kanplup
+cd kanplug
 cargo build --release
-# executable in ./target/release/kanplup
+# executable in ./target/release/kanplug
 ```
