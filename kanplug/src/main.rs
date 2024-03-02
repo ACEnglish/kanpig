@@ -26,6 +26,7 @@ mod pileup;
 mod regions;
 mod vargraph;
 mod vcf_traits;
+mod vcfwriter;
 
 use crate::bamparser::BamParser;
 use crate::chunker::VcfChunker;

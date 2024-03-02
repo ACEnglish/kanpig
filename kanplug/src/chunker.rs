@@ -93,10 +93,10 @@ impl<R: BufRead> VcfChunker<R> {
     /// Return the next vcf entry which passes parameter conditions
     fn get_next_entry(&mut self) -> Option<vcf::Record> {
         //let mut entry = vcf::Record::default();
-        let mut entry = vcf::lazy::Record::default();
+        let mut entry = vcf::Record::default();
 
         loop {
-            match self.m_vcf.read_lazy_record(&self.m_header, &mut entry) {
+            match self.m_vcf.read_record(&self.m_header, &mut entry) {
                 Ok(0) => return None,
                 Err(e) => {
                     error!("skipping invalid VCF entry {:?}", e);

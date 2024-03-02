@@ -91,7 +91,7 @@ impl BamParser {
                 m_reads.entry(qname).or_default().push(m_var);
             }
         }
-        
+
         // This stuff should be moved to a read_cluster procedure
         // bamparser just creates the pileups and feeds it to something that
         // creates expected haplotypes.
