@@ -92,6 +92,7 @@ impl<R: BufRead> VcfChunker<R> {
 
     /// Return the next vcf entry which passes parameter conditions
     fn get_next_entry(&mut self) -> Option<vcf::Record> {
+        //let mut entry = vcf::Record::default();
         let mut entry = vcf::Record::default();
 
         loop {

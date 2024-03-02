@@ -5,12 +5,7 @@ extern crate log;
 
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use noodles_vcf::{
-    self as vcf,
-    record::genotypes::{sample::Value, Genotypes},
-};
-use std::fs::File;
-use std::io::BufWriter;
+use noodles_vcf::{self as vcf};
 use std::thread;
 
 mod bamparser;
@@ -26,6 +21,7 @@ mod pileup;
 mod regions;
 mod vargraph;
 mod vcf_traits;
+mod vcfwriter;
 
 use crate::bamparser::BamParser;
 use crate::chunker::VcfChunker;
@@ -33,6 +29,7 @@ use crate::cli::ArgParser;
 use crate::pathscore::PathScore;
 use crate::regions::build_region_tree;
 use crate::vargraph::Variants;
+use crate::vcfwriter::VcfWriter;
 
 type InputType = (ArgParser, Vec<vcf::Record>);
 type OutputType = (Variants, PathScore, PathScore);
@@ -55,6 +52,10 @@ fn main() {
     let input_header = input_vcf.read_header().expect("Unable to parse header");
 
     // Ensure sample is correctly setup
+    // This goes into the new vcfwriter
+    // if the sample isn't present, we'll warn
+    // if the sample is present, we'll preserve its format fields
+    // But all the other samples are getting stripped out in the first version
     if args.io.sample.is_none() {
         if input_header.sample_names().is_empty() {
             error!("--input contains no samples");
@@ -78,9 +79,7 @@ fn main() {
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
 
-    let out_buf = BufWriter::new(File::create(&args.io.out).expect("Error Creating Kmers"));
-    let mut writer = vcf::Writer::new(out_buf);
-    writer.write_header(&input_header);
+    let mut writer = VcfWriter::new(&args.io.out, input_header.clone());
 
     let mut m_input = VcfChunker::new(input_vcf, input_header.clone(), tree, args.kd.clone());
 
@@ -126,27 +125,13 @@ fn main() {
         let (m_graph, p1, p2) = result_receiver.recv().unwrap();
 
         for var_idx in m_graph.node_indices {
-            let mut cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
+            let cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
                 Some(var) => var.clone(),
                 None => {
                     continue;
-                }
+                } // this never happens I could just let Some
             };
-            //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
-            let gt = match (p1.path.contains(&var_idx), p2.path.contains(&var_idx)) {
-                (true, true) => "1|1",
-                (true, false) => "1|0",
-                (false, true) => "0|1",
-                (false, false) => "0|0",
-            };
-            let keys = "GT:GQ".parse().unwrap();
-            let genotypes = Genotypes::new(
-                keys,
-                vec![vec![Some(Value::from(gt)), Some(Value::from(13))]],
-            );
-
-            *cur_var.genotypes_mut() = genotypes.clone();
-            let _ = writer.write_record(&input_header, &cur_var);
+            writer.anno_write(cur_var, &var_idx, &p1, &p2);
         }
     }
 

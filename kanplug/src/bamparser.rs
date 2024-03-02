@@ -20,11 +20,11 @@ pub struct BamParser {
 
 impl BamParser {
     pub fn new(bam_name: PathBuf, ref_name: PathBuf, params: KDParams) -> Self {
-        let bam = IndexedReader::from_path(&bam_name).unwrap();
-        let reference = faidx::Reader::from_path(&ref_name).unwrap();
+        let bam = IndexedReader::from_path(bam_name).unwrap();
+        let reference = faidx::Reader::from_path(ref_name).unwrap();
         BamParser {
-            bam: bam,
-            reference: reference,
+            bam,
+            reference,
             params,
         }
     }
@@ -92,6 +92,10 @@ impl BamParser {
             }
         }
 
+        // This stuff should be moved to a read_cluster procedure
+        // bamparser just creates the pileups and feeds it to something that
+        // creates expected haplotypes.
+        // The actual cut point is actually somewhere inside reads_to_haps.
         let mut m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
         let coverage = tot_cov / (window_end - window_start);
         // println!("Total coverage: {}", coverage);

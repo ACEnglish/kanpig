@@ -48,8 +48,8 @@ pub enum GTstate {
     Ref,
     Het,
     Hom,
-    Non,
     Unk,
+    // Non, missing...
     //Hemi should be a thing
 }
 
