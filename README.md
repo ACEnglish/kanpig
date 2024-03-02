@@ -1,8 +1,6 @@
-kanpig <img src="https://github.com/ACEnglish/kanpig/raw/develop/imgs/icon.png/" style="width:100px;" align="right" style="vertical-align: middle;"> 
+kanpig - Kmer ANalysis of PIleups for Genotyping
+<img src="https://github.com/ACEnglish/kanpig/raw/develop/imgs/icon.png/" style="width:100px;" align="right" style="vertical-align: middle;"> 
 ------
-
-Kmer ANalysis of PIleups for Genotyping
-
 A fast tool for genotyping structural variants with long-reads.
 
 Install
