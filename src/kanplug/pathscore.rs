@@ -1,7 +1,4 @@
-use crate::cli::KDParams;
-use crate::haplotype::Haplotype;
-use crate::metrics::{self as metrics};
-use crate::vargraph::VarNode;
+use crate::kanplug::{Haplotype, metrics, VarNode, KDParams};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::cmp::Ordering;
 

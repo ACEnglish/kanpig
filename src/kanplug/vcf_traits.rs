@@ -1,4 +1,4 @@
-use crate::kmer::seq_to_kmer;
+use crate::kanplug::seq_to_kmer;
 use noodles_vcf::{
     self as vcf, record::alternate_bases::allele, record::info::field, record::Filters,
 };

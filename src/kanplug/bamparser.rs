@@ -1,10 +1,10 @@
-use crate::cli::KDParams;
-use crate::haplotype::Haplotype;
-use crate::kmeans::kmeans;
-use crate::kmer::seq_to_kmer;
-use crate::metrics;
-use crate::pileup::PileupVariant;
-use crate::vcf_traits::Svtype;
+use crate::kanplug::KDParams;
+use crate::kanplug::Haplotype;
+use crate::kanplug::kmeans;
+use crate::kanplug::seq_to_kmer;
+use crate::kanplug::metrics;
+use crate::kanplug::pileup::PileupVariant;
+use crate::kanplug::vcf_traits::Svtype;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::pileup::Indel;
 use rust_htslib::bam::{IndexedReader, Read};

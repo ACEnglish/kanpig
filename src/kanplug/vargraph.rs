@@ -1,9 +1,9 @@
-use crate::cli::KDParams;
-use crate::haplotype::Haplotype;
-use crate::metrics::overlaps;
-use crate::pathscore::PathScore;
-use crate::traverse::brute_force_find_path;
-use crate::vcf_traits::KdpVcf;
+use crate::kanplug::{Haplotype,
+    KDParams,
+    metrics::overlaps,
+    PathScore,
+    brute_force_find_path,
+    KdpVcf};
 use itertools::Itertools;
 use noodles_vcf::{self as vcf};
 use petgraph::graph::{DiGraph, NodeIndex};

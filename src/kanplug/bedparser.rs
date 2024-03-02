@@ -4,7 +4,7 @@ use std::path::Path;
 
 type FileHandler = io::Result<io::Lines<io::BufReader<File>>>;
 
-pub fn read_lines<P>(filename: P) -> FileHandler
+fn read_lines<P>(filename: P) -> FileHandler
 where
     P: AsRef<Path>,
 {

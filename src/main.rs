@@ -3,34 +3,19 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
-use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use noodles_vcf::{self as vcf};
 use std::thread;
+use clap::Parser;
+mod kanplug;
 
-mod bamparser;
-mod bedparser;
-mod chunker;
-mod cli;
-mod haplotype;
-mod kmeans;
-mod kmer;
-mod metrics;
-mod pathscore;
-mod pileup;
-mod regions;
-mod traverse;
-mod vargraph;
-mod vcf_traits;
-mod vcfwriter;
-
-use crate::bamparser::BamParser;
-use crate::chunker::VcfChunker;
-use crate::cli::ArgParser;
-use crate::pathscore::PathScore;
-use crate::regions::build_region_tree;
-use crate::vargraph::Variants;
-use crate::vcfwriter::VcfWriter;
+use kanplug::{BamParser,
+            VcfChunker,
+            ArgParser,
+            PathScore,
+            build_region_tree,
+            Variants,
+            VcfWriter};
 
 type InputType = (ArgParser, Vec<vcf::Record>);
 type OutputType = (Variants, PathScore, PathScore, u64);

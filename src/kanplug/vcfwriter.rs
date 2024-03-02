@@ -39,7 +39,7 @@ use std::path::PathBuf;
 
 use petgraph::graph::NodeIndex;
 
-use crate::PathScore;
+use crate::kanplug::PathScore;
 
 use noodles_vcf::{
     self as vcf,
