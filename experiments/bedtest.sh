@@ -2,8 +2,8 @@ set -e
 bed=test_rs/test.chr20.bed
 
 create() {
-    #cargo run --release -- \
-    ../target/release/kanpig \
+    #../target/release/kanpig \
+    cargo run --release -- \
         --input test_rs/test2.vcf.gz \
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
@@ -35,4 +35,4 @@ bench() {
 }
 
 create
-#bench
+bench

@@ -1,4 +1,4 @@
-use crate::kanpig::traverse::one_to_one;
+use crate::kanpig::traverse::{get_one_to_one, prune_graph};
 use crate::kanpig::{
     brute_force_find_path, metrics::overlaps, Haplotype, KDParams, KdpVcf, PathScore,
 };
@@ -138,20 +138,39 @@ impl Variants {
                 ..Default::default()
             }
         } else {
-            match one_to_one(&self.graph, hap, params) {
-                Some(path) => {
-                    let mut ret = path.0.unwrap();
-                    ret.coverage = Some(hap.coverage);
-                    ret
-                }
-                None => {
-                    let mut ret =
-                        brute_force_find_path(&self.graph, hap, params, 0, 0, None, None, None)
-                            .0
-                            .unwrap();
-                    ret.coverage = Some(hap.coverage);
-                    ret
-                }
+            let partial_matches = get_one_to_one(&self.graph, hap, params);
+
+            let skip_edges = if params.prune {
+                prune_graph(
+                    &self.graph,
+                    &partial_matches,
+                    &self.node_indices[0],
+                    self.node_indices.last().unwrap(),
+                )
+            } else {
+                vec![]
+            };
+
+            if params.try_exact && !partial_matches.is_empty() {
+                let mut ret = partial_matches.iter().max().cloned().unwrap();
+                ret.coverage = Some(hap.coverage);
+                ret
+            } else {
+                let mut ret = brute_force_find_path(
+                    &self.graph,
+                    hap,
+                    params,
+                    0,
+                    0,
+                    None,
+                    None,
+                    None,
+                    &skip_edges,
+                )
+                .0
+                .unwrap();
+                ret.coverage = Some(hap.coverage);
+                ret
             }
         }
     }

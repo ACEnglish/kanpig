@@ -34,6 +34,8 @@ Options:
       --seqsim <SEQSIM>        Minimum sequence similarity for paths [default: 0.9]
       --sizesim <SIZESIM>      Minimum size similarity for paths [default: 0.9]
       --minkfreq <MINKFREQ>    Minimum frequency of kmer [default: 1]
+      --try-exact              Search for a 1-to-1 match before graph traversal
+      --prune                  Prune paths which don't traverse 1-to-1 nodes
   -h, --help                   Print help
   -V, --version                Print version
 ```

@@ -82,9 +82,13 @@ pub struct KDParams {
     #[arg(long, default_value_t = 1)]
     pub minkfreq: u64,
 
-    /// Skip 1-to-1 matching
+    /// Search for a 1-to-1 match before graph traversal
     #[arg(long, default_value_t = false)]
-    pub skip_one: bool,
+    pub try_exact: bool,
+
+    /// Prune paths which don't traverse 1-to-1 nodes
+    #[arg(long, default_value_t = false)]
+    pub prune: bool,
 }
 
 impl ArgParser {

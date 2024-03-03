@@ -1,6 +1,9 @@
 /// Approaches for applying Haplotypes to a VarGraph
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::EdgeRef;
+use petgraph::prelude::EdgeIndex;
+use petgraph::visit::{Dfs, EdgeRef};
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 use crate::kanpig::{Haplotype, KDParams, PathScore, VarNode};
 
@@ -19,6 +22,7 @@ pub fn brute_force_find_path(
     i_cur_node: Option<NodeIndex>,
     mut i_path: Option<Vec<NodeIndex>>,
     i_best_path: Option<PathScore>,
+    skip_edges: &Vec<EdgeIndex>,
 ) -> PathResult {
     let (path, mut best_path, cur_len, cur_node) = match i_cur_node {
         Some(node) => {
@@ -31,7 +35,8 @@ pub fn brute_force_find_path(
     let cur_len = cur_len + graph.node_weight(cur_node).unwrap().size;
     // Order next nodes by how close they get us to the haplotype's length
     let mut diffs: Vec<_> = graph
-        .edges(cur_node)
+        .edges(cur_node) // remove
+        .filter(|edge| !skip_edges.contains(&edge.id()))
         .map(|edge| {
             let target_node = edge.target();
             let size = graph.node_weight(target_node).unwrap().size;
@@ -55,6 +60,7 @@ pub fn brute_force_find_path(
                 Some(next_node),
                 Some(path.clone()),
                 Some(best_path.clone()),
+                skip_edges,
             );
 
             if let Some(new_best) = new_best {
@@ -70,19 +76,13 @@ pub fn brute_force_find_path(
     (Some(best_path), npaths)
 }
 
-/// 1-to-1 : Before we go crazy searching for a path,
-/// Lets just see if there is some single VarNode that
-/// matches to the haplotype pretty well
-pub fn one_to_one(
+/// Return nodes which that have a 1-to-1 match to the haplotype
+pub fn get_one_to_one(
     graph: &DiGraph<VarNode, ()>,
     target: &Haplotype,
     params: &KDParams,
-) -> Option<PathResult> {
-    // we were asked not to do this
-    if params.skip_one {
-        return None;
-    }
-    let mut candidates: Vec<_> = graph
+) -> Vec<PathScore> {
+    graph
         .node_indices()
         .filter_map(|target_node| {
             let candidate = PathScore::new(graph, vec![target_node], target, params);
@@ -93,12 +93,33 @@ pub fn one_to_one(
             }
             //(node.size >= size_range_lower) & (node.size <= size_range_upper) & (
         })
-        .collect();
+        .collect()
+}
 
-    if candidates.is_empty() {
-        None
-    } else {
-        candidates.sort();
-        Some((candidates.iter().max().cloned(), 0))
+/// Remove edges from graph that lead to paths which never pass through the kept nodes
+pub fn prune_graph(
+    graph: &DiGraph<VarNode, ()>,
+    kept_paths: &Vec<PathScore>,
+    source: &NodeIndex,
+    sink: &NodeIndex,
+) -> Vec<EdgeIndex> {
+    let mut visited = HashSet::new();
+    let mut dfs = Dfs::new(&graph, *sink);
+    let kept_nodes: HashSet<NodeIndex> = HashSet::from_iter(
+        kept_paths
+            .iter()
+            .flat_map(|i| i.path.clone())
+            .collect::<Vec<NodeIndex>>(),
+    );
+
+    while let Some(node) = dfs.next(&graph) {
+        visited.insert(node);
     }
+
+    //edges_to_remove
+    graph
+        .edges_directed(*source, petgraph::Direction::Outgoing)
+        .filter(|e| !kept_nodes.contains(&e.target()))
+        .map(|e| e.id())
+        .collect::<Vec<_>>()
 }
