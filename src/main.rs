@@ -5,6 +5,7 @@ extern crate log;
 
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
 use std::thread;
 mod kanpig;
@@ -66,7 +67,7 @@ fn main() {
     }
 
     // Send items to worker threads
-    let mut num_chunks = 0;
+    let mut num_chunks: u64= 0;
     info!("parsing input");
     for i in &mut m_input {
         sender.send(Some((args.clone(), i))).unwrap();
@@ -79,6 +80,14 @@ fn main() {
     }
 
     info!("collecting output");
+    let sty = ProgressStyle::with_template(
+        " [{elapsed_precise}] {bar:45.cyan/blue} > {pos:>7}/{len:7} {msg}",
+    )
+    .unwrap()
+    .progress_chars("##-");
+    let pbar = ProgressBar::new(num_chunks);
+    pbar.set_style(sty.clone());
+
     let mut phase_group: i32 = 0;
     for _ in 0..num_chunks {
         let (m_graph, p1, p2, coverage) = result_receiver.recv().unwrap();
@@ -93,6 +102,7 @@ fn main() {
             writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage, phase_group);
         }
         phase_group += 1;
+        pbar.inc(1);
     }
 
     info!("finished");
