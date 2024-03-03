@@ -1,12 +1,10 @@
-use crate::kanpig::pileup::PileupVariant;
-use crate::kanpig::seq_to_kmer;
-use crate::kanpig::vcf_traits::Svtype;
-use crate::kanpig::Haplotype;
-use crate::kanpig::KDParams;
-use rust_htslib::bam::ext::BamRecordExtensions;
-use rust_htslib::bam::pileup::Indel;
-use rust_htslib::bam::{IndexedReader, Read};
-use rust_htslib::faidx;
+use crate::kanpig::{seq_to_kmer, Haplotype, KDParams, PileupVariant, Svtype};
+use rust_htslib::{
+    bam::ext::BamRecordExtensions,
+    bam::pileup::Indel,
+    bam::{IndexedReader, Read},
+    faidx,
+};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -84,7 +82,7 @@ impl BamParser {
                     }
                     _ => continue,
                 };
-                // println!("Pileup {:?}", m_var);
+
                 *p_variants.entry(m_var.clone()).or_insert(0) += 1;
                 let qname = alignment.record().qname().to_owned();
                 m_reads.entry(qname).or_default().push(m_var);

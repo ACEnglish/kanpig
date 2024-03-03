@@ -42,10 +42,8 @@ pub fn cluster_haplotypes(
     // Sort them so we can pick the highest covered haplotype
     for (idx, hap) in m_haps.drain(..).enumerate() {
         if clusts[0].points_idx.contains(&idx) {
-            // println!("Assigning A {:?}", hap);
             hap_a.push(hap);
         } else {
-            // println!("Assigning B {:?}", hap);
             hap_b.push(hap);
         }
     }
@@ -72,9 +70,6 @@ pub fn cluster_haplotypes(
         std::mem::swap(&mut hap1, &mut hap2);
     }
 
-    // println!("Working with \n\t{:?}\n\t{:?}", hap1, hap2);
-    // println!("Hap coverage: {} - {}:{}", coverage, hap1.coverage, hap2.coverage);
-
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar
     let (mut hap1, mut hap2) = match metrics::genotyper(hap1.coverage as f64, hap2.coverage as f64)
@@ -82,11 +77,11 @@ pub fn cluster_haplotypes(
         // if hap1 == ref, return hap1, hap2. else combine hap2 into hap1 and make return Hap::blank, hap2
         (metrics::GTstate::Ref, _) => {
             if hap1.n == 0 {
-                // println!("Think hap2 is a better representative");
+                // hap2 is a better representative
                 hap2.coverage += hap1.coverage;
                 (Haplotype::blank(params.kmer, 0), hap2)
             } else {
-                // println!("Think hap1 is a better representative");
+                // hap1 is a better representative
                 hap1.coverage += hap2.coverage;
                 (Haplotype::blank(params.kmer, 0), hap1)
             }
@@ -97,11 +92,11 @@ pub fn cluster_haplotypes(
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
                     > params.sizesim
             {
-                // println!("These should be consolidated");
+                // should be consolidated
                 hap2.coverage += hap1.coverage;
                 (Haplotype::blank(params.kmer, 0), hap2)
             } else {
-                // println!("Could be a compound het or a fp");
+                // could be a compound het or a fp
                 (hap1, hap2)
             }
         }
@@ -111,11 +106,11 @@ pub fn cluster_haplotypes(
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
                     > params.sizesim
             {
-                // println!("Turning into Hom Alt");
+                // Hom Alt
                 hap2.coverage += hap1.coverage;
                 (Haplotype::blank(params.kmer, 0), hap2)
             } else {
-                // println!("Compound Het");
+                // Compound Het
                 (hap1, hap2)
             }
         }
@@ -140,7 +135,6 @@ pub fn cluster_haplotypes(
             )
         }
         (metrics::GTstate::Hom, gq) => {
-            // remaining coverage (if any) is lost here
             hap2.gq = gq.clone();
             if hap1.n == 0 {
                 // HOMALT

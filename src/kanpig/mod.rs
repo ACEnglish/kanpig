@@ -25,6 +25,7 @@ mod pathscore;
 pub use crate::kanpig::pathscore::PathScore;
 
 mod pileup;
+pub use crate::kanpig::pileup::PileupVariant;
 
 mod cluster;
 pub use crate::kanpig::cluster::cluster_haplotypes;

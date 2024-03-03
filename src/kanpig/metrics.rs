@@ -83,7 +83,6 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> (GTstate, Option<Vec<f64>>) {
         Some(2) => (GTstate::Hom, Some(gt_list)),
         _ => panic!("not possible"),
     };
-    // println!("GENOTYPER: {:?}", ret);
     ret
 }
 

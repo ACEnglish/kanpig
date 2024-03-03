@@ -57,7 +57,6 @@ fn main() {
                     BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
                 let (h1, h2) = cluster_haplotypes(haps, coverage, &m_args.kd);
-                // so find_haps would be returning the Vec<Haplotype> read_cluster(the above) to make h1, h2
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
                 let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
 
@@ -89,7 +88,7 @@ fn main() {
                 Some(var) => var.clone(),
                 None => {
                     continue;
-                } // this never happens I could just let Some
+                }
             };
             writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage, phase_group);
         }
