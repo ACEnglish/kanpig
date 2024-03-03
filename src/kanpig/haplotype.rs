@@ -2,32 +2,32 @@ use crate::kanpig::seq_to_kmer;
 
 #[derive(Clone, Debug)]
 pub struct Haplotype {
-    pub kfeat: Vec<f32>,
     pub size: i64,
     pub n: u64,
     pub coverage: u64,
     pub gq: Option<Vec<f64>>,
+    pub kfeat: Vec<f32>,
 }
 
 impl Haplotype {
     pub fn new(kfeat: Vec<f32>, size: i64, n: u64, coverage: u64) -> Self {
         Haplotype {
-            kfeat,
             size,
             n,
             coverage,
             gq: None,
+            kfeat,
         }
     }
 
     // Create an empty haplotype
     pub fn blank(kmer: u8, coverage: u64) -> Haplotype {
         Haplotype {
-            kfeat: seq_to_kmer(&[], kmer, false),
             size: 0,
             n: 0,
             coverage,
             gq: None,
+            kfeat: seq_to_kmer(&[], kmer, false),
         }
     }
 

@@ -13,11 +13,11 @@ pub struct VarNode {
     pub start: u64,
     pub end: u64,
     pub size: i64,
-    pub kfeat: Vec<f32>,
-    pub entry: Option<vcf::Record>,
     pub coverage: (Option<u64>, Option<u64>),
     pub seqsim: (Option<f32>, Option<f32>),
     pub sizesim: (Option<f32>, Option<f32>),
+    pub entry: Option<vcf::Record>,
+    pub kfeat: Vec<f32>,
 }
 
 impl VarNode {
@@ -31,11 +31,11 @@ impl VarNode {
             start,
             end,
             size,
-            kfeat,
             entry: Some(entry),
             coverage: (None, None),
             seqsim: (None, None),
             sizesim: (None, None),
+            kfeat,
         }
     }
 
@@ -46,11 +46,11 @@ impl VarNode {
             start: 0,
             end: 0,
             size: 0,
-            kfeat: vec![0f32; 4_usize.pow(kmer.into())],
             entry: None,
             coverage: (None, None),
             seqsim: (None, None),
             sizesim: (None, None),
+            kfeat: vec![0f32; 4_usize.pow(kmer.into())],
         }
     }
 }

@@ -4,10 +4,10 @@ use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
 pub struct PathScore {
-    pub path: Vec<NodeIndex>,
     pub sizesim: f32,
     pub seqsim: f32,
     pub coverage: Option<u64>,
+    pub path: Vec<NodeIndex>,
 }
 
 impl Eq for PathScore {}
