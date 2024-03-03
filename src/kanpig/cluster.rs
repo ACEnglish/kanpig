@@ -64,11 +64,18 @@ pub fn cluster_haplotypes(
     };
 
     // We want the second haplotype to be the higher covered if it is a non-REF
+    // Or the simplier if it has fewer variants
+    // Or the longer allele if all else is the same
+    // This helps improve determinism. To go all the way, we'd also need to compare the kfeat
     if hap1.n != 0
-        && (hap1.coverage > hap2.coverage || (hap1.coverage == hap2.coverage && hap1.n < hap2.n))
+        && (hap1.coverage > hap2.coverage
+            || (hap1.coverage == hap2.coverage
+                && (hap1.n < hap2.n || hap1.size.unsigned_abs() > hap2.size.unsigned_abs())))
     {
         std::mem::swap(&mut hap1, &mut hap2);
     }
+    debug!("Hap1 {:?}", hap1);
+    debug!("Hap2 {:?}", hap2);
 
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar

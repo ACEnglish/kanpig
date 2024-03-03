@@ -41,6 +41,10 @@ pub struct IOParams {
     /// Number of threads
     #[arg(long, default_value_t = 1)]
     pub threads: usize,
+
+    /// Verbose logging
+    #[arg(long, default_value_t = false)]
+    pub debug: bool,
 }
 
 #[derive(clap::Args, Clone, Debug)]

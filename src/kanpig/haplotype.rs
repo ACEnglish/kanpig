@@ -61,7 +61,12 @@ impl Ord for Haplotype {
 
         // If coverage is equal, compare by number of variants
         // We prefer 'simplier' changes, but this will not choose that.
-        self.n.cmp(&other.n)
+        let changes_ordering = self.n.partial_cmp(&other.n).unwrap();
+        if changes_ordering != std::cmp::Ordering::Equal {
+            return changes_ordering;
+        }
+        // sort by size - This makes a preference for keeping larger SVs
+        self.size.cmp(&other.size)
     }
 }
 

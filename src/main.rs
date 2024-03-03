@@ -19,11 +19,16 @@ type InputType = (ArgParser, Vec<vcf::Record>);
 type OutputType = (Variants, PathScore, PathScore, u64);
 
 fn main() {
+    let args = ArgParser::parse();
+    let level = if args.io.debug {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
     pretty_env_logger::formatted_timed_builder()
-        .filter_level(log::LevelFilter::Info)
+        .filter_level(level)
         .init();
 
-    let args = ArgParser::parse();
     info!("starting");
     if !args.validate() {
         error!("please fix arguments");

@@ -15,7 +15,7 @@ create() {
     # --bam /Users/english/code/kanpig/experiments/test_rs/GIABHG002.bam \
 }
 
-bench() {
+bench_lite() {
     bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
     tabix test_rs/hc.vcf.gz
     rm -rf test_rs/hcbench_all
@@ -23,16 +23,22 @@ bench() {
         -b test_rs/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz \
         -c test_rs/hc.vcf.gz -o test_rs/hcbench_all/ \
         --pctsize 0.90 --pctseq 0.90
+}
 
+bench_medium() {
     rm -rf test_rs/hcbench_noref
     truvari bench --includebed $bed \
         -b test_rs/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz \
         -c test_rs/hc.vcf.gz --no-ref a -o test_rs/hcbench_noref/ \
         --pctsize 0.90 --pctseq 0.90
+}
 
+bench_full() {
     truvari refine -f ~/code/references/grch38/GRCh38_1kg_mainchrs.fa -U -u -R \
             --regions test_rs/hcbench_noref/candidate.refine.bed test_rs/hcbench_noref
 }
 
 create
-bench
+bench_lite
+#bench_medium
+#bench_full
