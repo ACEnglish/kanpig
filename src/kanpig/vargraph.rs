@@ -1,3 +1,4 @@
+use crate::kanpig::traverse::one_to_one;
 use crate::kanpig::{
     brute_force_find_path, metrics::overlaps, Haplotype, KDParams, KdpVcf, PathScore,
 };
@@ -137,12 +138,21 @@ impl Variants {
                 ..Default::default()
             }
         } else {
-            // if - for some reason find_score returns None (I don't think this can happen)
-            let mut ret = brute_force_find_path(&self.graph, hap, params, 0, 0, None, None, None)
-                .0
-                .unwrap();
-            ret.coverage = Some(hap.coverage);
-            ret
+            match one_to_one(&self.graph, hap, params) {
+                Some(path) => {
+                    let mut ret = path.0.unwrap();
+                    ret.coverage = Some(hap.coverage);
+                    ret
+                }
+                None => {
+                    let mut ret =
+                        brute_force_find_path(&self.graph, hap, params, 0, 0, None, None, None)
+                            .0
+                            .unwrap();
+                    ret.coverage = Some(hap.coverage);
+                    ret
+                }
+            }
         }
     }
 }

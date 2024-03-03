@@ -81,6 +81,10 @@ pub struct KDParams {
     /// Minimum frequency of kmer
     #[arg(long, default_value_t = 1)]
     pub minkfreq: u64,
+
+    /// Skip 1-to-1 matching
+    #[arg(long, default_value_t = false)]
+    pub skip_one: bool,
 }
 
 impl ArgParser {

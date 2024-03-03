@@ -4,6 +4,8 @@ use petgraph::visit::EdgeRef;
 
 use crate::kanpig::{Haplotype, KDParams, PathScore, VarNode};
 
+type PathResult = (Option<PathScore>, u64);
+
 /// Recursive depth first search of a VarGraph that's guided by size similarity
 /// Search stops after maxpaths have been checked
 /// Assumes NodeIndex 0 is src node and NodeIndex -1 is snk
@@ -17,7 +19,7 @@ pub fn brute_force_find_path(
     i_cur_node: Option<NodeIndex>,
     mut i_path: Option<Vec<NodeIndex>>,
     i_best_path: Option<PathScore>,
-) -> (Option<PathScore>, u64) {
+) -> PathResult {
     let (path, mut best_path, cur_len, cur_node) = match i_cur_node {
         Some(node) => {
             i_path.as_mut().unwrap().push(node);
@@ -66,4 +68,37 @@ pub fn brute_force_find_path(
     }
 
     (Some(best_path), npaths)
+}
+
+/// 1-to-1 : Before we go crazy searching for a path,
+/// Lets just see if there is some single VarNode that
+/// matches to the haplotype pretty well
+pub fn one_to_one(
+    graph: &DiGraph<VarNode, ()>,
+    target: &Haplotype,
+    params: &KDParams,
+) -> Option<PathResult> {
+    // we were asked not to do this
+    if params.skip_one {
+        return None;
+    }
+    let mut candidates: Vec<_> = graph
+        .node_indices()
+        .filter_map(|target_node| {
+            let candidate = PathScore::new(graph, vec![target_node], target, params);
+            if candidate.seqsim > 0.0 {
+                Some(candidate)
+            } else {
+                None
+            }
+            //(node.size >= size_range_lower) & (node.size <= size_range_upper) & (
+        })
+        .collect();
+
+    if candidates.is_empty() {
+        None
+    } else {
+        candidates.sort();
+        Some((candidates.iter().max().cloned(), 0))
+    }
 }
