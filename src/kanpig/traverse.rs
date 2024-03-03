@@ -99,7 +99,7 @@ pub fn get_one_to_one(
 /// Remove edges from graph that lead to paths which never pass through the kept nodes
 pub fn prune_graph(
     graph: &DiGraph<VarNode, ()>,
-    kept_paths: &Vec<PathScore>,
+    kept_paths: &[PathScore],
     source: &NodeIndex,
     sink: &NodeIndex,
 ) -> Vec<EdgeIndex> {

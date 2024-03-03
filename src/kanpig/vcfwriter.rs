@@ -154,12 +154,22 @@ impl VcfWriter {
         let keys = "GT:PG:DP:AD:ZS:SS".parse().unwrap(); // I shouldn't be making this each time?
 
         //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
-        let gt = match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
-            (true, true) => "1|1",
-            (true, false) => "1|0",
-            (false, true) => "0|1",
-            (false, false) => "0|0",
+        let gt1 = if path1.path.contains(var_idx) {
+            "1"
+        } else if path1.coverage.unwrap() == 0 {
+            "."
+        } else {
+            "0"
         };
+        let gt2 = if path2.path.contains(var_idx) {
+            "1"
+        } else if path2.coverage.unwrap() == 0 {
+            "."
+        } else {
+            "0"
+        };
+        let gt = format!("{}|{}", gt1, gt2);
+
         // https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/header/record/value/map/struct.Map.html
         let ad = Value::from(vec![
             Some(path1.coverage.unwrap() as i32),

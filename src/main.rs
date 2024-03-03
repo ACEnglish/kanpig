@@ -67,7 +67,7 @@ fn main() {
     }
 
     // Send items to worker threads
-    let mut num_chunks: u64= 0;
+    let mut num_chunks: u64 = 0;
     info!("parsing input");
     for i in &mut m_input {
         sender.send(Some((args.clone(), i))).unwrap();
