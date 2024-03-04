@@ -78,6 +78,11 @@ fn main() {
         sender.send(Some((args.clone(), i))).unwrap();
         num_chunks += 1;
     }
+    
+    if num_chunks == 0 {
+        error!("No variants to be analyzed");
+        std::process::exit(1);
+    }
 
     // Signal worker threads to exit
     for _ in 0..args.io.threads {

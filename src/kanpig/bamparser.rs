@@ -142,6 +142,7 @@ impl BamParser {
                 cur_hap.add(&hap_parts[&p]);
             }
             cur_hap.coverage = coverage;
+            debug!("{:?}", cur_hap);
             ret.push(cur_hap);
         }
 
