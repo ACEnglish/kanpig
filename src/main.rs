@@ -4,7 +4,7 @@ extern crate pretty_env_logger;
 extern crate log;
 
 use clap::Parser;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
 use std::thread;
@@ -94,20 +94,33 @@ fn main() {
     pbar.set_style(sty.clone());
 
     let mut phase_group: i32 = 0;
-    for _ in 0..num_chunks {
-        let (m_graph, p1, p2, coverage) = result_receiver.recv().unwrap();
-
-        for var_idx in m_graph.node_indices {
-            let cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
-                Some(var) => var.clone(),
-                None => {
-                    continue;
+    loop {
+        select! {
+            recv(result_receiver) -> result => {
+                match result {
+                    Ok((m_graph, p1, p2, coverage)) => {
+                        for var_idx in m_graph.node_indices {
+                            let cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
+                                Some(var) => var.clone(),
+                                None => {
+                                    continue;
+                                }
+                            };
+                            writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage, phase_group);
+                        }
+                        phase_group += 1;
+                        pbar.inc(1);
+                        if phase_group as u64 == num_chunks {
+                            break;
+                        }
+                    },
+                    Err(e) => {
+                        debug!("Problem {:?}", e);
+                        break;
+                    },
                 }
-            };
-            writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage, phase_group);
+            },
         }
-        phase_group += 1;
-        pbar.inc(1);
     }
 
     info!("finished");

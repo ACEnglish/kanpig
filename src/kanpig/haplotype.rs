@@ -63,7 +63,7 @@ impl Ord for Haplotype {
         // We prefer fewer variants, thus the reverse
         let changes_ordering = self.n.partial_cmp(&other.n).unwrap();
         if changes_ordering != std::cmp::Ordering::Equal {
-            return changes_ordering.reverse(); 
+            return changes_ordering.reverse();
         }
         // sort by size - This makes a preference for keeping smaller SVs
         self.size.cmp(&other.size)
@@ -87,7 +87,6 @@ impl PartialEq for Haplotype {
 
 impl Eq for Haplotype {}
 
-
 impl std::fmt::Debug for Haplotype {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Haplotype")
@@ -99,4 +98,3 @@ impl std::fmt::Debug for Haplotype {
             .finish()
     }
 }
-

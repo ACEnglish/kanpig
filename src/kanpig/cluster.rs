@@ -63,8 +63,7 @@ pub fn cluster_haplotypes(
         Haplotype::blank(params.kmer, coverage - hap2.coverage)
     };
 
-    if hap1.n != 0 && hap1 > hap2
-    {
+    if hap1.n != 0 && hap1 > hap2 {
         std::mem::swap(&mut hap1, &mut hap2);
     }
     debug!("Hap1 {:?}", hap1);

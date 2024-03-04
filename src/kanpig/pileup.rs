@@ -67,12 +67,11 @@ impl Hash for PileupVariant {
     }
 }
 
-
 impl std::fmt::Debug for PileupVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let seq = match &self.sequence {
-                Some(seq) => String::from_utf8_lossy(seq),
-                None => String::from("").into(),
+            Some(seq) => String::from_utf8_lossy(seq),
+            None => String::from("").into(),
         };
         f.debug_struct("PileupVariant")
             .field("position", &self.position)
@@ -83,4 +82,3 @@ impl std::fmt::Debug for PileupVariant {
             .finish()
     }
 }
-

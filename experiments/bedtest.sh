@@ -2,15 +2,15 @@ set -e
 bed=test_rs/test.chr20.bed
 
 create() {
-    #../target/release/kanpig \
-    cargo run --release -- \
+    #cargo run --release -- \
+    ../target/release/kanpig \
         --input test_rs/test2.vcf.gz \
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
-        --bed $bed \
-        --sizesim 0.90 --seqsim 0.90 --threads 4 \
+        --sizesim 0.90 --seqsim 0.90 --threads 8 \
         --maxpaths 5000 \
         -o test_rs/hc.vcf
+        #--bed $bed 
     # --bed /Users/english/code/kanpig/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \
     # --bam /Users/english/code/kanpig/experiments/test_rs/GIABHG002.bam \
 }
@@ -39,6 +39,6 @@ bench_full() {
 }
 
 create
-bench_lite
+#bench_lite
 #bench_medium
 #bench_full
