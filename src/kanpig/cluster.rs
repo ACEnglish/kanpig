@@ -39,7 +39,7 @@ pub fn cluster_haplotypes(
     let mut hap_a = Vec::<Haplotype>::new();
     let mut hap_b = Vec::<Haplotype>::new();
 
-    // Sort them so we can pick the highest covered haplotype
+    // Separate the two haplotypes and sort
     for (idx, hap) in m_haps.drain(..).enumerate() {
         if clusts[0].points_idx.contains(&idx) {
             hap_a.push(hap);
@@ -63,14 +63,7 @@ pub fn cluster_haplotypes(
         Haplotype::blank(params.kmer, coverage - hap2.coverage)
     };
 
-    // We want the second haplotype to be the higher covered if it is a non-REF
-    // Or the simplier if it has fewer variants
-    // Or the longer allele if all else is the same
-    // This helps improve determinism. To go all the way, we'd also need to compare the kfeat
-    if hap1.n != 0
-        && (hap1.coverage > hap2.coverage
-            || (hap1.coverage == hap2.coverage
-                && (hap1.n < hap2.n || hap1.size.unsigned_abs() > hap2.size.unsigned_abs())))
+    if hap1.n != 0 && hap1 > hap2
     {
         std::mem::swap(&mut hap1, &mut hap2);
     }

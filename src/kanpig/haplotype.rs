@@ -1,6 +1,6 @@
 use crate::kanpig::seq_to_kmer;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Haplotype {
     pub size: i64,
     pub n: u64,
@@ -53,19 +53,19 @@ impl PartialOrd for Haplotype {
 
 impl Ord for Haplotype {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // First, compare by coverage
+        // First, compare by coverage. More coverage is better
         let coverage_ordering = self.coverage.partial_cmp(&other.coverage).unwrap();
         if coverage_ordering != std::cmp::Ordering::Equal {
             return coverage_ordering;
         }
 
         // If coverage is equal, compare by number of variants
-        // We prefer 'simplier' changes, but this will not choose that.
+        // We prefer fewer variants, thus the reverse
         let changes_ordering = self.n.partial_cmp(&other.n).unwrap();
         if changes_ordering != std::cmp::Ordering::Equal {
-            return changes_ordering;
+            return changes_ordering.reverse(); 
         }
-        // sort by size - This makes a preference for keeping larger SVs
+        // sort by size - This makes a preference for keeping smaller SVs
         self.size.cmp(&other.size)
     }
 }
@@ -86,3 +86,17 @@ impl PartialEq for Haplotype {
 }
 
 impl Eq for Haplotype {}
+
+
+impl std::fmt::Debug for Haplotype {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Haplotype")
+            .field("size", &self.size)
+            .field("n", &self.n)
+            .field("coverage", &self.coverage)
+            .field("gq", &self.gq)
+            // Exclude kfeat from the debug output
+            .finish()
+    }
+}
+

@@ -82,7 +82,7 @@ impl BamParser {
                     }
                     _ => continue,
                 };
-
+                debug!("{:?}", m_var);
                 *p_variants.entry(m_var.clone()).or_insert(0) += 1;
                 let qname = alignment.record().qname().to_owned();
                 m_reads.entry(qname).or_default().push(m_var);

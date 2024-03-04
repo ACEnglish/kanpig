@@ -5,12 +5,12 @@ use crate::kanpig::Svtype;
 use rust_htslib::bam::pileup::{Alignment, Indel};
 use std::hash::{Hash, Hasher};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PileupVariant {
     pub position: u64,
+    pub indel: Svtype,
     pub size: i64,
     pub sequence: Option<Vec<u8>>,
-    pub indel: Svtype,
 }
 
 impl PileupVariant {
@@ -28,9 +28,9 @@ impl PileupVariant {
 
         PileupVariant {
             position,
+            indel,
             size,
             sequence,
-            indel,
         }
     }
     // pub fn to_hap(&self) -> Haplotype going to need reference
@@ -66,3 +66,21 @@ impl Hash for PileupVariant {
         }
     }
 }
+
+
+impl std::fmt::Debug for PileupVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let seq = match &self.sequence {
+                Some(seq) => String::from_utf8_lossy(seq),
+                None => String::from("").into(),
+        };
+        f.debug_struct("PileupVariant")
+            .field("position", &self.position)
+            .field("size", &self.size)
+            .field("indel", &self.indel)
+            .field("sequence", &seq)
+            // Exclude kfeat from the debug output
+            .finish()
+    }
+}
+
