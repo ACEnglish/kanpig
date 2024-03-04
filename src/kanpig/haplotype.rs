@@ -5,7 +5,6 @@ pub struct Haplotype {
     pub size: i64,
     pub n: u64,
     pub coverage: u64,
-    pub gq: Option<Vec<f64>>,
     pub kfeat: Vec<f32>,
 }
 
@@ -15,7 +14,6 @@ impl Haplotype {
             size,
             n,
             coverage,
-            gq: None,
             kfeat,
         }
     }
@@ -26,7 +24,6 @@ impl Haplotype {
             size: 0,
             n: 0,
             coverage,
-            gq: None,
             kfeat: seq_to_kmer(&[], kmer, false),
         }
     }
@@ -93,7 +90,6 @@ impl std::fmt::Debug for Haplotype {
             .field("size", &self.size)
             .field("n", &self.n)
             .field("coverage", &self.coverage)
-            .field("gq", &self.gq)
             // Exclude kfeat from the debug output
             .finish()
     }
