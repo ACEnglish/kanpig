@@ -75,7 +75,6 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> (GTstate, f64, f64) {
     (m_gt, sq, gq)
 }
 
-
 fn log_choose(n: f64, k: f64) -> f64 {
     let mut r = 0.0;
     let mut n = n;
@@ -111,7 +110,8 @@ fn bayes_gt(alt1_cov: f64, alt2_cov: f64) -> Vec<f64> {
 /// Returns genotype and sample where genotype is confidence in the assigned genotype
 /// and sample is confidence that there is actually a variant present
 fn make_gt_quals(gt_lplist: &Vec<f64>) -> (f64, f64) {
-    let mut sorted_gt_lplist: Vec<(usize, f64)> = gt_lplist.iter().enumerate().map(|(i, &e)| (i, e)).collect();
+    let mut sorted_gt_lplist: Vec<(usize, f64)> =
+        gt_lplist.iter().enumerate().map(|(i, &e)| (i, e)).collect();
     sorted_gt_lplist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
     let best = sorted_gt_lplist[0];

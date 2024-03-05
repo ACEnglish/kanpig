@@ -24,9 +24,7 @@ pub fn cluster_haplotypes(
             (metrics::GTstate::Ref | metrics::GTstate::Het, _, _) => {
                 (Haplotype::blank(params.kmer, ref_cov as u64), hap2)
             }
-            (metrics::GTstate::Hom, _, _) => {
-                (hap2.clone(), hap2)
-            }
+            (metrics::GTstate::Hom, _, _) => (hap2.clone(), hap2),
             _ => panic!("The genotyper can't do this, yet"),
         };
         return ret;
@@ -70,8 +68,7 @@ pub fn cluster_haplotypes(
 
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar
-    let (hap1, mut hap2) = match metrics::genotyper(hap1.coverage as f64, hap2.coverage as f64)
-    {
+    let (hap1, mut hap2) = match metrics::genotyper(hap1.coverage as f64, hap2.coverage as f64) {
         // if hap1 == ref, return hap1, hap2. else combine hap2 into hap1 and make return Hap::blank, hap2
         (metrics::GTstate::Ref, _, _) => {
             if hap1.n == 0 {

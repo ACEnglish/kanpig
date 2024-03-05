@@ -63,7 +63,21 @@ impl Ord for Haplotype {
             return changes_ordering.reverse();
         }
         // sort by size - This makes a preference for keeping smaller SVs
-        self.size.cmp(&other.size)
+        let size_ordering = self.size.cmp(&other.size);
+        if size_ordering != std::cmp::Ordering::Equal {
+            return size_ordering;
+        }
+
+        // Increase determinism
+        for (i, j) in self.kfeat.iter().zip(other.kfeat.iter()) {
+            if *i as u64 != *j as u64 {
+                if i < j {
+                    return std::cmp::Ordering::Less;
+                }
+                return std::cmp::Ordering::Greater;
+            }
+        }
+        std::cmp::Ordering::Equal
     }
 }
 

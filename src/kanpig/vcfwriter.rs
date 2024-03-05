@@ -39,7 +39,7 @@ use std::path::PathBuf;
 
 use petgraph::graph::NodeIndex;
 
-use crate::kanpig::{PathScore, metrics};
+use crate::kanpig::{metrics, PathScore};
 
 use noodles_vcf::{
     self as vcf,
@@ -98,7 +98,8 @@ impl VcfWriter {
         let mut sqfmt = Map::<format::Format>::from(&sqid);
         *sqfmt.number_mut() = vcf::header::Number::Count(1);
         *sqfmt.type_mut() = format::Type::Integer;
-        *sqfmt.description_mut() = "Phred scaled quality of sample being non-ref at this variant".to_string();
+        *sqfmt.description_mut() =
+            "Phred scaled quality of sample being non-ref at this variant".to_string();
         all_formats.insert(sqid, sqfmt);
 
         // GQ
@@ -185,8 +186,11 @@ impl VcfWriter {
             "0"
         };
         let gt = format!("{}|{}", gt1, gt2);
-        
-        let (_, sq, gq) = metrics::genotyper(path1.coverage.unwrap() as f64, path2.coverage.unwrap() as f64);
+
+        let (_, sq, gq) = metrics::genotyper(
+            path1.coverage.unwrap() as f64,
+            path2.coverage.unwrap() as f64,
+        );
 
         let ad = Value::from(vec![
             Some(path1.coverage.unwrap() as i32),
@@ -206,11 +210,11 @@ impl VcfWriter {
         let genotypes = Genotypes::new(
             keys,
             vec![vec![
-                Some(Value::from(gt)),                 // GT
-                Some(Value::from(sq.round() as i32)),          // SQ
-                Some(Value::from(gq.round() as i32)),          // GQ
-                Some(Value::from(phase_group)),        // PG
-                Some(Value::from(coverage as i32)),    // DP
+                Some(Value::from(gt)),                // GT
+                Some(Value::from(sq.round() as i32)), // SQ
+                Some(Value::from(gq.round() as i32)), // GQ
+                Some(Value::from(phase_group)),       // PG
+                Some(Value::from(coverage as i32)),   // DP
                 Some(ad),
                 Some(zs),
                 Some(ss),
