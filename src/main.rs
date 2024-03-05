@@ -39,7 +39,7 @@ fn main() {
     let mut input_vcf = vcf::reader::Builder::default()
         .build_from_path(args.io.input.clone())
         .expect("Unable to parse vcf");
-    let input_header = input_vcf.read_header().expect("Unable to parse header");
+    let input_header = input_vcf.read_header().expect("Unable to parse vcf header");
 
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
@@ -78,7 +78,7 @@ fn main() {
         sender.send(Some((args.clone(), i))).unwrap();
         num_chunks += 1;
     }
-    
+
     if num_chunks == 0 {
         error!("No variants to be analyzed");
         std::process::exit(1);

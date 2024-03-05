@@ -5,7 +5,6 @@ pub struct Haplotype {
     pub size: i64,
     pub n: u64,
     pub coverage: u64,
-    pub gq: Option<Vec<f64>>,
     pub kfeat: Vec<f32>,
 }
 
@@ -15,7 +14,6 @@ impl Haplotype {
             size,
             n,
             coverage,
-            gq: None,
             kfeat,
         }
     }
@@ -26,7 +24,6 @@ impl Haplotype {
             size: 0,
             n: 0,
             coverage,
-            gq: None,
             kfeat: seq_to_kmer(&[], kmer, false),
         }
     }
@@ -66,7 +63,21 @@ impl Ord for Haplotype {
             return changes_ordering.reverse();
         }
         // sort by size - This makes a preference for keeping smaller SVs
-        self.size.cmp(&other.size)
+        let size_ordering = self.size.cmp(&other.size);
+        if size_ordering != std::cmp::Ordering::Equal {
+            return size_ordering;
+        }
+
+        // Increase determinism
+        for (i, j) in self.kfeat.iter().zip(other.kfeat.iter()) {
+            if *i as u64 != *j as u64 {
+                if i < j {
+                    return std::cmp::Ordering::Less;
+                }
+                return std::cmp::Ordering::Greater;
+            }
+        }
+        std::cmp::Ordering::Equal
     }
 }
 
@@ -93,7 +104,6 @@ impl std::fmt::Debug for Haplotype {
             .field("size", &self.size)
             .field("n", &self.n)
             .field("coverage", &self.coverage)
-            .field("gq", &self.gq)
             // Exclude kfeat from the debug output
             .finish()
     }

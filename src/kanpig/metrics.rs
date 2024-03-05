@@ -1,5 +1,4 @@
 use ordered_float::OrderedFloat;
-use std::f64::consts::LN_10;
 
 /// Canberra distance of featurized kmers
 pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
@@ -52,38 +51,28 @@ pub enum GTstate {
     //Hemi should be a thing
 }
 
-/// Generate probabilities of genotypes
-/// Smallest value is most likely genotype
-pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> (GTstate, Option<Vec<f64>>) {
+/// Generate genotypes given observed allele coverages
+/// Return GTstate and tuple of SQ/GQ
+pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> (GTstate, f64, f64) {
     let total = alt1_cov + alt2_cov;
     if total == 0.0 {
-        return (GTstate::Non, None);
+        return (GTstate::Non, 0.0, 0.0);
     }
 
-    let priors: &[f64] = &[0.05, 0.5, 0.95];
-
-    let mut gt_list = Vec::new();
-
-    for &p_alt in priors {
-        let mut comb = log_choose(total, alt1_cov);
-        comb += alt2_cov * p_alt.ln();
-        comb += alt1_cov * (1.0 - p_alt).ln();
-        gt_list.push(comb);
-    }
-
-    // Some(gt_list) What I should be returning for a GQ
-    let ret = match gt_list
+    let gt_lplist = bayes_gt(alt1_cov, alt2_cov);
+    let (sq, gq) = make_gt_quals(&gt_lplist);
+    let m_gt = match gt_lplist
         .iter()
         .enumerate()
         .max_by_key(|&(_, &x)| OrderedFloat(x))
         .map(|(i, _)| i)
     {
-        Some(0) => (GTstate::Ref, Some(gt_list)),
-        Some(1) => (GTstate::Het, Some(gt_list)),
-        Some(2) => (GTstate::Hom, Some(gt_list)),
+        Some(0) => GTstate::Ref,
+        Some(1) => GTstate::Het,
+        Some(2) => GTstate::Hom,
         _ => panic!("not possible"),
     };
-    ret
+    (m_gt, sq, gq)
 }
 
 fn log_choose(n: f64, k: f64) -> f64 {
@@ -95,33 +84,47 @@ fn log_choose(n: f64, k: f64) -> f64 {
         k = n - k;
     }
 
-    for d in 1..=k as u64 {
-        r += n.ln();
+    for d in 1..=(k as i32) {
+        r += n.log10();
         r -= d as f64;
         n -= 1.0;
     }
 
-    r / LN_10 // Convert to base 10 logarithm
+    r
 }
 
-/* Deprecated
-// use simsimd::SimSIMD; Deprecating
-/// Cosine similarity
-pub fn cosinesim(a: &[f32], b: &[f32]) -> f32 {
-    (1.0 - f32::cosine(a, b).unwrap()).abs()
+/// Probabilities of each genotype given the allele coveages
+fn bayes_gt(alt1_cov: f64, alt2_cov: f64) -> Vec<f64> {
+    let p_alt: &[f64] = &[1e-3, 0.5, 0.9];
+
+    let total = alt1_cov + alt2_cov;
+    let log_combo = log_choose(total, alt2_cov);
+
+    let lp_homref = log_combo + alt2_cov * p_alt[0].log10() + alt1_cov * (1.0 - p_alt[0]).log10();
+    let lp_het = log_combo + alt2_cov * p_alt[1].log10() + alt1_cov * (1.0 - p_alt[1]).log10();
+    let lp_homalt = log_combo + alt2_cov * p_alt[2].log10() + alt1_cov * (1.0 - p_alt[2]).log10();
+
+    vec![lp_homref, lp_het, lp_homalt]
 }
 
+/// Returns genotype and sample where genotype is confidence in the assigned genotype
+/// and sample is confidence that there is actually a variant present
+fn make_gt_quals(gt_lplist: &Vec<f64>) -> (f64, f64) {
+    let mut sorted_gt_lplist: Vec<(usize, f64)> =
+        gt_lplist.iter().enumerate().map(|(i, &e)| (i, e)).collect();
+    sorted_gt_lplist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-/// Weighted cosine similarity
-/// Cosine similarity seems to be influenced by large outlier values. By weighing by frequency,
-/// long sequences' cosine similarity behaves more consistently with small sequences
-pub fn weighted_cosinesim(a: &[f32], b: &[f32]) -> f32 {
-    let cos: f32 = cosinesim(a, b);
-    let dist: f32 = (1.0 / a.len() as f32)
-        * a.iter()
-            .zip(b.iter())
-            .map(|(x, y)| (x - y).abs())
-            .sum::<f32>();
+    let best = sorted_gt_lplist[0];
+    let second_best = sorted_gt_lplist[1];
 
-    cos / (dist.powi(2) + cos)
-}*/
+    let mut gt_sum = 0.0;
+    for &gt in gt_lplist {
+        gt_sum += 10.0_f64.powf(gt);
+    }
+
+    let gt_sum_log = gt_sum.log10();
+    let sample_qual = f64::min((-10.0 * (gt_lplist[0] - gt_sum_log)).abs(), 100.0);
+    let phred_gq = f64::min(-10.0 * (second_best.1 - best.1), 100.0);
+
+    (sample_qual, phred_gq)
+}

@@ -39,7 +39,7 @@ use std::path::PathBuf;
 
 use petgraph::graph::NodeIndex;
 
-use crate::kanpig::PathScore;
+use crate::kanpig::{metrics, PathScore};
 
 use noodles_vcf::{
     self as vcf,
@@ -83,7 +83,7 @@ impl VcfWriter {
         // Overwrites existing definitions
         let all_formats = header.formats_mut();
 
-        let keys: Keys = "GT:PG:DP:AD:ZS:SS".parse().unwrap(); // I shouldn't be making this each time?
+        let keys: Keys = "GT:SQ:GQ:PG:DP:AD:ZS:SS".parse().unwrap(); // I shouldn't be making this each time?
 
         // GT
         let gtid = keys[0].clone();
@@ -93,8 +93,25 @@ impl VcfWriter {
         *gtfmt.description_mut() = "Kanplug genotype".to_string();
         all_formats.insert(gtid, gtfmt);
 
+        // SQ
+        let sqid = keys[1].clone();
+        let mut sqfmt = Map::<format::Format>::from(&sqid);
+        *sqfmt.number_mut() = vcf::header::Number::Count(1);
+        *sqfmt.type_mut() = format::Type::Integer;
+        *sqfmt.description_mut() =
+            "Phred scaled quality of sample being non-ref at this variant".to_string();
+        all_formats.insert(sqid, sqfmt);
+
+        // GQ
+        let gqid = keys[2].clone();
+        let mut gqfmt = Map::<format::Format>::from(&gqid);
+        *gqfmt.number_mut() = vcf::header::Number::Count(1);
+        *gqfmt.type_mut() = format::Type::Integer;
+        *gqfmt.description_mut() = "Phred scaled quality of genotype".to_string();
+        all_formats.insert(gqid, gqfmt);
+
         // PG
-        let pgid = keys[1].clone();
+        let pgid = keys[3].clone();
         let mut pgfmt = Map::<format::Format>::from(&pgid);
         *pgfmt.number_mut() = vcf::header::Number::Count(1);
         *pgfmt.type_mut() = format::Type::Integer;
@@ -102,7 +119,7 @@ impl VcfWriter {
         all_formats.insert(pgid, pgfmt);
 
         // DP
-        let dpid = keys[2].clone();
+        let dpid = keys[4].clone();
         let mut dpfmt = Map::<format::Format>::from(&dpid);
         *dpfmt.number_mut() = vcf::header::Number::Count(1);
         *dpfmt.type_mut() = format::Type::Integer;
@@ -110,7 +127,7 @@ impl VcfWriter {
         all_formats.insert(dpid, dpfmt);
 
         // AD
-        let adid = keys[3].clone();
+        let adid = keys[5].clone();
         let mut adfmt = Map::<format::Format>::from(&adid);
         *adfmt.number_mut() = vcf::header::Number::R;
         *adfmt.type_mut() = format::Type::Integer;
@@ -118,7 +135,7 @@ impl VcfWriter {
         all_formats.insert(adid, adfmt);
 
         // ZS
-        let zsid = keys[4].clone();
+        let zsid = keys[6].clone();
         let mut zsfmt = Map::<format::Format>::from(&zsid);
         *zsfmt.number_mut() = vcf::header::Number::R;
         *zsfmt.type_mut() = format::Type::Integer;
@@ -126,7 +143,7 @@ impl VcfWriter {
         all_formats.insert(zsid, zsfmt);
 
         // SS
-        let ssid = keys[5].clone();
+        let ssid = keys[7].clone();
         let mut ssfmt = Map::<format::Format>::from(&ssid);
         *ssfmt.number_mut() = vcf::header::Number::R;
         *ssfmt.type_mut() = format::Type::Integer;
@@ -151,7 +168,7 @@ impl VcfWriter {
         phase_group: i32,
     ) {
         //let keys = "GT:PG:DP:AD".parse().unwrap(); // I shouldn't be making this each time?
-        let keys = "GT:PG:DP:AD:ZS:SS".parse().unwrap(); // I shouldn't be making this each time?
+        let keys = "GT:SQ:GQ:PG:DP:AD:ZS:SS".parse().unwrap(); // I shouldn't be making this each time?
 
         //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
         let gt1 = if path1.path.contains(var_idx) {
@@ -170,7 +187,11 @@ impl VcfWriter {
         };
         let gt = format!("{}|{}", gt1, gt2);
 
-        // https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/header/record/value/map/struct.Map.html
+        let (_, sq, gq) = metrics::genotyper(
+            path1.coverage.unwrap() as f64,
+            path2.coverage.unwrap() as f64,
+        );
+
         let ad = Value::from(vec![
             Some(path1.coverage.unwrap() as i32),
             Some(path2.coverage.unwrap() as i32),
@@ -189,9 +210,11 @@ impl VcfWriter {
         let genotypes = Genotypes::new(
             keys,
             vec![vec![
-                Some(Value::from(gt)),              // GT
-                Some(Value::from(phase_group)),     // PG
-                Some(Value::from(coverage as i32)), // DP
+                Some(Value::from(gt)),                // GT
+                Some(Value::from(sq.round() as i32)), // SQ
+                Some(Value::from(gq.round() as i32)), // GQ
+                Some(Value::from(phase_group)),       // PG
+                Some(Value::from(coverage as i32)),   // DP
                 Some(ad),
                 Some(zs),
                 Some(ss),
