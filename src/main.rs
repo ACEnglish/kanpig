@@ -122,7 +122,7 @@ fn main() {
                     Err(e) => {
                         debug!("Problem {:?}", e);
                         break;
-                    },
+                    }
                 }
             },
         }

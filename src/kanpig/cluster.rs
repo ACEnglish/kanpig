@@ -19,15 +19,16 @@ pub fn cluster_haplotypes(
     if m_haps.len() == 1 {
         let hap2 = m_haps.pop().unwrap();
         let ref_cov = (coverage - hap2.coverage) as f64;
-        let ret = match metrics::genotyper(ref_cov, hap2.coverage as f64) {
+        match metrics::genotyper(ref_cov, hap2.coverage as f64) {
             // And if Ref, should probably be set to lowq
             (metrics::GTstate::Ref | metrics::GTstate::Het, _, _) => {
-                (Haplotype::blank(params.kmer, ref_cov as u64), hap2)
-            }
-            (metrics::GTstate::Hom, _, _) => (hap2.clone(), hap2),
+                return (Haplotype::blank(params.kmer, ref_cov as u64), hap2)
+            },
+            (metrics::GTstate::Hom, _, _) => {
+                return (hap2.clone(), hap2)
+            },
             _ => panic!("The genotyper can't do this, yet"),
-        };
-        return ret;
+        }
     }
 
     let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();

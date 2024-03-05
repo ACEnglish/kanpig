@@ -1,6 +1,4 @@
-/*
- * A pileup variant that's hashable / equatable
- */
+/// A pileup variant that's hashable / comparable
 use crate::kanpig::Svtype;
 use rust_htslib::bam::pileup::{Alignment, Indel};
 use std::hash::{Hash, Hasher};
@@ -23,7 +21,7 @@ impl PileupVariant {
                     alignment.record().seq().as_bytes()[qpos..(qpos + size as usize)].to_vec();
                 (Svtype::Ins, size as i64, Some(seq))
             }
-            _ => panic!("this can't happen"),
+            _ => panic!("Unexpected Indel type"),
         };
 
         PileupVariant {
@@ -33,23 +31,23 @@ impl PileupVariant {
             sequence,
         }
     }
-    // pub fn to_hap(&self) -> Haplotype going to need reference
 }
 
 // Implement PartialEq trait for custom equality comparison
 impl PartialEq for PileupVariant {
     fn eq(&self, other: &Self) -> bool {
-        let first =
-            self.position == other.position && self.size == other.size && self.indel == other.indel;
-        if !first {
+        // Compare position, size, and indel types
+        if self.position != other.position || self.size != other.size || self.indel != other.indel {
             return false;
         }
-        // Don't compare DEL sequences
+
+        // If the indel is a deletion, only compare positions and sizes
         if self.indel == Svtype::Del {
-            true
-        } else {
-            self.sequence == other.sequence
+            return true;
         }
+
+        // Otherwise, compare sequences
+        self.sequence == other.sequence
     }
 }
 

@@ -1,38 +1,3 @@
-/*
-* This needs the output pathbuf
-* and a vcf header hold a copy since I think the vcfparser needs it, also
-* Actually, def a copy because we're altering it
-*
-* Then we check if the sample name is in the header
-* if yes, we want to preserve that format information
-* if not, we just warn that they're getting a new column
-* Lets be nice and warn that N samples will be dropped in the output vcf (for now because I don't
-* want to do record keeping)
-*
-* Format fields we'll populate are
-*  GT
-*  PG : phase group of a chunk. this will just be an integer and for a single sample. The writer
-*  will know what number its on
-*  DP : total coverage depth over the analyzed region
-*  AD : allele 1 and allele 2 depth
-*  --- Advanced ---
-*  GQ : (probably) Essentially copying what I did for
-*  PL : (I think -- what was this other field?) geno quality a single number and then
-*          per-combination, or something
-*  FT : filter for the different cases I might want to look out for e.g. lowcoverage, low
-*      similarity, low gq (which is just a non thresholded low coverage) I might make this a
-*      bit flag just so they take up less space.
-*
-* has a method for write() which will do the annotation work
-* before calling `writer.write_record`
-*
-*  "GT", genotype
-   "PG", local phase group
-   "DP", observed depth over region
-   "AD", allele supporting depth (reference is assumed)
-* Once this is setup, we'll work on the h1/h2 path finding where we stop trying to search for het
-* paths (n=0) and just used the reported overall coverage to populate DP/AD
-*/
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
@@ -51,6 +16,7 @@ use noodles_vcf::{
 pub struct VcfWriter {
     writer: vcf::Writer<BufWriter<File>>,
     header: vcf::Header,
+    keys: Keys,
 }
 
 impl VcfWriter {
@@ -83,7 +49,7 @@ impl VcfWriter {
         // Overwrites existing definitions
         let all_formats = header.formats_mut();
 
-        let keys: Keys = "GT:SQ:GQ:PG:DP:AD:ZS:SS".parse().unwrap(); // I shouldn't be making this each time?
+        let keys: Keys = "GT:SQ:GQ:PG:DP:AD:ZS:SS".parse().unwrap();
 
         // GT
         let gtid = keys[0].clone();
@@ -155,7 +121,7 @@ impl VcfWriter {
         let mut writer = vcf::Writer::new(out_buf);
         let _ = writer.write_header(&header);
 
-        Self { writer, header }
+        Self { writer, header, keys }
     }
 
     pub fn anno_write(
@@ -167,9 +133,6 @@ impl VcfWriter {
         coverage: u64,
         phase_group: i32,
     ) {
-        //let keys = "GT:PG:DP:AD".parse().unwrap(); // I shouldn't be making this each time?
-        let keys = "GT:SQ:GQ:PG:DP:AD:ZS:SS".parse().unwrap(); // I shouldn't be making this each time?
-
         //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
         let gt1 = if path1.path.contains(var_idx) {
             "1"
@@ -207,8 +170,8 @@ impl VcfWriter {
             Some((path2.seqsim * 100.0) as i32),
         ]);
 
-        let genotypes = Genotypes::new(
-            keys,
+        *entry.genotypes_mut() = Genotypes::new(
+            self.keys.clone(),
             vec![vec![
                 Some(Value::from(gt)),                // GT
                 Some(Value::from(sq.round() as i32)), // SQ
@@ -221,7 +184,6 @@ impl VcfWriter {
             ]],
         );
 
-        *entry.genotypes_mut() = genotypes.clone();
         let _result = self.writer.write_record(&self.header, &entry);
     }
 }
