@@ -1,4 +1,6 @@
 use crate::kanpig::seq_to_kmer;
+use std::cmp::Ordering;
+use std::fmt::{Debug, Formatter, Result};
 
 #[derive(Clone)]
 pub struct Haplotype {
@@ -43,63 +45,59 @@ impl Haplotype {
 }
 
 impl PartialOrd for Haplotype {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for Haplotype {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // First, compare by coverage. More coverage is better
-        let coverage_ordering = self.coverage.partial_cmp(&other.coverage).unwrap();
-        if coverage_ordering != std::cmp::Ordering::Equal {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let coverage_ordering = self.coverage.cmp(&other.coverage);
+        if coverage_ordering != Ordering::Equal {
             return coverage_ordering;
         }
 
-        // If coverage is equal, compare by number of variants
-        // We prefer fewer variants, thus the reverse
-        let changes_ordering = self.n.partial_cmp(&other.n).unwrap();
-        if changes_ordering != std::cmp::Ordering::Equal {
-            return changes_ordering.reverse();
+        let changes_ordering = self.n.cmp(&other.n).reverse();
+        if changes_ordering != Ordering::Equal {
+            return changes_ordering;
         }
-        // sort by size - This makes a preference for keeping smaller SVs
+
         let size_ordering = self.size.cmp(&other.size);
-        if size_ordering != std::cmp::Ordering::Equal {
+        if size_ordering != Ordering::Equal {
             return size_ordering;
         }
 
-        // Increase determinism
-        for (i, j) in self.kfeat.iter().zip(other.kfeat.iter()) {
-            if *i as u64 != *j as u64 {
-                if i < j {
-                    return std::cmp::Ordering::Less;
+        self.kfeat
+            .iter()
+            .zip(&other.kfeat)
+            .find_map(|(i, j)| {
+                if (*i as u64) != (*j as u64) {
+                    Some((*i as u64).cmp(&(*j as u64)))
+                } else {
+                    None
                 }
-                return std::cmp::Ordering::Greater;
-            }
-        }
-        std::cmp::Ordering::Equal
+            })
+            .unwrap_or(Ordering::Equal)
     }
 }
 
 impl PartialEq for Haplotype {
     fn eq(&self, other: &Self) -> bool {
-        let first = self.coverage == other.coverage && self.size == other.size && self.n == other.n;
-        if !first {
-            return false;
-        }
-        for (i, j) in self.kfeat.iter().zip(other.kfeat.iter()) {
-            if *i as u64 != *j as u64 {
-                return false;
-            }
-        }
-        true
+        self.coverage == other.coverage
+            && self.size == other.size
+            && self.n == other.n
+            && self
+                .kfeat
+                .iter()
+                .zip(&other.kfeat)
+                .all(|(i, j)| *i as u64 == *j as u64)
     }
 }
 
 impl Eq for Haplotype {}
 
-impl std::fmt::Debug for Haplotype {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for Haplotype {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("Haplotype")
             .field("size", &self.size)
             .field("n", &self.n)

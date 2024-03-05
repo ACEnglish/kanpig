@@ -20,14 +20,16 @@ impl PartialEq for PathScore {
 
 impl Ord for PathScore {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.sizesim < other.sizesim {
-            Ordering::Less
-        } else if self.sizesim > other.sizesim {
-            Ordering::Greater
-        } else {
-            self.seqsim
+        match self
+            .sizesim
+            .partial_cmp(&other.sizesim)
+            .unwrap_or(Ordering::Equal)
+        {
+            Ordering::Equal => self
+                .seqsim
                 .partial_cmp(&other.seqsim)
-                .unwrap_or(Ordering::Equal)
+                .unwrap_or(Ordering::Equal),
+            other_ordering => other_ordering,
         }
     }
 }
@@ -56,9 +58,6 @@ impl PathScore {
         target: &Haplotype,
         params: &KDParams,
     ) -> Self {
-        // This is essentially find best path and find all paths where
-        // I'm going to sum the path VarNodes and then do size/cos similarity
-        // PathScores will be comparable
         let path_size: i64 = path
             .iter()
             .filter_map(|&node_index| graph.node_weight(node_index))
@@ -66,23 +65,12 @@ impl PathScore {
             .sum();
 
         if path_size.signum() != target.size.signum() {
-            return PathScore {
-                path,
-                sizesim: -1.0, // ew
-                seqsim: -1.0,
-                coverage: None,
-            };
+            return PathScore::default();
         }
 
-        let mut sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
-        // No need for seqsim because sizesim is alredy a failure
+        let sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
         if sizesim < params.sizesim {
-            return PathScore {
-                path,
-                sizesim: -1.0,
-                seqsim: -1.0,
-                coverage: None,
-            };
+            return PathScore::default();
         }
 
         let path_k: Vec<f32> = path
@@ -99,11 +87,9 @@ impl PathScore {
                 },
             );
 
-        let mut seqsim = metrics::seqsim(&path_k, &target.kfeat, params.minkfreq as f32);
-
+        let seqsim = metrics::seqsim(&path_k, &target.kfeat, params.minkfreq as f32);
         if seqsim < params.seqsim {
-            seqsim = -1.0;
-            sizesim = -1.0;
+            return PathScore::default();
         }
 
         PathScore {

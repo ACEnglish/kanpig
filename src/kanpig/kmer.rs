@@ -1,3 +1,4 @@
+#[inline]
 fn encode_nuc(nuc: u8) -> u64 {
     match nuc {
         b'A' => 0,
@@ -10,9 +11,10 @@ fn encode_nuc(nuc: u8) -> u64 {
 
 /// Count kmers in a sequence
 pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool) -> Vec<f32> {
-    let mut kcounts = vec![0f32; 4_usize.pow(kmer.into())];
     let ukmer = kmer as usize;
+    let mut kcounts = vec![0f32; 1 << (2 * ukmer)];
     let cnt = if negative { -1.0 } else { 1.0 };
+
     // Must be at least one kmer long
     if sequence.len() < ukmer {
         return kcounts;
@@ -25,16 +27,21 @@ pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool) -> Vec<f32> {
         f_result += f_nuc << ((ukmer - pos - 1) * 2);
     }
 
-    kcounts[f_result as usize] += cnt;
+    // We know the vector has a space for every possible f_result
+    unsafe {
+        *kcounts.get_unchecked_mut(f_result as usize) += cnt;
+    }
 
     // rolling sum masks off first nuc and adds the next one
-    let mask: u64 = 4u64.pow((kmer - 1).into()) - 1;
+    let mask: u64 = (1 << (2 * (kmer - 1) as usize)) - 1;
 
     for i in sequence[1..(sequence.len() - ukmer + 1)].iter() {
         let f_nuc = encode_nuc(*i);
         f_result = ((f_result & mask) << 2) + f_nuc;
 
-        kcounts[f_result as usize] += cnt;
+        unsafe {
+            *kcounts.get_unchecked_mut(f_result as usize) += cnt;
+        }
     }
 
     kcounts
