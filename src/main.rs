@@ -127,6 +127,7 @@ fn main() {
             },
         }
     }
+    pbar.finish();
 
     info!("finished");
 }
