@@ -64,7 +64,8 @@ impl BamParser {
 
             for alignment in pileup.alignments() {
                 // None if either is_del or is_refskip, we we don't need it
-                if alignment.qpos().is_none() {
+                // Skip records without sequence, as well.
+                if alignment.qpos().is_none() || alignment.record().seq().is_empty() {
                     continue;
                 }
 
