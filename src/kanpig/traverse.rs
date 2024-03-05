@@ -31,7 +31,6 @@ pub fn brute_force_find_path(
         }
         None => (vec![], PathScore::default(), 0, NodeIndex::new(0)),
     };
-
     let cur_len = cur_len + graph.node_weight(cur_node).unwrap().size;
     // Order next nodes by how close they get us to the haplotype's length
     let mut diffs: Vec<_> = graph

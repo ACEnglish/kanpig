@@ -104,6 +104,7 @@ fn main() {
             recv(result_receiver) -> result => {
                 match result {
                     Ok((m_graph, p1, p2, coverage)) => {
+                        debug!("{:?}", m_graph);
                         for var_idx in m_graph.node_indices {
                             let cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
                                 Some(var) => var.clone(),
