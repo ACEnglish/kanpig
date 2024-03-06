@@ -108,6 +108,9 @@ impl<R: BufRead> VcfChunker<R> {
 
     /// Checks if this variant is within params.chunksize distance of last
     /// seen variant in this chunk
+    /// If we wanted to be TR aware, when checking new_chunk, we don't just look at 
+    /// cur_end but also the TR catalog. We want to chunk all TR changes together
+    /// regardless of their distance.
     fn entry_in_chunk(&mut self, entry: &vcf::Record) -> bool {
         let check_chrom = entry.chromosome().to_string();
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;

@@ -109,7 +109,9 @@ impl Variants {
             graph,
         }
     }
-
+    
+    /// Again, TR aware, we need to set the bounds for doing the pileup
+    /// to the TR boundaries.
     fn get_region(entries: &Vec<vcf::Record>) -> (String, u64, u64) {
         let chrom = entries[0].chromosome().to_string();
         let mut min_start = u64::MAX;
