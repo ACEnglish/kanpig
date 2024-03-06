@@ -96,9 +96,8 @@ pub fn cluster_haplotypes(
             }
         }
         (metrics::GTstate::Het, s, g) => {
-            (hap1, hap2)
             // If they're highly similar, combine and assume it was a 'noisy' HOM. Otherwise compound het
-            /*if (hap1.size.signum() == hap2.size.signum())
+            if (hap1.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
                     > params.sizesim
                 && metrics::seqsim(&hap1.kfeat, &hap2.kfeat, params.minkfreq as f32) > params.seqsim
@@ -109,7 +108,7 @@ pub fn cluster_haplotypes(
             } else {
                 // Compound Het
                 (hap1, hap2)
-            }*/
+            }
         }
         _ => panic!("The genotyper can't do this, yet"),
     };

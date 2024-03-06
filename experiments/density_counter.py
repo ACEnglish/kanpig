@@ -1,13 +1,14 @@
 import sys
 import truvari
 import pysam
-
+    
+BUFF=500
 v = pysam.VariantFile(sys.argv[1])
 m = truvari.Matcher()
 m.params.pctseq = 0
 m.params.sizemin = 20
 m.params.sizefilt = 20
-m.params.chunksize=200
+m.params.chunksize = BUFF * 2
 c = truvari.chunker(m, ('base', v))
 
 def get_bounds(cnk):
@@ -21,7 +22,7 @@ def get_bounds(cnk):
 for chunk, _ in c:
     s, e = get_bounds(chunk['base'])
     num = len(chunk['base'])
-    print("%s\t%d\t%d\t%d" % (chunk['base'][0].chrom,  s, e, num))
+    print("%s\t%d\t%d\t%d" % (chunk['base'][0].chrom,  s - BUFF, e + BUFF, num))
     # Debugging for the sub-chunkers
     #from truvari.collapse import tree_size_chunker, tree_dist_chunker
     #for i, _ in tree_size_chunker(m, [(chunk, 0)]):
