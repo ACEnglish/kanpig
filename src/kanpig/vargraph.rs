@@ -78,7 +78,6 @@ impl Variants {
         let mut graph = DiGraph::new();
 
         let (chrom, start, end) = Variants::get_region(&variants);
-
         let mut node_indices = Vec::<NodeIndex<_>>::with_capacity(variants.len() + 2);
         node_indices.push(graph.add_node(VarNode::new_anchor("src", kmer)));
 
