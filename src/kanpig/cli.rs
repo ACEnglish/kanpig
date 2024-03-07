@@ -62,7 +62,7 @@ pub struct KDParams {
     pub passonly: bool,
 
     /// Minimum size of variant to analyze
-    #[arg(long, default_value_t = 20)]
+    #[arg(long, default_value_t = 50)]
     pub sizemin: u64,
 
     // change this to 10k? also filtered variants are just plain gone...
@@ -90,9 +90,9 @@ pub struct KDParams {
     #[arg(long, default_value_t = false)]
     pub try_exact: bool,
 
-    /// Prune paths which don't traverse 1-to-1 nodes
+    /// Don't prune paths which don't traverse 1-to-1 nodes
     #[arg(long, default_value_t = false)]
-    pub prune: bool,
+    pub no_prune: bool,
 }
 
 impl ArgParser {

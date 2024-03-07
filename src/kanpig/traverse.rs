@@ -43,8 +43,11 @@ pub fn brute_force_find_path(
             .collect::<Vec<NodeIndex>>()
         {
             if next_node.index() == graph.node_count() - 1 {
-                best_path =
-                    best_path.max(PathScore::new(graph, cur_path.path.clone(), target, params));
+                let n_bp = PathScore::new(graph, cur_path.path.clone(), target, params);
+                //if n_bp > best_path {
+                    //debug!("new best @{} {:?}", npaths, n_bp);
+                //}
+                best_path = best_path.max(n_bp);
                 npaths += 1;
             } else {
                 any_push = true;
