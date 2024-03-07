@@ -108,7 +108,7 @@ impl Variants {
             graph,
         }
     }
-    
+
     /// Again, TR aware, we need to set the bounds for doing the pileup
     /// to the TR boundaries.
     fn get_region(entries: &Vec<vcf::Record>) -> (String, u64, u64) {
@@ -157,19 +157,7 @@ impl Variants {
                 ret.coverage = Some(hap.coverage);
                 ret
             } else {
-                let mut ret = brute_force_find_path(
-                    &self.graph,
-                    hap,
-                    params,
-                    0,
-                    0,
-                    None,
-                    None,
-                    None,
-                    &skip_edges,
-                )
-                .0
-                .unwrap();
+                let mut ret = brute_force_find_path(&self.graph, hap, params, &skip_edges);
                 ret.coverage = Some(hap.coverage);
                 ret
             }

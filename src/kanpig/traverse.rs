@@ -7,9 +7,15 @@ use std::iter::FromIterator;
 
 use crate::kanpig::{Haplotype, KDParams, PathScore, VarNode};
 
-type PathResult = (Option<PathScore>, u64);
+#[derive(Clone)]
+pub struct PathNodeState {
+    pub size: i64,
+    pub dist: u64,
+    pub node: NodeIndex,
+    pub path: Vec<NodeIndex>,
+}
 
-/// Recursive depth first search of a VarGraph that's guided by size similarity
+/// Search of a VarGraph that's guided by size similarity
 /// Search stops after maxpaths have been checked
 /// Assumes NodeIndex 0 is src node and NodeIndex -1 is snk
 /// Returns a PathScore
@@ -17,62 +23,53 @@ pub fn brute_force_find_path(
     graph: &DiGraph<VarNode, ()>,
     target: &Haplotype,
     params: &KDParams,
-    mut npaths: u64,
-    cur_len: i64,
-    i_cur_node: Option<NodeIndex>,
-    mut i_path: Option<Vec<NodeIndex>>,
-    i_best_path: Option<PathScore>,
-    skip_edges: &Vec<EdgeIndex>,
-) -> PathResult {
-    let (path, mut best_path, cur_len, cur_node) = match i_cur_node {
-        Some(node) => {
-            i_path.as_mut().unwrap().push(node);
-            (i_path.unwrap(), i_best_path.unwrap(), cur_len, node)
-        }
-        None => (vec![], PathScore::default(), 0, NodeIndex::new(0)),
+    skip_edges: &[EdgeIndex],
+) -> PathScore {
+    let start_path = PathNodeState {
+        size: 0,
+        dist: target.size.unsigned_abs(), // this is for sorting
+        node: NodeIndex::new(0),
+        path: vec![],
     };
-    let cur_len = cur_len + graph.node_weight(cur_node).unwrap().size;
-    // Order next nodes by how close they get us to the haplotype's length
-    let mut diffs: Vec<_> = graph
-        .edges(cur_node) // remove
-        .filter(|edge| !skip_edges.contains(&edge.id()))
-        .map(|edge| {
-            let target_node = edge.target();
-            let size = graph.node_weight(target_node).unwrap().size;
-            ((target.size.abs_diff(cur_len + size)), target_node)
-        })
-        .collect();
-    diffs.sort_by_key(|&(len_diff, _)| len_diff);
-
-    for (_, next_node) in diffs {
-        if next_node.index() == graph.node_count() - 1 {
-            let n_best_path = PathScore::new(graph, path.clone(), target, params);
-            best_path = best_path.max(n_best_path);
-            npaths += 1;
-        } else {
-            let (new_best, mp) = brute_force_find_path(
-                graph,
-                target,
-                params,
-                npaths,
-                cur_len,
-                Some(next_node),
-                Some(path.clone()),
-                Some(best_path.clone()),
-                skip_edges,
-            );
-
-            if let Some(new_best) = new_best {
-                best_path = best_path.max(new_best);
+    let mut stack: Vec<PathNodeState> = vec![start_path];
+    let mut best_path = PathScore::default();
+    let mut npaths = 0;
+    while let Some(cur_path) = stack.pop() {
+        let mut any_push = false;
+        for next_node in graph
+            .edges(cur_path.node)
+            .filter(|edge| !skip_edges.contains(&edge.id()))
+            .map(|edge| edge.target())
+            .collect::<Vec<NodeIndex>>()
+        {
+            if next_node.index() == graph.node_count() - 1 {
+                best_path =
+                    best_path.max(PathScore::new(graph, cur_path.path.clone(), target, params));
+                npaths += 1;
+            } else {
+                any_push = true;
+                let nsize = cur_path.size + graph.node_weight(next_node).unwrap().size;
+                let mut npath = cur_path.path.clone();
+                npath.push(next_node);
+                stack.push(PathNodeState {
+                    size: nsize,
+                    dist: target.size.abs_diff(nsize),
+                    node: next_node,
+                    path: npath,
+                });
             }
-            npaths = mp;
         }
+
+        if any_push {
+            stack.sort_by_key(|node| std::cmp::Reverse(node.dist));
+        }
+
         if npaths > params.maxpaths {
             break;
         }
     }
 
-    (Some(best_path), npaths)
+    best_path
 }
 
 /// Return nodes which that have a 1-to-1 match to the haplotype
