@@ -121,7 +121,11 @@ impl VcfWriter {
         let mut writer = vcf::Writer::new(out_buf);
         let _ = writer.write_header(&header);
 
-        Self { writer, header, keys }
+        Self {
+            writer,
+            header,
+            keys,
+        }
     }
 
     pub fn anno_write(

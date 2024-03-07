@@ -23,10 +23,8 @@ pub fn cluster_haplotypes(
             // And if Ref, should probably be set to lowq
             (metrics::GTstate::Ref | metrics::GTstate::Het, _, _) => {
                 return (Haplotype::blank(params.kmer, ref_cov as u64), hap2)
-            },
-            (metrics::GTstate::Hom, _, _) => {
-                return (hap2.clone(), hap2)
-            },
+            }
+            (metrics::GTstate::Hom, _, _) => return (hap2.clone(), hap2),
             _ => panic!("The genotyper can't do this, yet"),
         }
     }

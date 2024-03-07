@@ -32,11 +32,7 @@ impl BamParser {
         let window_end = end + self.params.chunksize;
 
         let mut tot_cov: u64 = 0;
-        if let Err(e) = self.bam.fetch((
-            &chrom,
-            window_start,
-            window_end,
-        )) {
+        if let Err(e) = self.bam.fetch((&chrom, window_start, window_end)) {
             panic!("Unable to fetch bam {}:{}-{}\n{:?}", chrom, start, end, e)
         };
 

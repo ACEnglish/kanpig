@@ -108,7 +108,7 @@ impl Variants {
             graph,
         }
     }
-    
+
     /// Again, TR aware, we need to set the bounds for doing the pileup
     /// to the TR boundaries.
     fn get_region(entries: &Vec<vcf::Record>) -> (String, u64, u64) {
@@ -141,15 +141,15 @@ impl Variants {
         } else {
             let partial_matches = get_one_to_one(&self.graph, hap, params);
 
-            let skip_edges = if params.prune {
+            let skip_edges = if params.no_prune {
+                vec![]
+            } else {
                 prune_graph(
                     &self.graph,
                     &partial_matches,
                     &self.node_indices[0],
                     self.node_indices.last().unwrap(),
                 )
-            } else {
-                vec![]
             };
 
             if params.try_exact && !partial_matches.is_empty() {
@@ -157,19 +157,7 @@ impl Variants {
                 ret.coverage = Some(hap.coverage);
                 ret
             } else {
-                let mut ret = brute_force_find_path(
-                    &self.graph,
-                    hap,
-                    params,
-                    0,
-                    0,
-                    None,
-                    None,
-                    None,
-                    &skip_edges,
-                )
-                .0
-                .unwrap();
+                let mut ret = brute_force_find_path(&self.graph, hap, params, &skip_edges);
                 ret.coverage = Some(hap.coverage);
                 ret
             }
