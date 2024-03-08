@@ -97,7 +97,7 @@ impl VcfWriter {
         let mut adfmt = Map::<format::Format>::from(&adid);
         *adfmt.number_mut() = vcf::header::Number::R;
         *adfmt.type_mut() = format::Type::Integer;
-        *adfmt.description_mut() = "Coverage per allele".to_string();
+        *adfmt.description_mut() = "Coverage for reference and alternate alleles".to_string();
         all_formats.insert(adid, adfmt);
 
         // ZS
@@ -137,8 +137,9 @@ impl VcfWriter {
         coverage: u64,
         phase_group: i32,
     ) {
-        //https://docs.rs/noodles-vcf/0.49.0/noodles_vcf/record/genotypes/struct.Genotypes.html
+        let mut alt_cov = 0.0;
         let gt1 = if path1.path.contains(var_idx) {
+            alt_cov += path1.coverage.unwrap() as f64;
             "1"
         } else if path1.coverage.unwrap() == 0 {
             "."
@@ -146,23 +147,26 @@ impl VcfWriter {
             "0"
         };
         let gt2 = if path2.path.contains(var_idx) {
+            // Don't double add coverage... you have to clean this up
+            // And for compound hets you do want to add this coverage because the path is
+            // different?
+            if !path1.path.contains(var_idx) {
+                alt_cov += path2.coverage.unwrap() as f64;
+            }
             "1"
         } else if path2.coverage.unwrap() == 0 {
             "."
         } else {
             "0"
         };
+
         let gt = format!("{}|{}", gt1, gt2);
+        let ref_cov = (coverage as f64) - alt_cov;
 
-        let (_, sq, gq) = metrics::genotyper(
-            path1.coverage.unwrap() as f64,
-            path2.coverage.unwrap() as f64,
-        );
+        // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
+        let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
 
-        let ad = Value::from(vec![
-            Some(path1.coverage.unwrap() as i32),
-            Some(path2.coverage.unwrap() as i32),
-        ]);
+        let ad = Value::from(vec![Some(ref_cov as i32), Some(alt_cov as i32)]);
 
         let zs = Value::from(vec![
             Some((path1.sizesim * 100.0) as i32),

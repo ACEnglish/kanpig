@@ -21,10 +21,10 @@ pub fn cluster_haplotypes(
         let ref_cov = (coverage - hap2.coverage) as f64;
         match metrics::genotyper(ref_cov, hap2.coverage as f64) {
             // And if Ref, should probably be set to lowq
-            (metrics::GTstate::Ref | metrics::GTstate::Het, _, _) => {
+            metrics::GTstate::Ref | metrics::GTstate::Het => {
                 return (Haplotype::blank(params.kmer, ref_cov as u64), hap2)
             }
-            (metrics::GTstate::Hom, _, _) => return (hap2.clone(), hap2),
+            metrics::GTstate::Hom => return (hap2.clone(), hap2),
             _ => panic!("The genotyper can't do this, yet"),
         }
     }
@@ -68,7 +68,7 @@ pub fn cluster_haplotypes(
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar
     let (hap1, mut hap2) = match metrics::genotyper(hap1.coverage as f64, hap2.coverage as f64) {
-        (metrics::GTstate::Ref, _, _) => {
+        metrics::GTstate::Ref => {
             if hap1.n == 0 {
                 // hap2 is a better representative
                 hap2.coverage += hap1.coverage;
@@ -80,7 +80,7 @@ pub fn cluster_haplotypes(
             }
         }
         // combine them (into hap2, the higher covered allele) return hap2 twice
-        (metrics::GTstate::Hom, _, _) => {
+        metrics::GTstate::Hom => {
             if (hap1.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
                     > params.sizesim
@@ -93,7 +93,7 @@ pub fn cluster_haplotypes(
                 (hap1, hap2)
             }
         }
-        (metrics::GTstate::Het, _, _) => {
+        metrics::GTstate::Het => {
             // If they're highly similar, combine and assume it was a 'noisy' HOM. Otherwise compound het
             if (hap1.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
@@ -120,14 +120,14 @@ pub fn cluster_haplotypes(
     match metrics::genotyper(remaining_coverage, applied_coverage) {
         // We need the one higher covered alt
         // and probably should assign this GT as lowq if REF
-        (metrics::GTstate::Ref | metrics::GTstate::Het, _, _) => {
+        metrics::GTstate::Ref | metrics::GTstate::Het => {
             hap2.coverage += hap1.coverage;
             (
                 Haplotype::blank(params.kmer, remaining_coverage as u64),
                 hap2,
             )
         }
-        (metrics::GTstate::Hom, _, _) => {
+        metrics::GTstate::Hom => {
             if hap1.n == 0 {
                 // HOMALT
                 (hap2.clone(), hap2)

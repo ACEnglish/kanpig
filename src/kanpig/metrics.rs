@@ -52,16 +52,11 @@ pub enum GTstate {
 }
 
 /// Generate genotypes given observed allele coverages
-/// Return GTstate and tuple of SQ/GQ
-pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> (GTstate, f64, f64) {
-    let total = alt1_cov + alt2_cov;
-    if total == 0.0 {
-        return (GTstate::Non, 0.0, 0.0);
+pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
+    if (alt1_cov + alt2_cov) == 0.0 {
+        return GTstate::Non;
     }
-
-    let gt_lplist = bayes_gt(alt1_cov, alt2_cov);
-    let (sq, gq) = make_gt_quals(&gt_lplist);
-    let m_gt = match gt_lplist
+    match genotype_scores(alt1_cov, alt2_cov)
         .iter()
         .enumerate()
         .max_by_key(|&(_, &x)| OrderedFloat(x))
@@ -71,10 +66,46 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> (GTstate, f64, f64) {
         Some(1) => GTstate::Het,
         Some(2) => GTstate::Hom,
         _ => panic!("not possible"),
-    };
-    (m_gt, sq, gq)
+    }
 }
 
+/// Probabilities of each genotype given the allele coveages
+fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> Vec<f64> {
+    let p_alt: &[f64] = &[1e-3, 0.5, 0.9];
+
+    let total = alt1_cov + alt2_cov;
+    let log_combo = log_choose(total, alt2_cov);
+
+    let lp_homref = log_combo + alt2_cov * p_alt[0].log10() + alt1_cov * (1.0 - p_alt[0]).log10();
+    let lp_het = log_combo + alt2_cov * p_alt[1].log10() + alt1_cov * (1.0 - p_alt[1]).log10();
+    let lp_homalt = log_combo + alt2_cov * p_alt[2].log10() + alt1_cov * (1.0 - p_alt[2]).log10();
+
+    vec![lp_homref, lp_het, lp_homalt]
+}
+
+/// Genotype quality: confidence in the assigned genotype
+/// Sample quality: confidence that there is non-reference present
+pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
+    let gt_lplist = genotype_scores(ref_cov, alt_cov);
+    let mut sorted_gt_lplist: Vec<(usize, f64)> =
+        gt_lplist.iter().enumerate().map(|(i, &e)| (i, e)).collect();
+    sorted_gt_lplist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+    let best = sorted_gt_lplist[0];
+    let second_best = sorted_gt_lplist[1];
+    let gq = f64::min(-10.0 * (second_best.1 - best.1), 100.0);
+
+    let mut gt_sum = 0.0;
+    for gt in &gt_lplist {
+        gt_sum += 10.0_f64.powf(*gt);
+    }
+
+    let gt_sum_log = gt_sum.log10();
+    let sq = f64::min((-10.0 * (gt_lplist[0] - gt_sum_log)).abs(), 100.0);
+    (gq, sq)
+}
+
+/// Helper function for genotype_scores
 fn log_choose(n: f64, k: f64) -> f64 {
     let mut r = 0.0;
     let mut n = n;
@@ -91,40 +122,4 @@ fn log_choose(n: f64, k: f64) -> f64 {
     }
 
     r
-}
-
-/// Probabilities of each genotype given the allele coveages
-fn bayes_gt(alt1_cov: f64, alt2_cov: f64) -> Vec<f64> {
-    let p_alt: &[f64] = &[1e-3, 0.5, 0.9];
-
-    let total = alt1_cov + alt2_cov;
-    let log_combo = log_choose(total, alt2_cov);
-
-    let lp_homref = log_combo + alt2_cov * p_alt[0].log10() + alt1_cov * (1.0 - p_alt[0]).log10();
-    let lp_het = log_combo + alt2_cov * p_alt[1].log10() + alt1_cov * (1.0 - p_alt[1]).log10();
-    let lp_homalt = log_combo + alt2_cov * p_alt[2].log10() + alt1_cov * (1.0 - p_alt[2]).log10();
-
-    vec![lp_homref, lp_het, lp_homalt]
-}
-
-/// Returns genotype and sample where genotype is confidence in the assigned genotype
-/// and sample is confidence that there is actually a variant present
-fn make_gt_quals(gt_lplist: &Vec<f64>) -> (f64, f64) {
-    let mut sorted_gt_lplist: Vec<(usize, f64)> =
-        gt_lplist.iter().enumerate().map(|(i, &e)| (i, e)).collect();
-    sorted_gt_lplist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-
-    let best = sorted_gt_lplist[0];
-    let second_best = sorted_gt_lplist[1];
-
-    let mut gt_sum = 0.0;
-    for &gt in gt_lplist {
-        gt_sum += 10.0_f64.powf(gt);
-    }
-
-    let gt_sum_log = gt_sum.log10();
-    let sample_qual = f64::min((-10.0 * (gt_lplist[0] - gt_sum_log)).abs(), 100.0);
-    let phred_gq = f64::min(-10.0 * (second_best.1 - best.1), 100.0);
-
-    (sample_qual, phred_gq)
 }
