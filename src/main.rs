@@ -46,7 +46,14 @@ fn main() {
 
     let mut writer = VcfWriter::new(&args.io.out, input_header.clone(), &args.io.sample);
 
-    let mut m_input = VcfChunker::new(input_vcf, input_header.clone(), tree, args.kd.clone());
+    // We send the writer to the reader so that we can pipe filtered variants forward
+    let mut m_input = VcfChunker::new(
+        input_vcf,
+        input_header.clone(),
+        tree,
+        args.kd.clone(),
+        &mut writer,
+    );
 
     // Create channels for communication between threads
     let (sender, receiver): (Sender<Option<InputType>>, Receiver<Option<InputType>>) = unbounded();

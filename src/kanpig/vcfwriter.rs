@@ -194,4 +194,14 @@ impl VcfWriter {
 
         let _result = self.writer.write_record(&self.header, &entry);
     }
+
+    pub fn write_entry(&mut self, mut entry: vcf::Record) {
+        *entry.genotypes_mut() = Genotypes::new(
+            "GT".parse().unwrap(),
+            vec![vec![
+                Some(Value::from("./.")), // GT
+            ]],
+        );
+        let _result = self.writer.write_record(&self.header, &entry);
+    }
 }

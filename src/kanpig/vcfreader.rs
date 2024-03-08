@@ -3,11 +3,11 @@ use std::io::BufRead;
 
 use noodles_vcf::{self as vcf};
 
-use crate::kanpig::{KDParams, KdpVcf, Regions};
+use crate::kanpig::{KDParams, KdpVcf, Regions, VcfWriter};
 
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
-pub struct VcfChunker<R: BufRead> {
+pub struct VcfChunker<'a, R: BufRead> {
     pub m_vcf: vcf::reader::Reader<R>,
     pub m_header: vcf::Header,
     regions: Regions,
@@ -21,14 +21,16 @@ pub struct VcfChunker<R: BufRead> {
     hold_entry: Option<vcf::Record>,
     chunk_count: u64,
     call_count: u64,
+    writer: &'a mut VcfWriter,
 }
 
-impl<R: BufRead> VcfChunker<R> {
+impl<'a, R: BufRead> VcfChunker<'a, R> {
     pub fn new(
         m_vcf: vcf::reader::Reader<R>,
         m_header: vcf::Header,
         regions: Regions,
         params: KDParams,
+        writer: &'a mut VcfWriter,
     ) -> Self {
         Self {
             m_vcf,
@@ -40,6 +42,7 @@ impl<R: BufRead> VcfChunker<R> {
             hold_entry: None,
             chunk_count: 0,
             call_count: 0,
+            writer,
         }
     }
 
@@ -100,8 +103,13 @@ impl<R: BufRead> VcfChunker<R> {
                     error!("skipping invalid VCF entry {:?}", e);
                     continue;
                 }
-                Ok(_) if self.filter_entry(&entry) => return Some(entry),
-                _ => continue,
+                Ok(_) => {
+                    if self.filter_entry(&entry) {
+                        return Some(entry);
+                    } else {
+                        self.writer.write_entry(entry.clone());
+                    }
+                }
             }
         }
     }
@@ -129,7 +137,7 @@ impl<R: BufRead> VcfChunker<R> {
     }
 }
 
-impl<R: BufRead> Iterator for VcfChunker<R> {
+impl<'a, R: BufRead> Iterator for VcfChunker<'a, R> {
     type Item = Vec<vcf::Record>;
 
     fn next(&mut self) -> Option<Self::Item> {
