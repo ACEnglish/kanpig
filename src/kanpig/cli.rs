@@ -93,6 +93,10 @@ pub struct KDParams {
     /// Don't prune paths which don't traverse 1-to-1 nodes
     #[arg(long, default_value_t = false)]
     pub no_prune: bool,
+
+    /// Minimum mapq of reads to consider
+    #[arg(long, default_value_t = 5)]
+    pub mapq: u8,
 }
 
 impl ArgParser {

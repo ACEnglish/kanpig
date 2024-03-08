@@ -56,6 +56,7 @@ impl BamParser {
                 break;
             }
 
+            // Only count coverage of reads used
             tot_cov += pileup.depth() as u64;
 
             for alignment in pileup.alignments() {
@@ -70,6 +71,11 @@ impl BamParser {
                 if !((alignment.record().reference_start() as u64) < start
                     && (alignment.record().reference_end() as u64) > end)
                 {
+                    continue;
+                }
+
+                // Minimum MapQ
+                if alignment.record().mapq() < self.params.mapq {
                     continue;
                 }
 
@@ -142,7 +148,7 @@ impl BamParser {
             //debug!("{:?}", cur_hap);
             ret.push(cur_hap);
         }
-        
+
         ret.sort_by(|a, b| b.cmp(a));
         debug!("{:?}", ret);
         ret

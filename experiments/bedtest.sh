@@ -8,15 +8,13 @@ create() {
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
         --sizesim 0.95 --seqsim 0.90 --threads 4 \
-        --maxpaths 5000 \
+        --maxpaths 5000 --mapq 5 \
         -o test_rs/hc.vcf --bed $bed 
     # --bed /Users/english/code/kanpig/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \
     # --bam /Users/english/code/kanpig/experiments/test_rs/GIABHG002.bam \
 }
 
 bench_lite() {
-    bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
-    tabix test_rs/hc.vcf.gz
     rm -rf test_rs/hcbench_all
     truvari bench --includebed $bed \
         -b test_rs/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz \
@@ -38,6 +36,8 @@ bench_full() {
 }
 
 create
-bench_lite
+bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
+tabix test_rs/hc.vcf.gz
+#bench_lite
 bench_medium
-bench_full
+#bench_full

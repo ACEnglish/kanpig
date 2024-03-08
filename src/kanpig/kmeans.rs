@@ -1,14 +1,9 @@
 // Written by chatgpt because the kmeans crate is broken because simd is??
-//use crate::kanpig::metrics;
 use std::cmp::Ordering;
 
-// Define a point in multidimensional space
 pub type Point = Vec<f32>;
-
-// Define a cluster centroid
 pub type Centroid = Point;
 
-// Define a cluster containing points
 #[derive(Debug)]
 pub struct Cluster {
     pub centroid: Centroid,
@@ -66,9 +61,7 @@ fn choose_centroids(sorted_vec: &[Point], k: usize) -> Vec<Point> {
 }
 
 pub fn kmeans(data: &[Point], k: usize) -> Vec<Cluster> {
-    // Initialize clusters with two highest covered centroids
-    // So we assume that data is sorted
-    let mut centroids: Vec<Point> = choose_centroids(data, k);//data.iter().take(k).cloned().collect();
+    let mut centroids: Vec<Point> = choose_centroids(data, k); //data.iter().take(k).cloned().collect();
     let mut clusters: Vec<Cluster> = centroids
         .iter()
         .map(|centroid| Cluster::new(centroid.clone()))
