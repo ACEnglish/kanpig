@@ -34,14 +34,22 @@ pub fn brute_force_find_path(
     let mut stack: Vec<PathNodeState> = vec![start_path];
     let mut best_path = PathScore::default();
     let mut npaths = 0;
+    let snk_node = NodeIndex::new(graph.node_count() - 1);
+
     while let Some(cur_path) = stack.pop() {
         let mut any_push = false;
-        for next_node in graph
-            .edges(cur_path.node)
-            .filter(|edge| !skip_edges.contains(&edge.id()))
-            .map(|edge| edge.target())
-        {
-            if next_node.index() == graph.node_count() - 1 {
+
+        // Throw all of cur_node's neighbors on the stack
+        // Except snk_node, which is an indicator that the
+        // current path has ended
+        for next_node in graph.edges(cur_path.node).filter_map(|edge| {
+            if skip_edges.contains(&edge.id()) {
+                None
+            } else {
+                Some(edge.target())
+            }
+        }) {
+            if next_node == snk_node {
                 best_path =
                     best_path.max(PathScore::new(graph, cur_path.path.clone(), target, params));
                 npaths += 1;
@@ -59,6 +67,7 @@ pub fn brute_force_find_path(
             }
         }
 
+        // Only need to sort when we've added to the stack
         if any_push {
             stack.sort_by_key(|node| std::cmp::Reverse(node.dist));
         }
