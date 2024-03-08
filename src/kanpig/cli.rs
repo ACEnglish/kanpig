@@ -79,7 +79,7 @@ pub struct KDParams {
     pub seqsim: f32,
 
     /// Minimum size similarity for paths
-    #[arg(long, default_value_t = 0.90)]
+    #[arg(long, default_value_t = 0.95)]
     pub sizesim: f32,
 
     /// Minimum frequency of kmer

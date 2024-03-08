@@ -139,12 +139,12 @@ impl BamParser {
                 cur_hap.add(&hap_parts[&p]);
             }
             cur_hap.coverage = coverage;
-            debug!("{:?}", cur_hap);
+            //debug!("{:?}", cur_hap);
             ret.push(cur_hap);
         }
-
-        // Sort so higher coverage haplotypes are preferred as centroids
-        ret.sort_by_key(|i| std::cmp::Reverse(i.coverage));
+        
+        ret.sort_by(|a, b| b.cmp(a));
+        debug!("{:?}", ret);
         ret
     }
 }

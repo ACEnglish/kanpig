@@ -1,5 +1,5 @@
 // Written by chatgpt because the kmeans crate is broken because simd is??
-//use rand::seq::SliceRandom;
+//use crate::kanpig::metrics;
 use std::cmp::Ordering;
 
 // Define a point in multidimensional space
@@ -53,12 +53,22 @@ fn distance(p1: &Point, p2: &Point) -> f32 {
         .sqrt()
 }
 
+fn choose_centroids(sorted_vec: &[Point], k: usize) -> Vec<Point> {
+    let segment_size = sorted_vec.len() / k;
+    let mut centroids = Vec::with_capacity(k);
+
+    for i in 0..k {
+        let centroid_index = i * segment_size + segment_size / 2;
+        centroids.push(sorted_vec[centroid_index].clone());
+    }
+
+    centroids
+}
+
 pub fn kmeans(data: &[Point], k: usize) -> Vec<Cluster> {
-    // Initialize clusters with random centroids
-    //let mut rng = rand::thread_rng();
-    // Should probably choose highest covered - or at least be able to seed
-    //let mut centroids: Vec<Point> = data.choose_multiple(&mut rng, k).cloned().collect();
-    let mut centroids: Vec<Point> = data.iter().take(k).cloned().collect();
+    // Initialize clusters with two highest covered centroids
+    // So we assume that data is sorted
+    let mut centroids: Vec<Point> = choose_centroids(data, k);//data.iter().take(k).cloned().collect();
     let mut clusters: Vec<Cluster> = centroids
         .iter()
         .map(|centroid| Cluster::new(centroid.clone()))
