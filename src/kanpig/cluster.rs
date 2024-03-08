@@ -93,7 +93,7 @@ pub fn cluster_haplotypes(
                 (hap1, hap2)
             }
         }
-        (metrics::GTstate::Het, s, g) => {
+        (metrics::GTstate::Het, _, _) => {
             // If they're highly similar, combine and assume it was a 'noisy' HOM. Otherwise compound het
             if (hap1.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
