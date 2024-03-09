@@ -97,6 +97,10 @@ pub struct KDParams {
     /// Minimum mapq of reads to consider
     #[arg(long, default_value_t = 5)]
     pub mapq: u8,
+
+    /// Alignments with flag matching this value are ignored
+    #[arg(long, default_value_t = 3840)]
+    pub mapflag: u16,
 }
 
 impl ArgParser {

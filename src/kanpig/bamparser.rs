@@ -52,30 +52,33 @@ impl BamParser {
             if m_pos < window_start {
                 continue;
             }
+            // Do this separately so we don't waste time downstream
             if window_end < m_pos {
                 break;
             }
 
-            // Only count coverage of reads used
-            tot_cov += pileup.depth() as u64;
-
+            // Only count coverage of reads used?
+            //tot_cov += pileup.depth() as u64;
             for alignment in pileup.alignments() {
-                // None if either is_del or is_refskip, we we don't need it
-                // Skip records without sequence, as well.
-                if alignment.qpos().is_none() || alignment.record().seq().is_empty() {
-                    continue;
-                }
-
-                // Guard against partial alignments which mess up the kfeat
-                // Will revisit when I can turn a Haplotype into a single-path graph
-                if !((alignment.record().reference_start() as u64) < start
-                    && (alignment.record().reference_end() as u64) > end)
+                // Skip records without sequence, below min mapq, matching the flag, or partially
+                // into our window. Will revisit partial when I can turn a Haplotype into a
+                // single-path graph
+                if alignment.record().seq().is_empty()
+                    || alignment.record().mapq() < self.params.mapq
+                    || (alignment.record().flags() & self.params.mapflag) != 0
+                    || !((alignment.record().reference_start() as u64) < start
+                        && (alignment.record().reference_end() as u64) > end)
                 {
                     continue;
                 }
 
-                // Minimum MapQ
-                if alignment.record().mapq() < self.params.mapq {
+                // Only count reads we're using - do this before we worry about the
+                // is_del/is_refskip
+                tot_cov += 1;
+
+                // None if either is_del or is_refskip, we we don't need it
+                // We do this separately from above so we can count 'deleted'  as covered
+                if alignment.qpos().is_none() {
                     continue;
                 }
 
