@@ -2,6 +2,7 @@ use crate::kanpig::seq_to_kmer;
 use noodles_vcf::{
     self as vcf, record::alternate_bases::allele, record::info::field, record::Filters,
 };
+use std::cmp::Ordering;
 use std::str::FromStr;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -73,11 +74,16 @@ impl KdpVcf for vcf::Record {
     fn size(&self) -> u64 {
         let svlen = self
             .info()
-            .get(&field::Key::from_str("SVLEN").expect("No SVLEN INFO"));
+            .get(&field::Key::from_str("SVLEN").unwrap_or_else(|_| panic!("No SVLEN INFO")));
+
         if let Some(Some(field::Value::Integer(svlen))) = svlen {
             return svlen.unsigned_abs() as u64;
         } else if let Some(Some(field::Value::Array(field::value::Array::Integer(svlen)))) = svlen {
-            return svlen[0].expect("Bad SVLEN").unsigned_abs() as u64;
+            return svlen
+                .first()
+                .unwrap_or_else(|| panic!("Bad SVLEN"))
+                .unwrap()
+                .unsigned_abs() as u64;
         }
 
         let r_len: u64 = self.reference_bases().len() as u64;
@@ -117,27 +123,25 @@ impl KdpVcf for vcf::Record {
         {
             // INFO/SVTYPE
             Some(Some(field::Value::String(svtype))) => svtype.parse().expect("Bad SVTYPE"),
-            Some(Some(field::Value::Array(field::value::Array::String(svtype)))) => {
-                svtype[0].clone().expect("Bad SVTYPE").parse().unwrap()
-            }
+            Some(Some(field::Value::Array(field::value::Array::String(svtype)))) => svtype
+                .first()
+                .cloned()
+                .unwrap_or_else(|| panic!("Bad SVTYPE"))
+                .expect("parsed")
+                .parse()
+                .unwrap(),
             // Direct from REF/ALT
             _ => match self.alternate_bases().first() {
                 Some(allele::Allele::Bases(alt)) => {
-                    let asz = alt.len();
-                    let rsz = self.reference_bases().len();
-                    if asz > rsz {
-                        Svtype::Ins
-                    } else if asz < rsz {
-                        Svtype::Del
-                    } else if asz == 1 {
-                        Svtype::Snp
-                    } else {
-                        Svtype::Unk
+                    match alt.len().cmp(&self.reference_bases().len()) {
+                        Ordering::Greater => Svtype::Ins,
+                        Ordering::Less => Svtype::Del,
+                        Ordering::Equal if alt.len() == 1 => Svtype::Snp,
+                        _ => Svtype::Unk,
                     }
                 }
-                Some(allele::Allele::Symbol(alt)) => {
-                    Svtype::from_str(&alt.to_string()).expect("Bad Symbolic Alt")
-                }
+                Some(allele::Allele::Symbol(alt)) => Svtype::from_str(&alt.to_string())
+                    .unwrap_or_else(|_| panic!("Bad Symbolic Alt")),
                 _ => Svtype::Unk,
             },
         }

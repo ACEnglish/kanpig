@@ -97,11 +97,10 @@ fn main() {
     }
 
     info!("collecting output");
-    let sty = ProgressStyle::with_template(
-        " [{elapsed_precise}] {bar:45.cyan/blue} > {pos:>7}/{len:7}",
-    )
-    .unwrap()
-    .progress_chars("##-");
+    let sty =
+        ProgressStyle::with_template(" [{elapsed_precise}] {bar:45.cyan/blue} > {pos:>7}/{len:7}")
+            .unwrap()
+            .progress_chars("##-");
     let pbar = ProgressBar::new(num_chunks);
     pbar.set_style(sty.clone());
 

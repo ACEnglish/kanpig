@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
     let mut deno: f32 = 0.0;
     let mut neum: f32 = 0.0;
-    for (x, y) in a.iter().zip(b.iter()) {
+    for (&x, &y) in a.iter().zip(b.iter()) {
         let d = x.abs() + y.abs();
         if d <= mink {
             continue;
@@ -71,7 +71,8 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
 
 /// Probabilities of each genotype given the allele coveages
 fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> Vec<f64> {
-    let p_alt: &[f64] = &[1e-3, 0.5, 0.9];
+    // Originally these were 1e3, .50, .90
+    let p_alt: &[f64] = &[1e-3, 0.55, 0.95];
 
     let total = alt1_cov + alt2_cov;
     let log_combo = log_choose(total, alt2_cov);
