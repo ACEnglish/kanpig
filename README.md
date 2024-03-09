@@ -25,17 +25,18 @@ Options:
       --bed <BED>              Regions to analyze
       --sample <SAMPLE>        Sample to apply genotypes to, default first column
       --threads <THREADS>      Number of threads [default: 1]
+      --debug                  Verbose logging
       --kmer <KMER>            Kmer size for featurization [default: 4]
       --chunksize <CHUNKSIZE>  Minimum distance between variants to create independent graphs [default: 100]
       --passonly               Only analyze reads with PASS FILTER
-      --sizemin <SIZEMIN>      Minimum size of variant to analyze [default: 20]
+      --sizemin <SIZEMIN>      Minimum size of variant to analyze [default: 50]
       --sizemax <SIZEMAX>      Maximum size of variant to analyze [default: 50000]
       --maxpaths <MAXPATHS>    Maximum number of paths in a graph to traverse [default: 1000]
       --seqsim <SEQSIM>        Minimum sequence similarity for paths [default: 0.9]
-      --sizesim <SIZESIM>      Minimum size similarity for paths [default: 0.9]
+      --sizesim <SIZESIM>      Minimum size similarity for paths [default: 0.95]
       --minkfreq <MINKFREQ>    Minimum frequency of kmer [default: 1]
       --try-exact              Search for a 1-to-1 match before graph traversal
-      --prune                  Prune paths which don't traverse 1-to-1 nodes
+      --no-prune               Don't prune paths which don't traverse 1-to-1 nodes
+      --mapq <MAPQ>            Minimum mapq of reads to consider [default: 20]
   -h, --help                   Print help
   -V, --version                Print version
-```
