@@ -84,6 +84,7 @@ pub fn cluster_haplotypes(
             if (hap1.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
                     > params.sizesim
+                //&& metrics::seqsim(&hap1.kfeat, &hap2.kfeat, params.minkfreq as f32) > params.seqsim
             {
                 // should be consolidated
                 hap2.coverage += hap1.coverage;
@@ -98,7 +99,7 @@ pub fn cluster_haplotypes(
             if (hap1.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
                     > params.sizesim
-                && metrics::seqsim(&hap1.kfeat, &hap2.kfeat, params.minkfreq as f32) > params.seqsim
+                //&& metrics::seqsim(&hap1.kfeat, &hap2.kfeat, params.minkfreq as f32) > params.seqsim
             {
                 // Hom Alt
                 hap2.coverage += hap1.coverage;
