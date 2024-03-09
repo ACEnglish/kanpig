@@ -98,7 +98,7 @@ fn main() {
 
     info!("collecting output");
     let sty = ProgressStyle::with_template(
-        " [{elapsed_precise}] {bar:45.cyan/blue} > {pos:>7}/{len:7} {msg}",
+        " [{elapsed_precise}] {bar:45.cyan/blue} > {pos:>7}/{len:7}",
     )
     .unwrap()
     .progress_chars("##-");
