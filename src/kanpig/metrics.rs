@@ -106,8 +106,7 @@ pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
     (gq, sq)
 }
 
-/// Helper function for genotype_scores
-fn log_choose(n: f64, k: f64) -> f64 {
+/*fn log_choose(n: f64, k: f64) -> f64 {
     let mut r = 0.0;
     let mut n = n;
     let mut k = k;
@@ -123,4 +122,44 @@ fn log_choose(n: f64, k: f64) -> f64 {
     }
 
     r
+}*/
+
+/// Helper function for genotype_scores
+use std::f64::consts::LN_10;
+
+const FACTORIAL_LIMIT: usize = 100;
+lazy_static::lazy_static! {
+    static ref LOG_FACTORIALS: Vec<f64> = {
+        let mut log_factorials = vec![0.0; FACTORIAL_LIMIT + 1];
+        let mut log_n_fact = 0.0;
+        for (n, item) in log_factorials.iter_mut().enumerate().take(FACTORIAL_LIMIT + 1).skip(1) {
+            log_n_fact += (n as f64).ln();
+            *item = log_n_fact;
+        }
+        log_factorials
+    };
+}
+
+fn log_choose(n: f64, k: f64) -> f64 {
+    if n.is_infinite() || k.is_infinite() || n.is_nan() || k.is_nan() {
+        return f64::NAN;
+    }
+
+    if k > n || k < 0.0 {
+        return 0.0;
+    }
+
+    if n <= FACTORIAL_LIMIT as f64 {
+        return LOG_FACTORIALS[n as usize] - LOG_FACTORIALS[k as usize] - LOG_FACTORIALS[(n - k) as usize];
+    }
+
+    let (small, large) = if k < n - k { (k, n - k) } else { (n - k, k) };
+    let mut log_choose = LOG_FACTORIALS[small as usize];
+
+    let n_plus_half = n + 0.5;
+    let k_plus_half = large + 0.5;
+
+    log_choose += (n_plus_half * (n + 1.0).ln() - n_plus_half - n) / LN_10;
+    log_choose -= (k_plus_half * (large + 1.0).ln() - k_plus_half - large) / LN_10;
+    log_choose
 }

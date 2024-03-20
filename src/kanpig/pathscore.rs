@@ -82,7 +82,7 @@ impl PathScore {
                 |acc: Vec<f32>, other: &Vec<f32>| {
                     acc.iter()
                         .zip(other)
-                        .map(|(x, y)| x + y) // This line sums corresponding elements
+                        .map(|(x, y)| x + y)
                         .collect()
                 },
             );
