@@ -52,6 +52,7 @@ pub fn brute_force_find_path(
             if next_node == snk_node {
                 best_path =
                     best_path.max(PathScore::new(graph, cur_path.path.clone(), target, params));
+                debug!("best path {:?}", best_path);
                 npaths += 1;
             } else {
                 any_push = true;

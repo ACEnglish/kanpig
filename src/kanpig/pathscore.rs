@@ -69,6 +69,7 @@ impl PathScore {
         }
 
         let sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
+        debug!("szsim: {}", sizesim);
         if sizesim < params.sizesim {
             return PathScore::default();
         }
@@ -88,6 +89,7 @@ impl PathScore {
             );
 
         let seqsim = metrics::seqsim(&path_k, &target.kfeat, params.minkfreq as f32);
+        debug!("sqsim: {}", seqsim);
         if seqsim < params.seqsim {
             return PathScore::default();
         }
