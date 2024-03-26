@@ -95,8 +95,12 @@ impl BamParser {
             }
         }
 
+        // Either all the reads used or the mean coverage over the window
+        let mut coverage = tot_cov / (window_end - window_start);
+        if (coverage as usize) < m_reads.len() {
+            coverage = m_reads.len() as u64;
+        }
         let m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
-        let coverage = tot_cov / (window_end - window_start);
         (m_haps, coverage)
     }
 
