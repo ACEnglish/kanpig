@@ -1,11 +1,11 @@
 use crate::kanpig::{seq_to_kmer, Haplotype, KDParams, PileupVariant, Svtype};
+use indexmap::IndexMap;
 use rust_htslib::{
     bam::ext::BamRecordExtensions,
     bam::pileup::Indel,
     bam::{IndexedReader, Read},
     faidx,
 };
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub struct BamParser {
@@ -41,9 +41,9 @@ impl BamParser {
         };
 
         // track the changes made by each read
-        let mut m_reads = HashMap::<Vec<u8>, Vec<PileupVariant>>::new();
+        let mut m_reads = IndexMap::<Vec<u8>, Vec<PileupVariant>>::new();
         // consolidate common variants
-        let mut p_variants = HashMap::<PileupVariant, u64>::new();
+        let mut p_variants = IndexMap::<PileupVariant, u64>::new();
         for pileup in self.bam.pileup() {
             if pileup.is_err() {
                 continue;
@@ -110,11 +110,11 @@ impl BamParser {
 
     fn reads_to_haps(
         &self,
-        reads: HashMap<Vec<u8>, Vec<PileupVariant>>,
-        pileups: HashMap<PileupVariant, u64>,
+        reads: IndexMap<Vec<u8>, Vec<PileupVariant>>,
+        pileups: IndexMap<PileupVariant, u64>,
         chrom: &String,
     ) -> Vec<Haplotype> {
-        let mut hap_parts = HashMap::<PileupVariant, Haplotype>::new();
+        let mut hap_parts = IndexMap::<PileupVariant, Haplotype>::new();
 
         for (mut p, _) in pileups.into_iter() {
             // Need to fill in deleted sequence
@@ -143,7 +143,7 @@ impl BamParser {
         }
 
         // Deduplicate reads
-        let mut unique_reads: HashMap<&Vec<PileupVariant>, u64> = HashMap::new();
+        let mut unique_reads: IndexMap<&Vec<PileupVariant>, u64> = IndexMap::new();
         for m_plups in reads.values() {
             *unique_reads.entry(m_plups).or_insert(0) += 1;
         }
@@ -153,7 +153,7 @@ impl BamParser {
         for (read_pileups, coverage) in unique_reads {
             let mut cur_hap = Haplotype::blank(self.params.kmer, 1);
             for p in read_pileups {
-                cur_hap.add(&hap_parts[&p]);
+                cur_hap.add(&hap_parts[p]);
             }
             cur_hap.coverage = coverage;
             //debug!("{:?}", cur_hap);

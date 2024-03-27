@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
 crossbeam-channel = { version = "0.5.12" }
-indexmap = { version = "2.2.3" }
+indexmap = "2.2.3"
 indicatif = "0.17.8"
 itertools = { version = "0.12.1" }
 lazy_static = "1.4.0"
