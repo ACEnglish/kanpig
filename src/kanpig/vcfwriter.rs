@@ -149,7 +149,8 @@ impl VcfWriter {
             (true, true) => ("1|1", metrics::GTstate::Hom, (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64),
             (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
             (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
-            (false, false) => ("0|0", metrics::GTstate::Ref, 0.0),
+            (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
+            (false, false) => ("./.", metrics::GTstate::Ref, 0.0),
         };
 
         let ref_cov = (coverage as f64) - alt_cov;

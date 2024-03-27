@@ -84,7 +84,7 @@ pub fn cluster_haplotypes(
         metrics::GTstate::Hom => {
             if (hap1.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
-                    >= params.sizesim
+                    >= params.hapsim
             //&& metrics::seqsim(&hap1.kfeat, &hap2.kfeat, params.minkfreq as f32) > params.seqsim
             {
                 // should be consolidated
@@ -99,7 +99,7 @@ pub fn cluster_haplotypes(
             // If they're highly similar, combine and assume it was a 'noisy' HOM. Otherwise compound het
             if (hap1.size.signum() == hap2.size.signum())
                 && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs())
-                    >= params.sizesim
+                    >= params.hapsim
             //&& metrics::seqsim(&hap1.kfeat, &hap2.kfeat, params.minkfreq as f32) > params.seqsim
             {
                 // Hom Alt
