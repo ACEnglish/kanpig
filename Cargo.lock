@@ -446,6 +446,7 @@ dependencies = [
  "indexmap",
  "indicatif",
  "itertools",
+ "lazy_static",
  "log",
  "noodles-vcf",
  "ordered-float",

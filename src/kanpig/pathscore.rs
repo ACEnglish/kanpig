@@ -81,10 +81,7 @@ impl PathScore {
             .fold(
                 vec![0f32; 4_usize.pow(params.kmer.into())],
                 |acc: Vec<f32>, other: &Vec<f32>| {
-                    acc.iter()
-                        .zip(other)
-                        .map(|(x, y)| x + y) // This line sums corresponding elements
-                        .collect()
+                    acc.iter().zip(other).map(|(x, y)| x + y).collect()
                 },
             );
 
