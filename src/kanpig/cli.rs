@@ -65,7 +65,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 50)]
     pub sizemin: u64,
 
-    // change this to 10k? 
+    // change this to 10k?
     /// Maximum size of variant to analyze
     #[arg(long, default_value_t = 50000)]
     pub sizemax: u64,
@@ -85,7 +85,7 @@ pub struct KDParams {
     /// Minimum frequency of kmer
     #[arg(long, default_value_t = 1)]
     pub minkfreq: u64,
-    
+
     /// Haplotype size similarity collapse threshold
     #[arg(long, default_value_t = 0.95)]
     pub hapsim: f32,

@@ -145,13 +145,18 @@ impl VcfWriter {
         coverage: u64,
         phase_group: i32,
     ) {
-        let (gt_str, gt_path, alt_cov) = match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
-            (true, true) => ("1|1", metrics::GTstate::Hom, (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64),
-            (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
-            (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
-            (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
-            (false, false) => ("./.", metrics::GTstate::Ref, 0.0),
-        };
+        let (gt_str, gt_path, alt_cov) =
+            match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
+                (true, true) => (
+                    "1|1",
+                    metrics::GTstate::Hom,
+                    (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+                ),
+                (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
+                (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
+                (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
+                (false, false) => ("./.", metrics::GTstate::Ref, 0.0),
+            };
 
         let ref_cov = (coverage as f64) - alt_cov;
         let gt_obs = metrics::genotyper(ref_cov, alt_cov);
@@ -187,7 +192,6 @@ impl VcfWriter {
         if alt_cov < 5.0 {
             filt += 16;
         }
-
 
         *entry.genotypes_mut() = Genotypes::new(
             self.keys.clone(),
