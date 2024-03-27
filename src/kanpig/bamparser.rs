@@ -28,7 +28,11 @@ impl BamParser {
     // Two possible haplotypes and coverage observed over the window
     pub fn find_haps(&mut self, chrom: &String, start: u64, end: u64) -> (Vec<Haplotype>, u64) {
         // We pileup a little outside the region for variants
-        let window_start = if start < self.params.chunksize { 0 } else {start - self.params.chunksize};
+        let window_start = if start < self.params.chunksize {
+            0
+        } else {
+            start - self.params.chunksize
+        };
         let window_end = end + self.params.chunksize;
 
         let mut tot_cov: u64 = 0;
@@ -95,8 +99,12 @@ impl BamParser {
             }
         }
 
+        // Either all the reads used or the mean coverage over the window
+        let mut coverage = tot_cov / (window_end - window_start);
+        if (coverage as usize) < m_reads.len() {
+            coverage = m_reads.len() as u64;
+        }
         let m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
-        let coverage = tot_cov / (window_end - window_start);
         (m_haps, coverage)
     }
 

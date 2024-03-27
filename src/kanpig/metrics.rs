@@ -56,7 +56,7 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
     if (alt1_cov + alt2_cov) == 0.0 {
         return GTstate::Non;
     }
-    match genotype_scores(alt1_cov, alt2_cov)
+    let ret = match genotype_scores(alt1_cov, alt2_cov)
         .iter()
         .enumerate()
         .max_by_key(|&(_, &x)| OrderedFloat(x))
@@ -66,13 +66,19 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
         Some(1) => GTstate::Het,
         Some(2) => GTstate::Hom,
         _ => panic!("not possible"),
-    }
+    };
+    debug!("{} {} -> {:?}", alt1_cov, alt2_cov, ret);
+    ret
 }
 
 /// Probabilities of each genotype given the allele coveages
 fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> Vec<f64> {
-    // Originally these were 1e3, .50, .90
-    let p_alt: &[f64] = &[1e-3, 0.55, 0.95];
+    // Needs to be more pure for lower coverage
+    let p_alt: &[f64] = if alt1_cov + alt2_cov < 10.0 {
+        &[1e-3, 0.55, 0.95]
+    } else {
+        &[1e-3, 0.50, 0.90]
+    };
 
     let total = alt1_cov + alt2_cov;
     let log_combo = log_choose(total, alt2_cov);

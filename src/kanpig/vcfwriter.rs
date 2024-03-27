@@ -49,7 +49,7 @@ impl VcfWriter {
         // Overwrites existing definitions
         let all_formats = header.formats_mut();
 
-        let keys: Keys = "GT:SQ:GQ:PG:DP:AD:ZS:SS".parse().unwrap();
+        let keys: Keys = "GT:FT:SQ:GQ:PG:DP:AD:ZS:SS".parse().unwrap();
 
         // GT
         let gtid = keys[0].clone();
@@ -59,8 +59,16 @@ impl VcfWriter {
         *gtfmt.description_mut() = "Kanplug genotype".to_string();
         all_formats.insert(gtid, gtfmt);
 
+        // FT
+        let ftid = keys[1].clone();
+        let mut ftfmt = Map::<format::Format>::from(&ftid);
+        *ftfmt.number_mut() = vcf::header::Number::Count(1);
+        *ftfmt.type_mut() = format::Type::Integer;
+        *ftfmt.description_mut() = "Kanpig filter".to_string();
+        all_formats.insert(ftid, ftfmt);
+
         // SQ
-        let sqid = keys[1].clone();
+        let sqid = keys[2].clone();
         let mut sqfmt = Map::<format::Format>::from(&sqid);
         *sqfmt.number_mut() = vcf::header::Number::Count(1);
         *sqfmt.type_mut() = format::Type::Integer;
@@ -69,7 +77,7 @@ impl VcfWriter {
         all_formats.insert(sqid, sqfmt);
 
         // GQ
-        let gqid = keys[2].clone();
+        let gqid = keys[3].clone();
         let mut gqfmt = Map::<format::Format>::from(&gqid);
         *gqfmt.number_mut() = vcf::header::Number::Count(1);
         *gqfmt.type_mut() = format::Type::Integer;
@@ -77,7 +85,7 @@ impl VcfWriter {
         all_formats.insert(gqid, gqfmt);
 
         // PG
-        let pgid = keys[3].clone();
+        let pgid = keys[4].clone();
         let mut pgfmt = Map::<format::Format>::from(&pgid);
         *pgfmt.number_mut() = vcf::header::Number::Count(1);
         *pgfmt.type_mut() = format::Type::Integer;
@@ -85,7 +93,7 @@ impl VcfWriter {
         all_formats.insert(pgid, pgfmt);
 
         // DP
-        let dpid = keys[4].clone();
+        let dpid = keys[5].clone();
         let mut dpfmt = Map::<format::Format>::from(&dpid);
         *dpfmt.number_mut() = vcf::header::Number::Count(1);
         *dpfmt.type_mut() = format::Type::Integer;
@@ -93,7 +101,7 @@ impl VcfWriter {
         all_formats.insert(dpid, dpfmt);
 
         // AD
-        let adid = keys[5].clone();
+        let adid = keys[6].clone();
         let mut adfmt = Map::<format::Format>::from(&adid);
         *adfmt.number_mut() = vcf::header::Number::R;
         *adfmt.type_mut() = format::Type::Integer;
@@ -101,7 +109,7 @@ impl VcfWriter {
         all_formats.insert(adid, adfmt);
 
         // ZS
-        let zsid = keys[6].clone();
+        let zsid = keys[7].clone();
         let mut zsfmt = Map::<format::Format>::from(&zsid);
         *zsfmt.number_mut() = vcf::header::Number::R;
         *zsfmt.type_mut() = format::Type::Integer;
@@ -109,7 +117,7 @@ impl VcfWriter {
         all_formats.insert(zsid, zsfmt);
 
         // SS
-        let ssid = keys[7].clone();
+        let ssid = keys[8].clone();
         let mut ssfmt = Map::<format::Format>::from(&ssid);
         *ssfmt.number_mut() = vcf::header::Number::R;
         *ssfmt.type_mut() = format::Type::Integer;
@@ -137,32 +145,21 @@ impl VcfWriter {
         coverage: u64,
         phase_group: i32,
     ) {
-        let mut alt_cov = 0.0;
-        let gt1 = if path1.path.contains(var_idx) {
-            alt_cov += path1.coverage.unwrap() as f64;
-            "1"
-        } else if path1.coverage.unwrap() == 0 {
-            "."
-        } else {
-            "0"
-        };
-        let gt2 = if path2.path.contains(var_idx) {
-            // Don't double add coverage... you have to clean this up
-            // And for compound hets you do want to add this coverage because the path is
-            // different?
-            if !path1.path.contains(var_idx) {
-                alt_cov += path2.coverage.unwrap() as f64;
-            }
-            "1"
-        } else if path2.coverage.unwrap() == 0 {
-            "."
-        } else {
-            "0"
-        };
+        let (gt_str, gt_path, alt_cov) =
+            match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
+                (true, true) => (
+                    "1|1",
+                    metrics::GTstate::Hom,
+                    (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+                ),
+                (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
+                (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
+                (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
+                (false, false) => ("./.", metrics::GTstate::Ref, 0.0),
+            };
 
-        let gt = format!("{}|{}", gt1, gt2);
         let ref_cov = (coverage as f64) - alt_cov;
-
+        let gt_obs = metrics::genotyper(ref_cov, alt_cov);
         // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
         let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
 
@@ -178,10 +175,29 @@ impl VcfWriter {
             Some((path2.seqsim * 100.0) as i32),
         ]);
 
+        let mut filt: i32 = 0;
+        // The genotype from AD doesn't match path genotype
+        if gt_obs != gt_path {
+            filt += 1;
+        }
+        if gq < 5.0 {
+            filt += 2;
+        }
+        if sq < 5.0 {
+            filt += 4;
+        }
+        if coverage < 5 {
+            filt += 8;
+        }
+        if alt_cov < 5.0 {
+            filt += 16;
+        }
+
         *entry.genotypes_mut() = Genotypes::new(
             self.keys.clone(),
             vec![vec![
-                Some(Value::from(gt)),                // GT
+                Some(Value::from(gt_str)),            // GT
+                Some(Value::from(filt)),              // FT
                 Some(Value::from(sq.round() as i32)), // SQ
                 Some(Value::from(gq.round() as i32)), // GQ
                 Some(Value::from(phase_group)),       // PG
