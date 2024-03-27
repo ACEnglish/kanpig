@@ -156,7 +156,9 @@ fn log_choose(n: f64, k: f64) -> f64 {
     }
 
     if n <= FACTORIAL_LIMIT as f64 {
-        return LOG_FACTORIALS[n as usize] - LOG_FACTORIALS[k as usize] - LOG_FACTORIALS[(n - k) as usize];
+        return LOG_FACTORIALS[n as usize]
+            - LOG_FACTORIALS[k as usize]
+            - LOG_FACTORIALS[(n - k) as usize];
     }
 
     let (small, large) = if k < n - k { (k, n - k) } else { (n - k, k) };
