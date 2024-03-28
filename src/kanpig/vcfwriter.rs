@@ -147,11 +147,13 @@ impl VcfWriter {
     ) {
         let (gt_str, gt_path, alt_cov) =
             match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
-                (true, true) => (
+                (true, true) if path1 != path2 => (
                     "1|1",
                     metrics::GTstate::Hom,
                     (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
                 ),
+                // sometimes I used the same path twice
+                (true, true) => ("1|1", metrics::GTstate::Hom, path1.coverage.unwrap() as f64),
                 (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
                 (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
                 (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
