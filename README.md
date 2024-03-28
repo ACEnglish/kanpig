@@ -63,12 +63,12 @@ also added to the written vcf entry.
 
 # Annotations
 * FT - Bit flag for properties of the variant's genotyping. Flags == 0 are considered PASS. The bits definitions are:
- * 0x1 - The genotype observed from variants matching paths is not equal to the genotype observed from measuring the
+  * 0x1 - The genotype observed from variants matching paths is not equal to the genotype observed from measuring the
   proportions of reads supporting the two alleles.
- * 0x2 - The genotype quality is less than 5
- * 0x4 - The sample quality is less than 5
- * 0x8 - The DP is less than 5
- * 0x16 - The number of reads supporting the alternate allele less than 5
+  * 0x2 - The genotype quality is less than 5
+  * 0x4 - The sample quality is less than 5
+  * 0x8 - The DP is less than 5
+  * 0x16 - The number of reads supporting the alternate allele less than 5
 * SQ
 * GQ
 * PG - Each chunk of variants is assigned a phase group.
