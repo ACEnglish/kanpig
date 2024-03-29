@@ -188,11 +188,11 @@ impl VcfWriter {
         if coverage < 5 {
             filt += 4;
         }
-        if (gt_path != metrics::GTstate::Ref) {
+        if gt_path != metrics::GTstate::Ref {
             if sq < 5.0 {
                 filt += 8;
             }
-            if alt_cov < 5.0) {
+            if alt_cov < 5.0 {
                 filt += 16;
             }
         }

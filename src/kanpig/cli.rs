@@ -105,6 +105,10 @@ pub struct KDParams {
     /// Alignments with flag matching this value are ignored
     #[arg(long, default_value_t = 3840)]
     pub mapflag: u16,
+
+    /// Don't require alignments to span vargraph region
+    #[arg(long, default_value_t = false)]
+    pub spanoff: bool,
 }
 
 impl ArgParser {
