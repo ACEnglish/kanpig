@@ -161,6 +161,20 @@ fn log_choose(n: f64, k: f64) -> f64 {
             - LOG_FACTORIALS[(n - k) as usize];
     }
 
+    let mut r = 0.0;
+    let mut n = n;
+    let mut k = k;
+    if k * 2.0 > n {
+        k = n - k;
+    }
+    for d in 1..=(k as i32) {
+        r += n.log10();
+        r -= d as f64;
+        n -= 1.0;
+    }
+
+    r
+    /*
     let (small, large) = if k < n - k { (k, n - k) } else { (n - k, k) };
     let mut log_choose = LOG_FACTORIALS[small as usize];
 
@@ -169,5 +183,5 @@ fn log_choose(n: f64, k: f64) -> f64 {
 
     log_choose += (n_plus_half * (n + 1.0).ln() - n_plus_half - n) / LN_10;
     log_choose -= (k_plus_half * (large + 1.0).ln() - k_plus_half - large) / LN_10;
-    log_choose
+    log_choose*/
 }
