@@ -185,14 +185,16 @@ impl VcfWriter {
         if gq < 5.0 {
             filt += 2;
         }
-        if sq < 5.0 {
+        if coverage < 5 {
             filt += 4;
         }
-        if coverage < 5 {
-            filt += 8;
-        }
-        if alt_cov < 5.0 {
-            filt += 16;
+        if (gt_path != metrics::GTstate::Ref) {
+            if sq < 5.0 {
+                filt += 8;
+            }
+            if alt_cov < 5.0) {
+                filt += 16;
+            }
         }
 
         *entry.genotypes_mut() = Genotypes::new(

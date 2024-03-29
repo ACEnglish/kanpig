@@ -64,8 +64,8 @@ impl BamParser {
             // Only count coverage of reads used?
             //tot_cov += pileup.depth() as u64;
             for alignment in pileup.alignments() {
-                // Skip records without sequence, below min mapq, matching the flag, or partially
-                // into our window. Will revisit partial when I can turn a Haplotype into a
+                // Skip records without sequence, below min mapq, matching the flag, 
+                // or partially into our window. Will revisit partial when I can turn a Haplotype into a
                 // single-path graph
                 if alignment.record().seq().is_empty()
                     || alignment.record().mapq() < self.params.mapq

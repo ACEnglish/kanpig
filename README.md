@@ -66,9 +66,9 @@ also added to the written vcf entry.
   * 0x1 - The genotype observed from variants matching paths is not equal to the genotype observed from measuring the
   proportions of reads supporting the two alleles.
   * 0x2 - The genotype quality is less than 5
-  * 0x4 - The sample quality is less than 5
-  * 0x8 - The DP is less than 5
-  * 0x16 - The number of reads supporting the alternate allele less than 5
+  * 0x4 - The DP is less than 5
+  * 0x8 - The sample quality is less than 5 (non-Ref)
+  * 0x16 - The number of reads supporting the alternate allele less than 5 (non-Ref)
 * SQ
 * GQ
 * PG - Each chunk of variants is assigned a phase group.
