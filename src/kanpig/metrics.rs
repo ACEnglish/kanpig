@@ -131,8 +131,6 @@ pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
 }*/
 
 /// Helper function for genotype_scores
-use std::f64::consts::LN_10;
-
 const FACTORIAL_LIMIT: usize = 100;
 lazy_static::lazy_static! {
     static ref LOG_FACTORIALS: Vec<f64> = {

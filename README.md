@@ -38,9 +38,9 @@ Options:
       --no-prune               Don't prune paths which don't traverse 1-to-1 nodes
       --mapq <MAPQ>            Minimum mapq of reads to consider [default: 5]
       --mapflag <MAPFLAG>      Alignments with flag matching this value are ignored [default: 3840]
+      --spanoff                Don't require alignments to span vargraph region
   -h, --help                   Print help
-  -V, --version                Print version
-```
+  -V, --version                Print version```
 
 
 # Method
@@ -84,4 +84,5 @@ Sorted bed file restricts kanpig to only analyzing variants with starts and ends
 
 ## `--hapsim`
 Wh
+
 
