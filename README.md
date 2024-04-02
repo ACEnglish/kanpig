@@ -40,7 +40,8 @@ Options:
       --mapflag <MAPFLAG>      Alignments with flag matching this value are ignored [default: 3840]
       --spanoff                Don't require alignments to span vargraph region
   -h, --help                   Print help
-  -V, --version                Print version```
+  -V, --version                Print version
+```
 
 
 # Method
@@ -69,9 +70,9 @@ also added to the written vcf entry.
   * 0x4 - The DP is less than 5
   * 0x8 - The sample quality is less than 5 (non-Ref)
   * 0x16 - The number of reads supporting the alternate allele less than 5 (non-Ref)
-* SQ
-* GQ
-* PG - Each chunk of variants is assigned a phase group.
+* SQ - Phred scaled likelihood variant alternate is present in the sample
+* GQ - Phred scale difference between most and second-most likely genotypes
+* PG - Each chunk of variants is assigned a phase group
 * DP - Read coverage over the region
 * AD - Read coverage supporting the reference and alternate alleles.
 * SZ - Size similarity of the two haplotypes to this variant
