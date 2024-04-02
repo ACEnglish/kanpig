@@ -1,6 +1,6 @@
 #[inline]
 fn encode_nuc(nuc: u8) -> u64 {
-    match nuc {
+    match nuc.to_ascii_uppercase() {
         b'A' => 0,
         b'G' => 1,
         b'C' => 2,
