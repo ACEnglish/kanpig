@@ -128,3 +128,69 @@ pub fn prune_graph(
         .map(|e| e.id())
         .collect::<Vec<_>>()
 }
+
+/// Search of a VarGraph that's guided by size similarity
+/// Search stops after maxpaths have been checked
+/// Assumes NodeIndex 0 is src node and NodeIndex -1 is snk
+/// Returns a PathScore
+pub fn dp_brute_force_find_path(
+    graph: &DiGraph<VarNode, ()>,
+    target: &Haplotype,
+    params: &KDParams,
+    skip_edges: &[EdgeIndex],
+) -> PathScore {
+    let start_path = PathNodeState {
+        size: 0,
+        dist: target.size.unsigned_abs(), // this is for sorting
+        node: NodeIndex::new(0),
+        path: vec![],
+    };
+    let mut stack: Vec<PathNodeState> = vec![start_path];
+    let mut best_path = PathScore::default();
+    let mut npaths = 0;
+    let snk_node = NodeIndex::new(graph.node_count() - 1);
+
+    while let Some(cur_path) = stack.pop() {
+        let mut any_push = false;
+
+        // Throw all of cur_node's neighbors on the stack
+        // Except snk_node, which is an indicator that the
+        // current path has ended
+        for next_node in graph.edges(cur_path.node).filter_map(|edge| {
+            if skip_edges.contains(&edge.id()) {
+                None
+            } else {
+                Some(edge.target())
+            }
+        }) {
+            if next_node == snk_node {
+                best_path =
+                    best_path.max(PathScore::new(graph, cur_path.path.clone(), target, params));
+                debug!("best path {:?}", best_path);
+                npaths += 1;
+            } else {
+                any_push = true;
+                let nsize = cur_path.size + graph.node_weight(next_node).unwrap().size;
+                let mut npath = cur_path.path.clone();
+                npath.push(next_node);
+                stack.push(PathNodeState {
+                    size: nsize,
+                    dist: target.size.abs_diff(nsize),
+                    node: next_node,
+                    path: npath,
+                });
+            }
+        }
+
+        // Only need to sort when we've added to the stack
+        if any_push {
+            stack.sort_by_key(|node| std::cmp::Reverse(node.dist));
+        }
+
+        if npaths > params.maxpaths {
+            break;
+        }
+    }
+
+    best_path
+}

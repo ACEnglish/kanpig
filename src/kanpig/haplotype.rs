@@ -8,25 +8,32 @@ pub struct Haplotype {
     pub n: u64,
     pub coverage: u64,
     pub kfeat: Vec<f32>,
+    pub size_parts: Vec<i64>,
+    pub kfeat_parts: Vec<Vec<f32>>,
 }
 
 impl Haplotype {
     pub fn new(kfeat: Vec<f32>, size: i64, n: u64, coverage: u64) -> Self {
         Haplotype {
-            size,
+            size: size.clone(),
             n,
             coverage,
-            kfeat,
+            kfeat: kfeat.clone(),
+            size_parts: vec![size],
+            kfeat_parts: vec![kfeat],
         }
     }
 
     // Create an empty haplotype
     pub fn blank(kmer: u8, coverage: u64) -> Haplotype {
+        let mk = seq_to_kmer(&[], kmer, false);
         Haplotype {
             size: 0,
             n: 0,
             coverage,
-            kfeat: seq_to_kmer(&[], kmer, false),
+            kfeat: mk.clone(),
+            size_parts: vec![0],
+            kfeat_parts: vec![mk],
         }
     }
 
@@ -41,6 +48,8 @@ impl Haplotype {
             .for_each(|(x, y)| *x += y);
         self.size += other.size;
         self.n += 1;
+        self.size_parts.push(other.size);
+        self.kfeat_parts.push(other.kfeat.clone());
     }
 }
 

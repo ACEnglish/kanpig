@@ -8,6 +8,7 @@ pub struct PathScore {
     pub seqsim: f32,
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
+    pub align_pct: f32, // percent of the haplotype used 
 }
 
 impl Eq for PathScore {}
@@ -47,6 +48,7 @@ impl Default for PathScore {
             sizesim: 0.0,
             seqsim: 0.0,
             coverage: None,
+            align_pct: 0.0,
         }
     }
 }
@@ -55,7 +57,8 @@ impl PathScore {
     pub fn new(
         graph: &DiGraph<VarNode, ()>,
         path: Vec<NodeIndex>,
-        target: &Haplotype,
+        target: &Haplotype, // I can turn this into &Vec<Haplotype> instead of calling
+                            // partial_haplotypes everytime
         params: &KDParams,
     ) -> Self {
         let path_size: i64 = path
@@ -63,16 +66,6 @@ impl PathScore {
             .filter_map(|&node_index| graph.node_weight(node_index))
             .map(|x| x.size)
             .sum();
-
-        if path_size.signum() != target.size.signum() {
-            return PathScore::default();
-        }
-
-        let sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
-        debug!("szsim: {}", sizesim);
-        if sizesim < params.sizesim {
-            return PathScore::default();
-        }
 
         let path_k: Vec<f32> = path
             .iter()
@@ -85,17 +78,34 @@ impl PathScore {
                 },
             );
 
-        let seqsim = metrics::seqsim(&path_k, &target.kfeat, params.minkfreq as f32);
-        debug!("sqsim: {}", seqsim);
-        if seqsim < params.seqsim {
-            return PathScore::default();
-        }
+        let best_path = PathScore::default();
+        for (hap_parts, piece_pct) in target.partial_haplotypes() {
+            if path_size.signum() != hap_parts.size.signum() {
+                continue;
+            }
 
-        PathScore {
-            path,
-            sizesim,
-            seqsim,
-            coverage: None,
+            let sizesim = metrics::sizesim(path_size.unsigned_abs(), hap_parts.size.unsigned_abs());
+            debug!("szsim: {}", sizesim);
+            if sizesim < params.sizesim {
+                continue;
+            }
+
+            let seqsim = metrics::seqsim(&path_k, &target.kfeat, params.minkfreq as f32);
+            debug!("sqsim: {}", seqsim);
+            if seqsim < params.seqsim {
+                continue;
+            }
+
+            let cur_path = PathScore {
+                path,
+                sizesim,
+                seqsim,
+                coverage: None,
+            };
+            if cur_path > best_path {
+                best_path = cur_path;
+            }
         }
+        best_path
     }
 }
