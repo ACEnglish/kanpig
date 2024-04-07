@@ -57,8 +57,8 @@ impl PathScore {
     pub fn new(
         graph: &DiGraph<VarNode, ()>,
         path: Vec<NodeIndex>,
-        target: &Haplotype, // I can turn this into &Vec<Haplotype> instead of calling
-                            // partial_haplotypes everytime
+        targets: &Vec<Haplotype>,
+        target_size: i64,
         params: &KDParams,
     ) -> Self {
         let path_size: i64 = path
@@ -79,7 +79,7 @@ impl PathScore {
             );
 
         // Return the partials in order from all to least
-        for hap_parts in target.partial_haplotypes() {
+        for hap_parts in targets {
             if path_size.signum() != hap_parts.size.signum() {
                 continue;
             }
@@ -90,7 +90,7 @@ impl PathScore {
                 continue;
             }
 
-            let seqsim = metrics::seqsim(&path_k, &target.kfeat, params.minkfreq as f32);
+            let seqsim = metrics::seqsim(&path_k, &hap_parts.kfeat, params.minkfreq as f32);
             debug!("sqsim: {}", seqsim);
             if seqsim < params.seqsim {
                 continue;
@@ -102,7 +102,7 @@ impl PathScore {
                 sizesim,
                 seqsim,
                 coverage: None,
-                align_pct: (hap_parts.size.unsigned_abs() as f32 / target.size.unsigned_abs() as f32).abs()
+                align_pct: (hap_parts.size.unsigned_abs() as f32 / target_size.unsigned_abs() as f32).abs()
             };
         }
         PathScore::default()
