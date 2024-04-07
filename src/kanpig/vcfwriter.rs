@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use petgraph::graph::NodeIndex;
 
-use crate::kanpig::{metrics, PathScore};
+use crate::kanpig::{metrics, FiltFlags, PathScore};
 
 use noodles_vcf::{
     self as vcf,
@@ -177,35 +177,38 @@ impl VcfWriter {
             Some((path2.seqsim * 100.0) as i32),
         ]);
 
-        let mut filt: i32 = 0;
+        let mut filt = FiltFlags::PASS;
         // The genotype from AD doesn't match path genotype
         if gt_obs != gt_path {
-            filt += 1;
+            filt |= FiltFlags::GTMISMATCH;
         }
         if gq < 5.0 {
-            filt += 2;
+            filt |= FiltFlags::LOWGQ;
         }
         if coverage < 5 {
-            filt += 4;
+            filt |= FiltFlags::LOWCOV;
         }
         if gt_path != metrics::GTstate::Ref {
             if sq < 5.0 {
-                filt += 8;
+                filt |= FiltFlags::LOWSQ;
             }
             if alt_cov < 5.0 {
-                filt += 16;
+                filt |= FiltFlags::LOWALT;
             }
+        }
+        if (path1.align_pct != 1.0) || (path2.align_pct != 1.0) {
+            filt |= FiltFlags::PARTIAL;
         }
 
         *entry.genotypes_mut() = Genotypes::new(
             self.keys.clone(),
             vec![vec![
-                Some(Value::from(gt_str)),            // GT
-                Some(Value::from(filt)),              // FT
-                Some(Value::from(sq.round() as i32)), // SQ
-                Some(Value::from(gq.round() as i32)), // GQ
-                Some(Value::from(phase_group)),       // PG
-                Some(Value::from(coverage as i32)),   // DP
+                Some(Value::from(gt_str)),             // GT
+                Some(Value::from(filt.bits() as i32)), // FT
+                Some(Value::from(sq.round() as i32)),  // SQ
+                Some(Value::from(gq.round() as i32)),  // GQ
+                Some(Value::from(phase_group)),        // PG
+                Some(Value::from(coverage as i32)),    // DP
                 Some(ad),
                 Some(zs),
                 Some(ss),

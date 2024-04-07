@@ -4,11 +4,14 @@ pub use crate::kanpig::bamparser::BamParser;
 mod bedparser;
 pub use crate::kanpig::bedparser::BedParser;
 
-mod vcfreader;
-pub use crate::kanpig::vcfreader::VcfChunker;
-
 mod cli;
 pub use crate::kanpig::cli::{ArgParser, KDParams};
+
+mod cluster;
+pub use crate::kanpig::cluster::cluster_haplotypes;
+
+mod filter_flags;
+pub use crate::kanpig::filter_flags::FiltFlags;
 
 mod haplotype;
 pub use crate::kanpig::haplotype::Haplotype;
@@ -27,9 +30,6 @@ pub use crate::kanpig::pathscore::PathScore;
 mod pileup;
 pub use crate::kanpig::pileup::PileupVariant;
 
-mod cluster;
-pub use crate::kanpig::cluster::cluster_haplotypes;
-
 mod regions;
 pub use crate::kanpig::regions::{build_region_tree, Regions};
 
@@ -41,6 +41,9 @@ pub use crate::kanpig::vargraph::{VarNode, Variants};
 
 mod vcf_traits;
 pub use crate::kanpig::vcf_traits::{KdpVcf, Svtype};
+
+mod vcfreader;
+pub use crate::kanpig::vcfreader::VcfChunker;
 
 mod vcfwriter;
 pub use crate::kanpig::vcfwriter::VcfWriter;
