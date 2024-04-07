@@ -51,8 +51,13 @@ pub fn brute_force_find_path(
             }
         }) {
             if next_node == snk_node {
-                best_path =
-                    best_path.max(PathScore::new(graph, cur_path.path.clone(), &partial_haps, target.size, params));
+                best_path = best_path.max(PathScore::new(
+                    graph,
+                    cur_path.path.clone(),
+                    &partial_haps,
+                    target.size,
+                    params,
+                ));
                 debug!("best path {:?}", best_path);
                 npaths += 1;
             } else {
@@ -91,7 +96,13 @@ pub fn get_one_to_one(
     graph
         .node_indices()
         .filter_map(|target_node| {
-            let candidate = PathScore::new(graph, vec![target_node], vec![target.clone()].as_ref(), target.size, params);
+            let candidate = PathScore::new(
+                graph,
+                vec![target_node],
+                vec![target.clone()].as_ref(),
+                target.size,
+                params,
+            );
             if candidate.seqsim > 0.0 {
                 Some(candidate)
             } else {

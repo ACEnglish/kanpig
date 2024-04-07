@@ -8,34 +8,40 @@ pub struct PathScore {
     pub seqsim: f32,
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
-    pub align_pct: f32, // percent of the haplotype used 
+    pub align_pct: f32, // percent of the haplotype used
 }
 
 impl Eq for PathScore {}
 
 impl PartialEq for PathScore {
     fn eq(&self, other: &Self) -> bool {
-        self.align_pct == other.align_pct && self.sizesim == other.sizesim && self.seqsim == other.seqsim
+        self.align_pct == other.align_pct
+            && self.sizesim == other.sizesim
+            && self.seqsim == other.seqsim
     }
 }
 
 impl Ord for PathScore {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.align_pct.partial_cmp(&other.align_pct).unwrap_or(Ordering::Equal) {
+        match self
+            .align_pct
+            .partial_cmp(&other.align_pct)
+            .unwrap_or(Ordering::Equal)
+        {
             Ordering::Equal => match self
-                    .sizesim
-                    .partial_cmp(&other.sizesim)
-                    .unwrap_or(Ordering::Equal)
-                {
-                    Ordering::Equal => self
-                        .seqsim
-                        .partial_cmp(&other.seqsim)
-                        .unwrap_or(Ordering::Equal),
-                    other_ordering => other_ordering,
-                },
+                .sizesim
+                .partial_cmp(&other.sizesim)
+                .unwrap_or(Ordering::Equal)
+            {
+                Ordering::Equal => self
+                    .seqsim
+                    .partial_cmp(&other.seqsim)
+                    .unwrap_or(Ordering::Equal),
+                other_ordering => other_ordering,
+            },
             other_ordering => other_ordering,
-            }
         }
+    }
 }
 
 impl PartialOrd for PathScore {
@@ -105,7 +111,9 @@ impl PathScore {
                 sizesim,
                 seqsim,
                 coverage: None,
-                align_pct: (hap_parts.size.unsigned_abs() as f32 / target_size.unsigned_abs() as f32).abs()
+                align_pct: (hap_parts.size.unsigned_abs() as f32
+                    / target_size.unsigned_abs() as f32)
+                    .abs(),
             };
         }
         PathScore::default()

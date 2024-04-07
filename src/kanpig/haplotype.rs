@@ -1,7 +1,7 @@
 use crate::kanpig::seq_to_kmer;
+use itertools::Itertools;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter, Result};
-use itertools::Itertools;
 
 #[derive(Clone)]
 pub struct Haplotype {
@@ -31,7 +31,7 @@ impl Haplotype {
             n: 0,
             coverage,
             kfeat: mk.clone(),
-            parts: vec![]
+            parts: vec![],
         }
     }
 
@@ -56,7 +56,11 @@ impl Haplotype {
                 let mut cur_hap = Haplotype::blank(4, self.coverage);
                 for k in j.iter() {
                     cur_hap.size += k.0;
-                    cur_hap.kfeat.iter_mut().zip(k.1.iter()).for_each(|(x,y)| *x += y);
+                    cur_hap
+                        .kfeat
+                        .iter_mut()
+                        .zip(k.1.iter())
+                        .for_each(|(x, y)| *x += y);
                 }
                 ret.push(cur_hap);
             }
