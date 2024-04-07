@@ -19,7 +19,7 @@ pub struct PathNodeState {
 /// Search stops after maxpaths have been checked
 /// Assumes NodeIndex 0 is src node and NodeIndex -1 is snk
 /// Returns a PathScore
-pub fn brute_force_find_path(
+pub fn orig_brute_force_find_path(
     graph: &DiGraph<VarNode, ()>,
     target: &Haplotype,
     params: &KDParams,
@@ -133,7 +133,7 @@ pub fn prune_graph(
 /// Search stops after maxpaths have been checked
 /// Assumes NodeIndex 0 is src node and NodeIndex -1 is snk
 /// Returns a PathScore
-pub fn dp_brute_force_find_path(
+pub fn brute_force_find_path(
     graph: &DiGraph<VarNode, ()>,
     target: &Haplotype,
     params: &KDParams,
