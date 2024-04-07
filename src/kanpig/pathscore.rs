@@ -78,8 +78,8 @@ impl PathScore {
                 },
             );
 
-        let best_path = PathScore::default();
-        for (hap_parts, piece_pct) in target.partial_haplotypes() {
+        // Return the partials in order from all to least
+        for hap_parts in target.partial_haplotypes() {
             if path_size.signum() != hap_parts.size.signum() {
                 continue;
             }
@@ -95,17 +95,16 @@ impl PathScore {
             if seqsim < params.seqsim {
                 continue;
             }
-
-            let cur_path = PathScore {
+            // Stop on the first one that matches
+            // This has weird tying implications, I think
+            return PathScore {
                 path,
                 sizesim,
                 seqsim,
                 coverage: None,
+                align_pct: (hap_parts.size.unsigned_abs() as f32 / target.size.unsigned_abs() as f32).abs()
             };
-            if cur_path > best_path {
-                best_path = cur_path;
-            }
         }
-        best_path
+        PathScore::default()
     }
 }
