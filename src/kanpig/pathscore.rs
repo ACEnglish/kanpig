@@ -15,24 +15,27 @@ impl Eq for PathScore {}
 
 impl PartialEq for PathScore {
     fn eq(&self, other: &Self) -> bool {
-        self.sizesim == other.sizesim && self.seqsim == other.seqsim
+        self.align_pct == other.align_pct && self.sizesim == other.sizesim && self.seqsim == other.seqsim
     }
 }
 
 impl Ord for PathScore {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self
-            .sizesim
-            .partial_cmp(&other.sizesim)
-            .unwrap_or(Ordering::Equal)
-        {
-            Ordering::Equal => self
-                .seqsim
-                .partial_cmp(&other.seqsim)
-                .unwrap_or(Ordering::Equal),
+        match self.align_pct.partial_cmp(&other.align_pct).unwrap_or(Ordering::Equal) {
+            Ordering::Equal => match self
+                    .sizesim
+                    .partial_cmp(&other.sizesim)
+                    .unwrap_or(Ordering::Equal)
+                {
+                    Ordering::Equal => self
+                        .seqsim
+                        .partial_cmp(&other.seqsim)
+                        .unwrap_or(Ordering::Equal),
+                    other_ordering => other_ordering,
+                },
             other_ordering => other_ordering,
+            }
         }
-    }
 }
 
 impl PartialOrd for PathScore {
