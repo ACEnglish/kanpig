@@ -107,7 +107,7 @@ pub struct KDParams {
     pub mapflag: u16,
 
     /// Don't require alignments to span vargraph region
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = true)]
     pub spanoff: bool,
 }
 

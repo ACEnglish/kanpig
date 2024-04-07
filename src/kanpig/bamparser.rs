@@ -71,7 +71,7 @@ impl BamParser {
                     || alignment.record().mapq() < self.params.mapq
                     || (alignment.record().flags() & self.params.mapflag) != 0
                     || (self.params.spanoff
-                        || !((alignment.record().reference_start() as u64) < start
+                        && !((alignment.record().reference_start() as u64) < start
                             && (alignment.record().reference_end() as u64) > end))
                 {
                     continue;
