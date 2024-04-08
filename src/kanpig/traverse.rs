@@ -34,6 +34,7 @@ pub fn brute_force_find_path(
     let mut stack: Vec<PathNodeState> = vec![start_path];
     let mut best_path = PathScore::default();
     let mut npaths = 0;
+    let partial_haps = target.partial_haplotypes();
     let snk_node = NodeIndex::new(graph.node_count() - 1);
 
     while let Some(cur_path) = stack.pop() {
@@ -50,8 +51,13 @@ pub fn brute_force_find_path(
             }
         }) {
             if next_node == snk_node {
-                best_path =
-                    best_path.max(PathScore::new(graph, cur_path.path.clone(), target, params));
+                best_path = best_path.max(PathScore::new(
+                    graph,
+                    cur_path.path.clone(),
+                    &partial_haps,
+                    target.size,
+                    params,
+                ));
                 debug!("best path {:?}", best_path);
                 npaths += 1;
             } else {
@@ -90,7 +96,13 @@ pub fn get_one_to_one(
     graph
         .node_indices()
         .filter_map(|target_node| {
-            let candidate = PathScore::new(graph, vec![target_node], target, params);
+            let candidate = PathScore::new(
+                graph,
+                vec![target_node],
+                vec![target.clone()].as_ref(),
+                target.size,
+                params,
+            );
             if candidate.seqsim > 0.0 {
                 Some(candidate)
             } else {

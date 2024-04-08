@@ -1,4 +1,5 @@
 use crate::kanpig::seq_to_kmer;
+use itertools::Itertools;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter, Result};
 
@@ -8,6 +9,7 @@ pub struct Haplotype {
     pub n: u64,
     pub coverage: u64,
     pub kfeat: Vec<f32>,
+    pub parts: Vec<(i64, Vec<f32>)>,
 }
 
 impl Haplotype {
@@ -16,17 +18,20 @@ impl Haplotype {
             size,
             n,
             coverage,
-            kfeat,
+            kfeat: kfeat.clone(),
+            parts: vec![(size, kfeat)],
         }
     }
 
     // Create an empty haplotype
     pub fn blank(kmer: u8, coverage: u64) -> Haplotype {
+        let mk = seq_to_kmer(&[], kmer, false);
         Haplotype {
             size: 0,
             n: 0,
             coverage,
-            kfeat: seq_to_kmer(&[], kmer, false),
+            kfeat: mk.clone(),
+            parts: vec![],
         }
     }
 
@@ -41,6 +46,26 @@ impl Haplotype {
             .for_each(|(x, y)| *x += y);
         self.size += other.size;
         self.n += 1;
+        self.parts.push((other.size, other.kfeat.clone()));
+    }
+
+    pub fn partial_haplotypes(&self) -> Vec<Haplotype> {
+        let mut ret = vec![];
+        for i in (1..=self.parts.len()).rev() {
+            for j in self.parts.iter().combinations(i) {
+                let mut cur_hap = Haplotype::blank(4, self.coverage);
+                for k in j.iter() {
+                    cur_hap.size += k.0;
+                    cur_hap
+                        .kfeat
+                        .iter_mut()
+                        .zip(k.1.iter())
+                        .for_each(|(x, y)| *x += y);
+                }
+                ret.push(cur_hap);
+            }
+        }
+        ret
     }
 }
 

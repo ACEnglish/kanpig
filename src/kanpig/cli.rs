@@ -107,7 +107,7 @@ pub struct KDParams {
     pub mapflag: u16,
 
     /// Don't require alignments to span vargraph region
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = true)]
     pub spanoff: bool,
 }
 
@@ -119,21 +119,33 @@ impl ArgParser {
         if !self.io.input.exists() {
             error!("--input does not exist");
             is_ok = false;
+        } else if !self.io.input.is_file() {
+            error!("--input is not a file");
+            is_ok = false;
         }
 
         if !self.io.bam.exists() {
             error!("--bam does not exist");
+            is_ok = false;
+        } else if !self.io.bam.is_file() {
+            error!("--bam is not a file");
             is_ok = false;
         }
 
         if !self.io.reference.exists() {
             error!("--reference does not exist");
             is_ok = false;
+        } else if !self.io.reference.is_file() {
+            error!("--reference is not a file");
+            is_ok = false;
         }
 
         if let Some(bed_file) = &self.io.bed {
             if !bed_file.exists() {
                 error!("--bed does not exist");
+                is_ok = false;
+            } else if !bed_file.is_file() {
+                error!("--bed is not a file");
                 is_ok = false;
             }
         }

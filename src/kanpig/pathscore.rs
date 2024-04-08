@@ -8,27 +8,37 @@ pub struct PathScore {
     pub seqsim: f32,
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
+    pub align_pct: f32, // percent of the haplotype used
 }
 
 impl Eq for PathScore {}
 
 impl PartialEq for PathScore {
     fn eq(&self, other: &Self) -> bool {
-        self.sizesim == other.sizesim && self.seqsim == other.seqsim
+        self.align_pct == other.align_pct
+            && self.sizesim == other.sizesim
+            && self.seqsim == other.seqsim
     }
 }
 
 impl Ord for PathScore {
     fn cmp(&self, other: &Self) -> Ordering {
         match self
-            .sizesim
-            .partial_cmp(&other.sizesim)
+            .align_pct
+            .partial_cmp(&other.align_pct)
             .unwrap_or(Ordering::Equal)
         {
-            Ordering::Equal => self
-                .seqsim
-                .partial_cmp(&other.seqsim)
-                .unwrap_or(Ordering::Equal),
+            Ordering::Equal => match self
+                .sizesim
+                .partial_cmp(&other.sizesim)
+                .unwrap_or(Ordering::Equal)
+            {
+                Ordering::Equal => self
+                    .seqsim
+                    .partial_cmp(&other.seqsim)
+                    .unwrap_or(Ordering::Equal),
+                other_ordering => other_ordering,
+            },
             other_ordering => other_ordering,
         }
     }
@@ -47,6 +57,7 @@ impl Default for PathScore {
             sizesim: 0.0,
             seqsim: 0.0,
             coverage: None,
+            align_pct: 0.0,
         }
     }
 }
@@ -55,7 +66,8 @@ impl PathScore {
     pub fn new(
         graph: &DiGraph<VarNode, ()>,
         path: Vec<NodeIndex>,
-        target: &Haplotype,
+        targets: &Vec<Haplotype>,
+        target_size: i64,
         params: &KDParams,
     ) -> Self {
         let path_size: i64 = path
@@ -63,16 +75,6 @@ impl PathScore {
             .filter_map(|&node_index| graph.node_weight(node_index))
             .map(|x| x.size)
             .sum();
-
-        if path_size.signum() != target.size.signum() {
-            return PathScore::default();
-        }
-
-        let sizesim = metrics::sizesim(path_size.unsigned_abs(), target.size.unsigned_abs());
-        debug!("szsim: {}", sizesim);
-        if sizesim < params.sizesim {
-            return PathScore::default();
-        }
 
         let path_k: Vec<f32> = path
             .iter()
@@ -85,17 +87,35 @@ impl PathScore {
                 },
             );
 
-        let seqsim = metrics::seqsim(&path_k, &target.kfeat, params.minkfreq as f32);
-        debug!("sqsim: {}", seqsim);
-        if seqsim < params.seqsim {
-            return PathScore::default();
-        }
+        // Return the partials in order from all to least
+        for hap_parts in targets {
+            if path_size.signum() != hap_parts.size.signum() {
+                continue;
+            }
 
-        PathScore {
-            path,
-            sizesim,
-            seqsim,
-            coverage: None,
+            let sizesim = metrics::sizesim(path_size.unsigned_abs(), hap_parts.size.unsigned_abs());
+            debug!("szsim: {}", sizesim);
+            if sizesim < params.sizesim {
+                continue;
+            }
+
+            let seqsim = metrics::seqsim(&path_k, &hap_parts.kfeat, params.minkfreq as f32);
+            debug!("sqsim: {}", seqsim);
+            if seqsim < params.seqsim {
+                continue;
+            }
+            // Stop on the first one that matches
+            // This has weird tying implications, I think
+            return PathScore {
+                path,
+                sizesim,
+                seqsim,
+                coverage: None,
+                align_pct: (hap_parts.size.unsigned_abs() as f32
+                    / target_size.unsigned_abs() as f32)
+                    .abs(),
+            };
         }
+        PathScore::default()
     }
 }
