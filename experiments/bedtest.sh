@@ -7,6 +7,7 @@ create() {
         --input test_rs/test2.vcf.gz \
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
+        --sizemin 20 \
         --sizesim 0.95 --seqsim 0.90 --threads 4 \
         --maxpaths 5000 --mapq 5 \
         -o test_rs/hc.vcf --bed $bed 

@@ -33,7 +33,7 @@ impl BedParser {
     pub fn parse(&mut self) -> Vec<(String, u64, u64)> {
         if let Ok(lines) = read_lines(&mut self.file) {
             lines
-                .flatten()
+                .map_while(Result::ok)
                 .map(|line| {
                     let collection: Vec<&str> = line.split('\t').collect();
                     if collection.len() < 3 {
