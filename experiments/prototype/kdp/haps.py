@@ -46,8 +46,8 @@ class Haplotype():
         """
         Turn variant record into a kfeat
         """
-        alt = kdp.seq_to_kmer(entry.alts[0], kmer)
-        ref = kdp.seq_to_kmer(entry.ref, kmer)
+        alt = kdp.seq_to_kmer(entry.alts[0][1:], kmer)
+        ref = kdp.seq_to_kmer(entry.ref[1:], kmer)
         szdiff = len(entry.alts[0]) - len(entry.ref)
         return Haplotype(alt - ref, szdiff, 1)
 
