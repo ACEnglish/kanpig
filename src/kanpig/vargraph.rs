@@ -139,20 +139,24 @@ impl Variants {
                 ..Default::default()
             }
         } else {
-            let partial_matches = get_one_to_one(&self.graph, hap, params);
-
-            let skip_edges = if params.no_prune {
-                vec![]
+            let partial_matches = if params.prune || params.try_exact {
+                get_one_to_one(&self.graph, hap, params)
             } else {
+                vec![]
+            };
+
+            let skip_edges = if params.prune {
                 prune_graph(
                     &self.graph,
                     &partial_matches,
                     &self.node_indices[0],
                     self.node_indices.last().unwrap(),
                 )
+            } else {
+                vec![]
             };
 
-            if params.try_exact && !partial_matches.is_empty() {
+            if params.try_exact {
                 let mut ret = partial_matches.iter().max().cloned().unwrap();
                 ret.coverage = Some(hap.coverage);
                 ret
