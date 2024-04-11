@@ -49,11 +49,22 @@ impl Haplotype {
         self.parts.push((other.size, other.kfeat.clone()));
     }
 
-    pub fn partial_haplotypes(&self) -> Vec<Haplotype> {
+    pub fn partial_haplotypes(&self, kmer: u8) -> Vec<Haplotype> {
+        // Consider putting these as parameters. But really we just need smarter clustering
+        let max_fns = 3; // Most number of false-negatives we'll attempt to apply to the graph
+        let max_parts = 500; // Most number of pileups we'll even attempt to split
+                             // If its more than this, we can't evaluate the region reasonably,
+                             // anyway.
         let mut ret = vec![];
-        for i in (1..=self.parts.len()).rev() {
+        let m_len = self.parts.len();
+        if m_len >= max_parts {
+            ret.push(self.clone());
+            return ret;
+        }
+        let lower = if m_len <= max_fns { 1 } else {m_len - max_fns};
+        for i in (lower..=m_len).rev() {
             for j in self.parts.iter().combinations(i) {
-                let mut cur_hap = Haplotype::blank(4, self.coverage);
+                let mut cur_hap = Haplotype::blank(kmer, self.coverage);
                 for k in j.iter() {
                     cur_hap.size += k.0;
                     cur_hap
