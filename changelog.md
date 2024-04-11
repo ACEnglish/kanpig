@@ -1,7 +1,10 @@
-v0.2.0
+v0.1.1
 *in progress*
 
 * The `--no-prune` flag has been changed to `--prune` since not pruning is a better default.
+* Partial haplotypes now only allow up to 3 false negatives for regions with fewer than 500 pileups. More than 500 do
+  not attempt partials.
+* Partial haplotypes now respect the `--kmer` option.
 
 v0.1.0
 *Apr 9, 2024*
