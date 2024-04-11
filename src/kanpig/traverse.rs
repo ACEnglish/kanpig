@@ -34,7 +34,7 @@ pub fn brute_force_find_path(
     let mut stack: Vec<PathNodeState> = vec![start_path];
     let mut best_path = PathScore::default();
     let mut npaths = 0;
-    let partial_haps = target.partial_haplotypes();
+    let partial_haps = target.partial_haplotypes(params.kmer);
     let snk_node = NodeIndex::new(graph.node_count() - 1);
 
     while let Some(cur_path) = stack.pop() {
