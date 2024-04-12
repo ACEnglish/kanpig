@@ -11,12 +11,12 @@ use std::thread;
 mod kanpig;
 
 use kanpig::{
-    build_region_tree, cluster_haplotypes, ArgParser, BamParser, PathScore, Variants, VcfChunker,
-    VcfWriter,
+    build_region_tree, cluster_haplotypes, ArgParser, BamParser, GenotypeAnno, Variants,
+    VcfChunker, VcfWriter,
 };
 
 type InputType = (ArgParser, Vec<vcf::Record>);
-type OutputType = (Variants, PathScore, PathScore, u64);
+type OutputType = Vec<GenotypeAnno>;
 
 fn main() {
     let args = ArgParser::parse();
@@ -65,7 +65,7 @@ fn main() {
         let result_sender = result_sender.clone();
         thread::spawn(move || {
             for (m_args, chunk) in receiver.into_iter().flatten() {
-                let m_graph = Variants::new(chunk, m_args.kd.kmer);
+                let mut m_graph = Variants::new(chunk, m_args.kd.kmer);
                 let mut m_bam =
                     BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
@@ -74,8 +74,9 @@ fn main() {
                 debug!("Hap2 out {:?}", h2);
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
                 let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
-
-                result_sender.send((m_graph, p1, p2, coverage)).unwrap();
+                result_sender
+                    .send(m_graph.to_annotated(&p1, &p2, coverage))
+                    .unwrap();
             }
         });
     }
@@ -111,16 +112,9 @@ fn main() {
         select! {
             recv(result_receiver) -> result => {
                 match result {
-                    Ok((m_graph, p1, p2, coverage)) => {
-                        debug!("{:?}", m_graph);
-                        for var_idx in m_graph.node_indices {
-                            let cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
-                                Some(var) => var.clone(),
-                                None => {
-                                    continue;
-                                }
-                            };
-                            writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage, phase_group);
+                    Ok(annotated_entries) => {
+                        for entry in annotated_entries {
+                            writer.anno_write(entry, phase_group);
                         }
                         phase_group += 1;
                         pbar.inc(1);

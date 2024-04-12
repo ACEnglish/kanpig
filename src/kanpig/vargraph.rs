@@ -1,6 +1,6 @@
 use crate::kanpig::traverse::{get_one_to_one, prune_graph};
 use crate::kanpig::{
-    brute_force_find_path, metrics::overlaps, Haplotype, KDParams, KdpVcf, PathScore,
+    brute_force_find_path, metrics::overlaps, GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore,
 };
 use itertools::Itertools;
 use noodles_vcf::{self as vcf};
@@ -166,5 +166,27 @@ impl Variants {
                 ret
             }
         }
+    }
+
+    /// Transform the graph back into annotated variants
+    /// This destroys the internal graph
+    pub fn to_annotated(
+        &mut self,
+        path1: &PathScore,
+        path2: &PathScore,
+        coverage: u64,
+    ) -> Vec<GenotypeAnno> {
+        self.node_indices
+            .iter()
+            .filter_map(|var_idx| match self.graph.remove_node(*var_idx) {
+                Some(cur_var) => match cur_var.entry {
+                    Some(entry) => {
+                        Some(GenotypeAnno::new(entry, &var_idx, path1, path2, coverage))
+                    }
+                    None => None,
+                },
+                None => None,
+            })
+            .collect::<Vec<GenotypeAnno>>()
     }
 }

@@ -11,7 +11,7 @@ mod cluster;
 pub use crate::kanpig::cluster::cluster_haplotypes;
 
 mod filter_flags;
-pub use crate::kanpig::filter_flags::FiltFlags;
+pub use crate::kanpig::filter_flags::GenotypeAnno;
 
 mod haplotype;
 pub use crate::kanpig::haplotype::Haplotype;

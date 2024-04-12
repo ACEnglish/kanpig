@@ -1,4 +1,9 @@
+use crate::kanpig::{metrics, PathScore};
 use bitflags::bitflags;
+
+use petgraph::graph::NodeIndex;
+
+use noodles_vcf::{self as vcf, record::genotypes::sample::Value};
 
 bitflags! {
     pub struct FiltFlags: u32 {
@@ -9,5 +14,111 @@ bitflags! {
         const LOWSQ      = 0x8;  // sample quality below below 5 (only on non-ref genotypes)
         const LOWALT     = 0x16; // alt coverage below 5 (only on non-ref genotypes)
         const PARTIAL    = 0x32; // best scoring path only used part of the haplotype
+    }
+}
+
+//Format Integer Type Number = G
+type IntG = Vec<Option<i32>>;
+pub struct GenotypeAnno {
+    pub entry: vcf::Record,
+    pub gt: String,
+    pub filt: FiltFlags,
+    pub sq: i32,
+    pub gq: i32,
+    pub dp: i32,
+    pub ad: IntG,
+    pub zs: IntG,
+    pub ss: IntG,
+}
+
+impl GenotypeAnno {
+    pub fn new(
+        entry: vcf::Record,
+        var_idx: &NodeIndex,
+        path1: &PathScore,
+        path2: &PathScore,
+        coverage: u64,
+    ) -> Self {
+        let (gt_str, gt_path, alt_cov) =
+            match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
+                (true, true) if path1 != path2 => (
+                    "1|1",
+                    metrics::GTstate::Hom,
+                    (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+                ),
+                // sometimes I used the same path twice
+                (true, true) => ("1|1", metrics::GTstate::Hom, path1.coverage.unwrap() as f64),
+                (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
+                (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
+                (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
+                (false, false) => ("./.", metrics::GTstate::Ref, 0.0),
+            };
+
+        let ref_cov = (coverage as f64) - alt_cov;
+        let gt_obs = metrics::genotyper(ref_cov, alt_cov);
+        // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
+        let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
+
+        let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
+
+        let zs = vec![
+            Some((path1.sizesim * 100.0) as i32),
+            Some((path2.sizesim * 100.0) as i32),
+        ];
+
+        let ss = vec![
+            Some((path1.seqsim * 100.0) as i32),
+            Some((path2.seqsim * 100.0) as i32),
+        ];
+
+        let mut filt = FiltFlags::PASS;
+        // The genotype from AD doesn't match path genotype
+        if gt_obs != gt_path {
+            filt |= FiltFlags::GTMISMATCH;
+        }
+        if gq < 5.0 {
+            filt |= FiltFlags::LOWGQ;
+        }
+        if coverage < 5 {
+            filt |= FiltFlags::LOWCOV;
+        }
+        if gt_path != metrics::GTstate::Ref {
+            if sq < 5.0 {
+                filt |= FiltFlags::LOWSQ;
+            }
+            if alt_cov < 5.0 {
+                filt |= FiltFlags::LOWALT;
+            }
+        }
+        if (path1.align_pct != 1.0) || (path2.align_pct != 1.0) {
+            filt |= FiltFlags::PARTIAL;
+        }
+
+        GenotypeAnno {
+            entry,
+            gt: gt_str.to_string(),
+            filt,
+            sq: sq.round() as i32,
+            gq: gq.round() as i32,
+            dp: coverage as i32,
+            ad,
+            zs,
+            ss,
+        }
+    }
+
+    // These are tied to VcfWriter.keys
+    pub fn make_fields(&self, phase_group: i32) -> Vec<Option<Value>> {
+        vec![
+            Some(Value::from(self.gt.clone())),
+            Some(Value::from(self.filt.bits() as i32)),
+            Some(Value::from(self.sq.clone())),
+            Some(Value::from(self.gq.clone())),
+            Some(Value::from(phase_group)),
+            Some(Value::from(self.dp.clone())),
+            Some(Value::from(self.ad.clone())),
+            Some(Value::from(self.zs.clone())),
+            Some(Value::from(self.ss.clone())),
+        ]
     }
 }
