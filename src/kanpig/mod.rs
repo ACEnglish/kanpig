@@ -10,8 +10,8 @@ pub use crate::kanpig::cli::{ArgParser, KDParams};
 mod cluster;
 pub use crate::kanpig::cluster::cluster_haplotypes;
 
-mod filter_flags;
-pub use crate::kanpig::filter_flags::GenotypeAnno;
+mod annotator;
+pub use crate::kanpig::annotator::GenotypeAnno;
 
 mod haplotype;
 pub use crate::kanpig::haplotype::Haplotype;

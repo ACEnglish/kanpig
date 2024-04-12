@@ -112,10 +112,10 @@ impl GenotypeAnno {
         vec![
             Some(Value::from(self.gt.clone())),
             Some(Value::from(self.filt.bits() as i32)),
-            Some(Value::from(self.sq.clone())),
-            Some(Value::from(self.gq.clone())),
+            Some(Value::from(self.sq)),
+            Some(Value::from(self.gq)),
             Some(Value::from(phase_group)),
-            Some(Value::from(self.dp.clone())),
+            Some(Value::from(self.dp)),
             Some(Value::from(self.ad.clone())),
             Some(Value::from(self.zs.clone())),
             Some(Value::from(self.ss.clone())),
