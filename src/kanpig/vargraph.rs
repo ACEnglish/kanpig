@@ -178,9 +178,11 @@ impl Variants {
     ) -> Vec<GenotypeAnno> {
         self.node_indices
             .iter()
-            .filter_map(|var_idx| match self.graph.remove_node(*var_idx) {
-                Some(cur_var) => cur_var.entry.map(|entry| GenotypeAnno::new(entry, var_idx, path1, path2, coverage)),
-                None => None,
+            .filter_map(|&var_idx| {
+                self.graph.remove_node(var_idx).map(|cur_var| (cur_var, var_idx))
+            })
+            .filter_map(|(cur_var, var_idx)| {
+                cur_var.entry.map(|entry| GenotypeAnno::new(entry, &var_idx, path1, path2, coverage))
             })
             .collect::<Vec<GenotypeAnno>>()
     }
