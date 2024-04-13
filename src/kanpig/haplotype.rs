@@ -61,7 +61,7 @@ impl Haplotype {
             ret.push(self.clone());
             return ret;
         }
-        let lower = if m_len <= max_fns { 1 } else {m_len - max_fns};
+        let lower = if m_len <= max_fns { 1 } else { m_len - max_fns };
         for i in (lower..=m_len).rev() {
             for j in self.parts.iter().combinations(i) {
                 let mut cur_hap = Haplotype::blank(kmer, self.coverage);
