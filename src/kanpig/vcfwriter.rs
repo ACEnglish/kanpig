@@ -123,7 +123,10 @@ impl VcfWriter {
         all_formats.insert(ssid, ssfmt);
 
         // Ready to make files
-        let out_buf = BufWriter::new(File::create(out_path).expect("Error Creating Output File"));
+        let out_buf = BufWriter::with_capacity(
+            page_size::get() * 1000,
+            File::create(out_path).expect("Error Creating Output File"),
+        );
         let mut writer = vcf::Writer::new(out_buf);
         let _ = writer.write_header(&header);
 

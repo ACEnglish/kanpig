@@ -169,8 +169,7 @@ impl Variants {
     }
 
     /// Transform the graph back into annotated variants
-    /// This destroys the internal graph
-    pub fn to_annotated(
+    pub fn get_annotated(
         &mut self,
         path1: &PathScore,
         path2: &PathScore,
@@ -179,10 +178,12 @@ impl Variants {
         self.node_indices
             .iter()
             .filter_map(|&var_idx| {
-                self.graph.remove_node(var_idx).map(|cur_var| (cur_var, var_idx))
+                self.graph
+                    .node_weight(var_idx)
+                    .map(|cur_var| (cur_var.entry.clone(), var_idx))
             })
-            .filter_map(|(cur_var, var_idx)| {
-                cur_var.entry.map(|entry| GenotypeAnno::new(entry, &var_idx, path1, path2, coverage))
+            .filter_map(|(entry, var_idx)| {
+                entry.map(|entry| GenotypeAnno::new(entry, &var_idx, path1, path2, coverage))
             })
             .collect::<Vec<GenotypeAnno>>()
     }
