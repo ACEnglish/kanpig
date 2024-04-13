@@ -1,7 +1,9 @@
 v0.1.2
 *in progress*
+
 * IO improvements: Off-loaded annotation work from the single writer thread to the worker threads and using a large
   multiple of page size for the BufWriter capacity
+* Improved logging info
 
 v0.1.1
 *Apr 11, 2024*

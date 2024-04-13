@@ -1,4 +1,4 @@
-use crate::kanpig::seq_to_kmer;
+use crate::kplib::seq_to_kmer;
 use itertools::Itertools;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter, Result};

@@ -5,7 +5,7 @@ use petgraph::visit::{Dfs, EdgeRef};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-use crate::kanpig::{Haplotype, KDParams, PathScore, VarNode};
+use crate::kplib::{Haplotype, KDParams, PathScore, VarNode};
 
 #[derive(Clone)]
 pub struct PathNodeState {

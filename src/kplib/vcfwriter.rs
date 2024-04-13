@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 
-use crate::kanpig::GenotypeAnno;
+use crate::kplib::{metrics::GTstate, GenotypeAnno};
 
 use noodles_vcf::{
     self as vcf,
@@ -15,6 +16,7 @@ pub struct VcfWriter {
     writer: vcf::Writer<BufWriter<File>>,
     header: vcf::Header,
     keys: Keys,
+    pub gtcounts: HashMap<GTstate, usize>,
 }
 
 impl VcfWriter {
@@ -134,10 +136,12 @@ impl VcfWriter {
             writer,
             header,
             keys,
+            gtcounts: HashMap::new(),
         }
     }
 
     pub fn anno_write(&mut self, mut annot: GenotypeAnno, phase_group: i32) {
+        *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
         *annot.entry.genotypes_mut() =
             Genotypes::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
 
@@ -151,6 +155,7 @@ impl VcfWriter {
                 Some(Value::from("./.")), // GT
             ]],
         );
+        *self.gtcounts.entry(GTstate::Non).or_insert(0) += 1;
         let _result = self.writer.write_record(&self.header, &entry);
     }
 }

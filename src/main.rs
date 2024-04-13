@@ -8,9 +8,9 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
 use std::thread;
-mod kanpig;
+mod kplib;
 
-use kanpig::{
+use kplib::{
     build_region_tree, cluster_haplotypes, ArgParser, BamParser, GenotypeAnno, Variants,
     VcfChunker, VcfWriter,
 };
@@ -99,7 +99,7 @@ fn main() {
 
     info!("collecting output");
     let sty =
-        ProgressStyle::with_template(" [{elapsed_precise}] {bar:45.cyan/blue} > {pos:>7}/{len:7}")
+        ProgressStyle::with_template(" [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed")
             .unwrap()
             .progress_chars("##-");
     let pbar = ProgressBar::new(num_chunks);
@@ -129,6 +129,6 @@ fn main() {
         }
     }
     pbar.finish();
-
+    info!("genotype counts: {:#?}", writer.gtcounts);
     info!("finished");
 }

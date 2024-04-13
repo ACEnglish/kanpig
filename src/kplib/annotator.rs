@@ -1,4 +1,4 @@
-use crate::kanpig::{metrics, PathScore};
+use crate::kplib::{metrics, PathScore};
 use bitflags::bitflags;
 
 use petgraph::graph::NodeIndex;
@@ -29,6 +29,7 @@ pub struct GenotypeAnno {
     pub ad: IntG,
     pub zs: IntG,
     pub ss: IntG,
+    pub gt_state: metrics::GTstate,
 }
 
 impl GenotypeAnno {
@@ -51,7 +52,7 @@ impl GenotypeAnno {
                 (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
                 (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
                 (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
-                (false, false) => ("./.", metrics::GTstate::Ref, 0.0),
+                (false, false) => ("./.", metrics::GTstate::Non, 0.0),
             };
 
         let ref_cov = (coverage as f64) - alt_cov;
@@ -104,6 +105,7 @@ impl GenotypeAnno {
             ad,
             zs,
             ss,
+            gt_state: gt_path,
         }
     }
 

@@ -1,4 +1,4 @@
-use crate::kanpig::{kmeans, metrics, Haplotype, KDParams};
+use crate::kplib::{kmeans, metrics, Haplotype, KDParams};
 
 /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
 /// This is 'actually' the genotyper. Whatever come out of here is mapped to the variants

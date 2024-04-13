@@ -1,5 +1,5 @@
 /// A pileup variant that's hashable / comparable
-use crate::kanpig::Svtype;
+use crate::kplib::Svtype;
 use rust_htslib::bam::pileup::{Alignment, Indel};
 use std::hash::{Hash, Hasher};
 

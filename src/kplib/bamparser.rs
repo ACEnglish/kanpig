@@ -1,4 +1,4 @@
-use crate::kanpig::{seq_to_kmer, Haplotype, KDParams, PileupVariant, Svtype};
+use crate::kplib::{seq_to_kmer, Haplotype, KDParams, PileupVariant, Svtype};
 use indexmap::IndexMap;
 use rust_htslib::{
     bam::ext::BamRecordExtensions,

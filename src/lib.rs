@@ -1,10 +1,10 @@
 #[macro_use]
 extern crate log;
 
-mod kanpig;
+mod kplib;
 pub use self::{
-    kanpig::brute_force_find_path, kanpig::build_region_tree, kanpig::cluster_haplotypes,
-    kanpig::kmeans, kanpig::seq_to_kmer, kanpig::ArgParser, kanpig::BamParser, kanpig::BedParser,
-    kanpig::Haplotype, kanpig::KDParams, kanpig::KdpVcf, kanpig::PathScore, kanpig::Regions,
-    kanpig::Svtype, kanpig::VarNode, kanpig::Variants, kanpig::VcfChunker, kanpig::VcfWriter,
+    kplib::brute_force_find_path, kplib::build_region_tree, kplib::cluster_haplotypes,
+    kplib::kmeans, kplib::seq_to_kmer, kplib::ArgParser, kplib::BamParser, kplib::BedParser,
+    kplib::Haplotype, kplib::KDParams, kplib::KdpVcf, kplib::PathScore, kplib::Regions,
+    kplib::Svtype, kplib::VarNode, kplib::Variants, kplib::VcfChunker, kplib::VcfWriter,
 };

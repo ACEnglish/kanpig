@@ -1,5 +1,5 @@
-use crate::kanpig::traverse::{get_one_to_one, prune_graph};
-use crate::kanpig::{
+use crate::kplib::traverse::{get_one_to_one, prune_graph};
+use crate::kplib::{
     brute_force_find_path, metrics::overlaps, GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore,
 };
 use itertools::Itertools;
