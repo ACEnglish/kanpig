@@ -73,7 +73,7 @@ fn main() {
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
                 let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
                 result_sender
-                    .send(m_graph.get_annotated(&p1, &p2, coverage))
+                    .send(m_graph.take_annotated(&p1, &p2, coverage))
                     .unwrap();
             }
         });

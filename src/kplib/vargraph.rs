@@ -169,7 +169,29 @@ impl Variants {
     }
 
     /// Transform the graph back into annotated variants
-    pub fn get_annotated(
+    /// Note that this will take the entries out of the graph's VarNodes
+    pub fn take_annotated(
+        &mut self,
+        path1: &PathScore,
+        path2: &PathScore,
+        coverage: u64,
+    ) -> Vec<GenotypeAnno> {
+        self.node_indices
+            .iter_mut()
+            .filter_map(|var_idx| {
+                self.graph
+                    .node_weight_mut(*var_idx)
+                    .map(|cur_var| (cur_var.entry.take(), var_idx))
+            })
+            .filter_map(|(entry, var_idx)| {
+                entry.map(|m_entry| GenotypeAnno::new(m_entry, var_idx, path1, path2, coverage))
+            })
+            .collect::<Vec<GenotypeAnno>>()
+    }
+
+    /// Transform the graph back into annotated variants
+    /// Note that this will clone the entries from the graph's VarNodes
+    pub fn __clone_annotated(
         &mut self,
         path1: &PathScore,
         path2: &PathScore,
