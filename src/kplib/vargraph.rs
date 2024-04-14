@@ -181,10 +181,10 @@ impl Variants {
             .filter_map(|var_idx| {
                 self.graph
                     .node_weight_mut(*var_idx)
-                    .map(|cur_var| (cur_var.entry.take(), var_idx))
-            })
-            .filter_map(|(entry, var_idx)| {
-                entry.map(|m_entry| GenotypeAnno::new(m_entry, var_idx, path1, path2, coverage))
+                    .unwrap()
+                    .entry
+                    .take()
+                    .map(|entry| GenotypeAnno::new(entry, var_idx, path1, path2, coverage))
             })
             .collect::<Vec<GenotypeAnno>>()
     }
@@ -202,10 +202,10 @@ impl Variants {
             .filter_map(|&var_idx| {
                 self.graph
                     .node_weight(var_idx)
-                    .map(|cur_var| (cur_var.entry.clone(), var_idx))
-            })
-            .filter_map(|(entry, var_idx)| {
-                entry.map(|entry| GenotypeAnno::new(entry, &var_idx, path1, path2, coverage))
+                    .unwrap()
+                    .entry
+                    .as_ref()
+                    .map(|entry| GenotypeAnno::new(entry.clone(), &var_idx, path1, path2, coverage))
             })
             .collect::<Vec<GenotypeAnno>>()
     }
