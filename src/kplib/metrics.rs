@@ -72,7 +72,7 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
 }
 
 /// Probabilities of each genotype given the allele coveages
-fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> Vec<f64> {
+fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
     // Needs to be more pure for lower coverage
     let p_alt: &[f64] = if alt1_cov + alt2_cov < 10.0 {
         &[1e-3, 0.55, 0.95]
@@ -83,24 +83,22 @@ fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> Vec<f64> {
     let total = alt1_cov + alt2_cov;
     let log_combo = log_choose(total, alt2_cov);
 
-    let lp_homref = log_combo + alt2_cov * p_alt[0].log10() + alt1_cov * (1.0 - p_alt[0]).log10();
-    let lp_het = log_combo + alt2_cov * p_alt[1].log10() + alt1_cov * (1.0 - p_alt[1]).log10();
-    let lp_homalt = log_combo + alt2_cov * p_alt[2].log10() + alt1_cov * (1.0 - p_alt[2]).log10();
-
-    vec![lp_homref, lp_het, lp_homalt]
+    [
+        log_combo + alt2_cov * p_alt[0].log10() + alt1_cov * (1.0 - p_alt[0]).log10(),
+        log_combo + alt2_cov * p_alt[1].log10() + alt1_cov * (1.0 - p_alt[1]).log10(),
+        log_combo + alt2_cov * p_alt[2].log10() + alt1_cov * (1.0 - p_alt[2]).log10(),
+    ]
 }
 
 /// Genotype quality: confidence in the assigned genotype
 /// Sample quality: confidence that there is non-reference present
 pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
-    let gt_lplist = genotype_scores(ref_cov, alt_cov);
-    let mut sorted_gt_lplist: Vec<(usize, f64)> =
-        gt_lplist.iter().enumerate().map(|(i, &e)| (i, e)).collect();
-    sorted_gt_lplist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    let mut gt_lplist = genotype_scores(ref_cov, alt_cov);
+    gt_lplist.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-    let best = sorted_gt_lplist[0];
-    let second_best = sorted_gt_lplist[1];
-    let gq = f64::min(-10.0 * (second_best.1 - best.1), 100.0);
+    let best = gt_lplist[0];
+    let second_best = gt_lplist[1];
+    let gq = f64::min(-10.0 * (second_best - best), 100.0);
 
     let mut gt_sum = 0.0;
     for gt in &gt_lplist {
@@ -111,24 +109,6 @@ pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
     let sq = f64::min((-10.0 * (gt_lplist[0] - gt_sum_log)).abs(), 100.0);
     (gq, sq)
 }
-
-/*fn log_choose(n: f64, k: f64) -> f64 {
-    let mut r = 0.0;
-    let mut n = n;
-    let mut k = k;
-
-    if k * 2.0 > n {
-        k = n - k;
-    }
-
-    for d in 1..=(k as i32) {
-        r += n.log10();
-        r -= d as f64;
-        n -= 1.0;
-    }
-
-    r
-}*/
 
 /// Helper function for genotype_scores
 const FACTORIAL_LIMIT: usize = 100;
@@ -172,14 +152,4 @@ fn log_choose(n: f64, k: f64) -> f64 {
     }
 
     r
-    /*
-    let (small, large) = if k < n - k { (k, n - k) } else { (n - k, k) };
-    let mut log_choose = LOG_FACTORIALS[small as usize];
-
-    let n_plus_half = n + 0.5;
-    let k_plus_half = large + 0.5;
-
-    log_choose += (n_plus_half * (n + 1.0).ln() - n_plus_half - n) / LN_10;
-    log_choose -= (k_plus_half * (large + 1.0).ln() - k_plus_half - large) / LN_10;
-    log_choose*/
 }
