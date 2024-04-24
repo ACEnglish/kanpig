@@ -1,5 +1,5 @@
 use crate::kplib::{seq_to_kmer, Haplotype, KDParams, PileupVariant, Svtype};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use rust_htslib::{
     bam::ext::BamRecordExtensions,
     bam::pileup::Indel,
@@ -41,9 +41,9 @@ impl BamParser {
         };
 
         // track the changes made by each read
-        let mut m_reads = IndexMap::<Vec<u8>, Vec<PileupVariant>>::new();
+        let mut m_reads = IndexMap::<Vec<u8>, Vec<usize>>::new();
         // consolidate common variants
-        let mut p_variants = IndexMap::<PileupVariant, u64>::new();
+        let mut p_variants = IndexSet::<PileupVariant>::new();
         for pileup in self.bam.pileup() {
             if pileup.is_err() {
                 continue;
@@ -94,57 +94,57 @@ impl BamParser {
                     _ => continue,
                 };
                 debug!("{:?}", m_var);
-                *p_variants.entry(m_var.clone()).or_insert(0) += 1;
+
+                let p_idx = if let Some(index) = p_variants.get_full(&m_var) {
+                    index.0
+                } else {
+                    p_variants.insert(m_var);
+                    p_variants.len() - 1
+                };
+
                 let qname = alignment.record().qname().to_owned();
-                m_reads.entry(qname).or_default().push(m_var);
+                m_reads.entry(qname).or_default().push(p_idx);
             }
         }
 
         // Either all the reads used or the mean coverage over the window
-        let mut coverage = tot_cov / (window_end - window_start);
-        if (coverage as usize) < m_reads.len() {
-            coverage = m_reads.len() as u64;
-        }
+        let coverage = (tot_cov / (window_end - window_start)).max(m_reads.len() as u64);
         let m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
         (m_haps, coverage)
     }
 
     fn reads_to_haps(
         &self,
-        reads: IndexMap<Vec<u8>, Vec<PileupVariant>>,
-        pileups: IndexMap<PileupVariant, u64>,
+        reads: IndexMap<Vec<u8>, Vec<usize>>,
+        pileups: IndexSet<PileupVariant>,
         chrom: &String,
     ) -> Vec<Haplotype> {
-        let mut hap_parts = IndexMap::<PileupVariant, Haplotype>::new();
+        let mut hap_parts = Vec::<Haplotype>::with_capacity(pileups.len());
 
-        for (mut p, _) in pileups.into_iter() {
+        for p in pileups.iter() {
             // Need to fill in deleted sequence
-            if p.indel == Svtype::Del {
+            let sequence = if p.indel == Svtype::Del {
                 let d_start = p.position;
                 let d_end = d_start + p.size.unsigned_abs();
-                p.sequence = Some(
-                    self.reference
-                        .fetch_seq(chrom, d_start as usize, d_end as usize)
-                        .unwrap()
-                        .to_vec(),
-                );
-            }
+                self.reference
+                    .fetch_seq(chrom, d_start as usize, d_end as usize)
+                    .unwrap()
+                    .to_vec()
+            } else {
+                p.sequence.clone().unwrap()
+            };
 
             let n_hap = Haplotype::new(
-                seq_to_kmer(
-                    &p.sequence.clone().unwrap(),
-                    self.params.kmer,
-                    p.indel == Svtype::Del,
-                ),
+                seq_to_kmer(&sequence, self.params.kmer, p.indel == Svtype::Del),
                 p.size,
                 1,
                 1,
             );
-            hap_parts.insert(p, n_hap);
+            hap_parts.push(n_hap);
         }
 
-        // Deduplicate reads
-        let mut unique_reads: IndexMap<&Vec<PileupVariant>, u64> = IndexMap::new();
+        // Deduplicate reads by pileup combination
+        let mut unique_reads: IndexMap<&Vec<usize>, u64> = IndexMap::new();
         for m_plups in reads.values() {
             *unique_reads.entry(m_plups).or_insert(0) += 1;
         }
@@ -154,7 +154,7 @@ impl BamParser {
         for (read_pileups, coverage) in unique_reads {
             let mut cur_hap = Haplotype::blank(self.params.kmer, 1);
             for p in read_pileups {
-                cur_hap.add(&hap_parts[p]);
+                cur_hap.add(&hap_parts[*p]);
             }
             cur_hap.coverage = coverage;
             //debug!("{:?}", cur_hap);
