@@ -15,7 +15,7 @@ use kplib::{
     VcfChunker, VcfWriter,
 };
 
-type InputType = (ArgParser, Vec<vcf::Record>);
+type InputType = Vec<vcf::Record>;
 type OutputType = Vec<GenotypeAnno>;
 
 fn main() {
@@ -61,13 +61,13 @@ fn main() {
 
     info!("spawning {} threads", args.io.threads);
     for _ in 0..args.io.threads {
+        let m_args = args.clone();
         let receiver = receiver.clone();
         let result_sender = result_sender.clone();
         thread::spawn(move || {
-            for (m_args, chunk) in receiver.into_iter().flatten() {
+            let mut m_bam = BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
+            for chunk in receiver.into_iter().flatten() {
                 let mut m_graph = Variants::new(chunk, m_args.kd.kmer);
-                let mut m_bam =
-                    BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
                 let (h1, h2) = cluster_haplotypes(haps, coverage, &m_args.kd);
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
@@ -83,7 +83,7 @@ fn main() {
     let mut num_chunks: u64 = 0;
     info!("parsing input");
     for i in &mut m_input {
-        sender.send(Some((args.clone(), i))).unwrap();
+        sender.send(Some(i)).unwrap();
         num_chunks += 1;
     }
 
