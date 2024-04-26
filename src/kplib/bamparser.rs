@@ -1,5 +1,6 @@
 use crate::kplib::{seq_to_kmer, Haplotype, KDParams, PileupVariant, Svtype};
 use indexmap::{IndexMap, IndexSet};
+
 use rust_htslib::{
     bam::ext::BamRecordExtensions,
     bam::pileup::Indel,
@@ -41,7 +42,7 @@ impl BamParser {
         };
 
         // track the changes made by each read
-        let mut m_reads = IndexMap::<Vec<u8>, Vec<usize>>::new();
+        let mut reads = IndexMap::<Vec<u8>, Vec<usize>>::new();
         // consolidate common variants
         let mut p_variants = IndexSet::<PileupVariant>::new();
         for pileup in self.bam.pileup() {
@@ -95,33 +96,19 @@ impl BamParser {
                 };
                 debug!("{:?}", m_var);
 
-                let p_idx = if let Some(index) = p_variants.get_full(&m_var) {
-                    index.0
-                } else {
-                    p_variants.insert(m_var);
-                    p_variants.len() - 1
-                };
-
+                let (p_idx, _) = p_variants.insert_full(m_var);
                 let qname = alignment.record().qname().to_owned();
-                m_reads.entry(qname).or_default().push(p_idx);
+                reads.entry(qname).or_default().push(p_idx);
             }
         }
 
         // Either all the reads used or the mean coverage over the window
-        let coverage = (tot_cov / (window_end - window_start)).max(m_reads.len() as u64);
-        let m_haps = self.reads_to_haps(m_reads, p_variants, chrom);
-        (m_haps, coverage)
-    }
+        let coverage = (tot_cov / (window_end - window_start)).max(reads.len() as u64);
 
-    fn reads_to_haps(
-        &self,
-        reads: IndexMap<Vec<u8>, Vec<usize>>,
-        pileups: IndexSet<PileupVariant>,
-        chrom: &String,
-    ) -> Vec<Haplotype> {
-        let mut hap_parts = Vec::<Haplotype>::with_capacity(pileups.len());
+        let mut hap_parts = Vec::<Haplotype>::with_capacity(p_variants.len());
 
-        for p in pileups.iter() {
+        //p_variants.reverse();
+        while let Some(mut p) = p_variants.pop() {
             // Need to fill in deleted sequence
             let sequence = if p.indel == Svtype::Del {
                 let d_start = p.position;
@@ -131,7 +118,9 @@ impl BamParser {
                     .unwrap()
                     .to_vec()
             } else {
-                p.sequence.clone().unwrap()
+                p.sequence
+                    .take()
+                    .expect("Insertions should already have a sequence")
             };
 
             let n_hap = Haplotype::new(
@@ -154,7 +143,9 @@ impl BamParser {
         for (read_pileups, coverage) in unique_reads {
             let mut cur_hap = Haplotype::blank(self.params.kmer, 1);
             for p in read_pileups {
-                cur_hap.add(&hap_parts[*p]);
+                cur_hap.add(&hap_parts[hap_parts.len() - *p - 1]);
+                // When using p_variants.reverse above reversed in the while pop
+                //cur_hap.add(&hap_parts[*p]);
             }
             cur_hap.coverage = coverage;
             //debug!("{:?}", cur_hap);
@@ -163,6 +154,6 @@ impl BamParser {
 
         ret.sort_by(|a, b| b.cmp(a));
         debug!("{:?}", ret);
-        ret
+        (ret, coverage)
     }
 }
