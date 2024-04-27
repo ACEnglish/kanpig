@@ -113,18 +113,11 @@ impl Variants {
     /// to the TR boundaries.
     fn get_region(entries: &Vec<vcf::Record>) -> (String, u64, u64) {
         let chrom = entries[0].chromosome().to_string();
-        let mut min_start = u64::MAX;
-        let mut max_end = 0;
 
-        for e in entries {
+        let (min_start, max_end) = entries.iter().fold((u64::MAX, 0), |acc, e| {
             let (start, end) = e.boundaries();
-            if start < min_start {
-                min_start = start;
-            }
-            if end > max_end {
-                max_end = end;
-            }
-        }
+            (acc.0.min(start), acc.1.max(end))
+        });
 
         (chrom, min_start, max_end)
     }
@@ -134,37 +127,37 @@ impl Variants {
     pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
         // if there are no variants in the hap, we don't want to apply the coverage.
         if hap.n == 0 {
-            PathScore {
+            return PathScore {
                 coverage: Some(hap.coverage),
                 ..Default::default()
-            }
+            };
+        }
+
+        let partial_matches = if params.prune || params.try_exact {
+            get_one_to_one(&self.graph, hap, params)
         } else {
-            let partial_matches = if params.prune || params.try_exact {
-                get_one_to_one(&self.graph, hap, params)
-            } else {
-                vec![]
-            };
+            vec![]
+        };
 
-            let skip_edges = if params.prune {
-                prune_graph(
-                    &self.graph,
-                    &partial_matches,
-                    &self.node_indices[0],
-                    self.node_indices.last().unwrap(),
-                )
-            } else {
-                vec![]
-            };
+        let skip_edges = if params.prune {
+            prune_graph(
+                &self.graph,
+                &partial_matches,
+                &self.node_indices[0],
+                self.node_indices.last().unwrap(),
+            )
+        } else {
+            vec![]
+        };
 
-            if params.try_exact {
-                let mut ret = partial_matches.iter().max().cloned().unwrap();
-                ret.coverage = Some(hap.coverage);
-                ret
-            } else {
-                let mut ret = brute_force_find_path(&self.graph, hap, params, &skip_edges);
-                ret.coverage = Some(hap.coverage);
-                ret
-            }
+        if params.try_exact {
+            let mut ret = partial_matches.iter().max().cloned().unwrap();
+            ret.coverage = Some(hap.coverage);
+            ret
+        } else {
+            let mut ret = brute_force_find_path(&self.graph, hap, params, &skip_edges);
+            ret.coverage = Some(hap.coverage);
+            ret
         }
     }
 
