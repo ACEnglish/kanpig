@@ -111,7 +111,7 @@ impl Variants {
 
     /// Again, TR aware, we need to set the bounds for doing the pileup
     /// to the TR boundaries.
-    fn get_region(entries: &Vec<vcf::Record>) -> (String, u64, u64) {
+    fn get_region(entries: &[vcf::Record]) -> (String, u64, u64) {
         let chrom = entries[0].chromosome().to_string();
 
         let (min_start, max_end) = entries.iter().fold((u64::MAX, 0), |acc, e| {
