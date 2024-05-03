@@ -150,7 +150,7 @@ impl Variants {
             vec![]
         };
 
-        if params.try_exact {
+        if params.try_exact & !partial_matches.is_empty() {
             let mut ret = partial_matches.iter().max().cloned().unwrap();
             ret.coverage = Some(hap.coverage);
             ret
