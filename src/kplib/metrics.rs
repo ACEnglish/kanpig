@@ -94,7 +94,7 @@ fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
 /// Sample quality: confidence that there is non-reference present
 pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
     let mut gt_lplist = genotype_scores(ref_cov, alt_cov);
-    gt_lplist.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    gt_lplist.sort_by(|a, b| b.partial_cmp(a).unwrap());
 
     let best = gt_lplist[0];
     let second_best = gt_lplist[1];
@@ -132,6 +132,10 @@ fn log_choose(n: f64, k: f64) -> f64 {
     if k > n || k < 0.0 {
         return 0.0;
     }
+
+    /*if k * 2.0 > n {
+        k = n - k;
+    }*/
 
     if n <= FACTORIAL_LIMIT as f64 {
         return LOG_FACTORIALS[n as usize]
