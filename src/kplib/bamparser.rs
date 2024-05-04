@@ -124,7 +124,12 @@ impl BamParser {
             };
 
             let n_hap = Haplotype::new(
-                seq_to_kmer(&sequence, self.params.kmer, p.indel == Svtype::Del),
+                seq_to_kmer(
+                    &sequence,
+                    self.params.kmer,
+                    p.indel == Svtype::Del,
+                    self.params.maxhom,
+                ),
                 p.size,
                 1,
                 1,

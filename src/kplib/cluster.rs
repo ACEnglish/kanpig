@@ -43,6 +43,9 @@ pub fn cluster_haplotypes(
             hap_b.push(hap);
         }
     }
+    // Averaging Haplotypes could be done here.
+    // However, 'low-quality' long-reads are now ~97% (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10070092/)
+    // Which is reasonably within the thresholds of size/seqsim's search space
     hap_a.sort();
     hap_b.sort();
 

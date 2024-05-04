@@ -109,6 +109,10 @@ pub struct KDParams {
     /// Don't require alignments to span vargraph region
     #[arg(long, default_value_t = true)]
     pub spanoff: bool,
+
+    /// Maximum homopolymer length to kmerize (off=0)
+    #[arg(long, default_value_t = 5)]
+    pub maxhom: usize,
 }
 
 impl ArgParser {

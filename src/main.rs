@@ -67,7 +67,7 @@ fn main() {
         thread::spawn(move || {
             let mut m_bam = BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
             for chunk in receiver.into_iter().flatten() {
-                let mut m_graph = Variants::new(chunk, m_args.kd.kmer);
+                let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
                 let (h1, h2) = cluster_haplotypes(haps, coverage, &m_args.kd);
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);

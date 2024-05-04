@@ -21,11 +21,11 @@ pub struct VarNode {
 }
 
 impl VarNode {
-    pub fn new(entry: vcf::Record, kmer: u8) -> Self {
+    pub fn new(entry: vcf::Record, kmer: u8, maxhom: usize) -> Self {
         // Want to make a hash for these names for debugging, I think.
         let name = "".to_string();
         let (start, end) = entry.boundaries();
-        let (kfeat, size) = entry.to_kfeat(kmer);
+        let (kfeat, size) = entry.to_kfeat(kmer, maxhom);
         Self {
             name,
             start,
@@ -70,7 +70,7 @@ pub struct Variants {
 /// The graph has an upstream 'src' node that point to every variant node
 /// The graph has a dnstream 'snk' node that is pointed to by every variant node and 'src'
 impl Variants {
-    pub fn new(mut variants: Vec<vcf::Record>, kmer: u8) -> Self {
+    pub fn new(mut variants: Vec<vcf::Record>, kmer: u8, maxhom: usize) -> Self {
         if variants.is_empty() {
             panic!("Cannot create a graph from no variants");
         }
@@ -84,7 +84,7 @@ impl Variants {
         node_indices.append(
             &mut variants
                 .drain(..) // drain lets us move the entry without a clone
-                .map(|entry| graph.add_node(VarNode::new(entry, kmer)))
+                .map(|entry| graph.add_node(VarNode::new(entry, kmer, maxhom)))
                 .collect(),
         );
 

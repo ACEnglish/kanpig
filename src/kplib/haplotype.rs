@@ -25,7 +25,7 @@ impl Haplotype {
 
     // Create an empty haplotype
     pub fn blank(kmer: u8, coverage: u64) -> Haplotype {
-        let mk = seq_to_kmer(&[], kmer, false);
+        let mk = seq_to_kmer(&[], kmer, false, 0);
         Haplotype {
             size: 0,
             n: 0,
