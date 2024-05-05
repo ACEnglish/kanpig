@@ -77,9 +77,9 @@ jobs:
             tar -czf "$dirname.tar.gz" "$dirname"
             echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
           fi
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      
+      - name: Uploading asset
+        uses: actions/upload-artifact@v3
         with:
-          files: |
-            ${{ env.ASSET }}
+          name: asset
+          path: ${{ env.ASSET }}
