@@ -1,4 +1,4 @@
-use crate::kanpig::seq_to_kmer;
+use crate::kplib::seq_to_kmer;
 use noodles_vcf::{
     self as vcf, record::alternate_bases::allele, record::info::field, record::Filters,
 };
@@ -32,7 +32,7 @@ impl FromStr for Svtype {
 
 /// Convert vcf::Record to kfeat
 pub trait KdpVcf {
-    fn to_kfeat(&self, kmer: u8) -> (Vec<f32>, i64);
+    fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64);
     fn boundaries(&self) -> (u64, u64);
     fn size(&self) -> u64;
     fn is_filtered(&self) -> bool;
@@ -41,7 +41,7 @@ pub trait KdpVcf {
 
 impl KdpVcf for vcf::Record {
     /// Convert variant sequence to Kfeat
-    fn to_kfeat(&self, kmer: u8) -> (Vec<f32>, i64) {
+    fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64) {
         let ref_seq = self.reference_bases().to_string();
         let alt_seq = self
             .alternate_bases()
@@ -51,8 +51,8 @@ impl KdpVcf for vcf::Record {
 
         let size = alt_seq.len() as i64 - ref_seq.len() as i64;
 
-        let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer, false);
-        let m_alt = seq_to_kmer(&alt_seq.as_bytes()[1..], kmer, false);
+        let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer, false, maxhom);
+        let m_alt = seq_to_kmer(&alt_seq.as_bytes()[1..], kmer, false, maxhom);
 
         let m_ret: Vec<_> = m_alt
             .iter()

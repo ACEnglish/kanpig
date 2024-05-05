@@ -1,4 +1,4 @@
-use crate::kanpig::seq_to_kmer;
+use crate::kplib::seq_to_kmer;
 use itertools::Itertools;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter, Result};
@@ -25,7 +25,7 @@ impl Haplotype {
 
     // Create an empty haplotype
     pub fn blank(kmer: u8, coverage: u64) -> Haplotype {
-        let mk = seq_to_kmer(&[], kmer, false);
+        let mk = seq_to_kmer(&[], kmer, false, 0);
         Haplotype {
             size: 0,
             n: 0,
@@ -61,7 +61,7 @@ impl Haplotype {
             ret.push(self.clone());
             return ret;
         }
-        let lower = if m_len <= max_fns { 1 } else {m_len - max_fns};
+        let lower = if m_len <= max_fns { 1 } else { m_len - max_fns };
         for i in (lower..=m_len).rev() {
             for j in self.parts.iter().combinations(i) {
                 let mut cur_hap = Haplotype::blank(kmer, self.coverage);

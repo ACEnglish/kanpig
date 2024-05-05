@@ -67,6 +67,7 @@ pub fn kmeans(data: &[Point], k: usize) -> Vec<Cluster> {
         .map(|centroid| Cluster::new(centroid.clone()))
         .collect();
 
+    let mut ntries = 10;
     loop {
         // Assign each point to the nearest cluster
         for (idx, point) in data.iter().enumerate() {
@@ -93,7 +94,7 @@ pub fn kmeans(data: &[Point], k: usize) -> Vec<Cluster> {
 
         // Check for convergence
         let new_centroids: Vec<Point> = clusters.iter().map(|c| c.centroid.clone()).collect();
-        if new_centroids == old_centroids {
+        if new_centroids == old_centroids || ntries == 0 {
             break;
         } else {
             centroids = new_centroids;
@@ -102,6 +103,7 @@ pub fn kmeans(data: &[Point], k: usize) -> Vec<Cluster> {
                 .map(|centroid| Cluster::new(centroid.clone()))
                 .collect();
         }
+        ntries -= 1;
     }
 
     clusters

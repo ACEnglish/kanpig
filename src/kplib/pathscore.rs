@@ -1,4 +1,4 @@
-use crate::kanpig::{metrics, Haplotype, KDParams, VarNode};
+use crate::kplib::{metrics, Haplotype, KDParams, VarNode};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::cmp::Ordering;
 

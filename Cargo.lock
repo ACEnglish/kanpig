@@ -445,7 +445,7 @@ dependencies = [
 
 [[package]]
 name = "kanpig"
-version = "0.1.1"
+version = "0.1.2-dev"
 dependencies = [
  "bitflags",
  "clap",
@@ -457,6 +457,7 @@ dependencies = [
  "log",
  "noodles-vcf",
  "ordered-float",
+ "page_size",
  "petgraph",
  "pretty_env_logger",
  "rust-htslib",
@@ -641,6 +642,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a76df7075c7d4d01fdcb46c912dd17fba5b60c78ea480b475f2b6ab6f666584e"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "page_size"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]

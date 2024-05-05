@@ -35,14 +35,13 @@ Options:
       --minkfreq <MINKFREQ>    Minimum frequency of kmer [default: 1]
       --hapsim <HAPSIM>        Haplotype size similarity collapse threshold [default: 0.95]
       --try-exact              Search for a 1-to-1 match before graph traversal
-      --no-prune               Don't prune paths which don't traverse 1-to-1 nodes
+      --prune                  Prune paths which don't traverse 1-to-1 nodes
       --mapq <MAPQ>            Minimum mapq of reads to consider [default: 5]
       --mapflag <MAPFLAG>      Alignments with flag matching this value are ignored [default: 3840]
       --spanoff                Don't require alignments to span vargraph region
   -h, --help                   Print help
   -V, --version                Print version
 ```
-
 
 # Method
 

@@ -3,7 +3,7 @@ use std::io::BufRead;
 
 use noodles_vcf::{self as vcf};
 
-use crate::kanpig::{KDParams, KdpVcf, Regions, VcfWriter};
+use crate::kplib::{KDParams, KdpVcf, Regions, VcfWriter};
 
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
@@ -21,6 +21,7 @@ pub struct VcfChunker<'a, R: BufRead> {
     hold_entry: Option<vcf::Record>,
     chunk_count: u64,
     call_count: u64,
+    skip_count: u64,
     writer: &'a mut VcfWriter,
 }
 
@@ -42,6 +43,7 @@ impl<'a, R: BufRead> VcfChunker<'a, R> {
             hold_entry: None,
             chunk_count: 0,
             call_count: 0,
+            skip_count: 0,
             writer,
         }
     }
@@ -107,6 +109,7 @@ impl<'a, R: BufRead> VcfChunker<'a, R> {
                     if self.filter_entry(&entry) {
                         return Some(entry);
                     } else {
+                        self.skip_count += 1;
                         self.writer.write_entry(entry.clone());
                     }
                 }
@@ -162,6 +165,7 @@ impl<'a, R: BufRead> Iterator for VcfChunker<'a, R> {
                 "{} chunks of {} variants",
                 self.chunk_count, self.call_count
             );
+            info!("{} variants skipped", self.skip_count);
             None
         }
     }

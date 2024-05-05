@@ -8,15 +8,15 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
 use std::thread;
-mod kanpig;
+mod kplib;
 
-use kanpig::{
-    build_region_tree, cluster_haplotypes, ArgParser, BamParser, PathScore, Variants, VcfChunker,
-    VcfWriter,
+use kplib::{
+    build_region_tree, cluster_haplotypes, ArgParser, BamParser, GenotypeAnno, Variants,
+    VcfChunker, VcfWriter,
 };
 
-type InputType = (ArgParser, Vec<vcf::Record>);
-type OutputType = (Variants, PathScore, PathScore, u64);
+type InputType = Vec<vcf::Record>;
+type OutputType = Vec<GenotypeAnno>;
 
 fn main() {
     let args = ArgParser::parse();
@@ -61,21 +61,20 @@ fn main() {
 
     info!("spawning {} threads", args.io.threads);
     for _ in 0..args.io.threads {
+        let m_args = args.clone();
         let receiver = receiver.clone();
         let result_sender = result_sender.clone();
         thread::spawn(move || {
-            for (m_args, chunk) in receiver.into_iter().flatten() {
-                let m_graph = Variants::new(chunk, m_args.kd.kmer);
-                let mut m_bam =
-                    BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
+            let mut m_bam = BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
+            for chunk in receiver.into_iter().flatten() {
+                let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
                 let (h1, h2) = cluster_haplotypes(haps, coverage, &m_args.kd);
-                debug!("Hap1 out {:?}", h1);
-                debug!("Hap2 out {:?}", h2);
                 let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
                 let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
-
-                result_sender.send((m_graph, p1, p2, coverage)).unwrap();
+                result_sender
+                    .send(m_graph.take_annotated(&p1, &p2, coverage))
+                    .unwrap();
             }
         });
     }
@@ -84,7 +83,7 @@ fn main() {
     let mut num_chunks: u64 = 0;
     info!("parsing input");
     for i in &mut m_input {
-        sender.send(Some((args.clone(), i))).unwrap();
+        sender.send(Some(i)).unwrap();
         num_chunks += 1;
     }
 
@@ -100,7 +99,7 @@ fn main() {
 
     info!("collecting output");
     let sty =
-        ProgressStyle::with_template(" [{elapsed_precise}] {bar:45.cyan/blue} > {pos:>7}/{len:7}")
+        ProgressStyle::with_template(" [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed")
             .unwrap()
             .progress_chars("##-");
     let pbar = ProgressBar::new(num_chunks);
@@ -111,16 +110,9 @@ fn main() {
         select! {
             recv(result_receiver) -> result => {
                 match result {
-                    Ok((m_graph, p1, p2, coverage)) => {
-                        debug!("{:?}", m_graph);
-                        for var_idx in m_graph.node_indices {
-                            let cur_var = match &m_graph.graph.node_weight(var_idx).unwrap().entry {
-                                Some(var) => var.clone(),
-                                None => {
-                                    continue;
-                                }
-                            };
-                            writer.anno_write(cur_var, &var_idx, &p1, &p2, coverage, phase_group);
+                    Ok(annotated_entries) => {
+                        for entry in annotated_entries {
+                            writer.anno_write(entry, phase_group);
                         }
                         phase_group += 1;
                         pbar.inc(1);
@@ -137,6 +129,6 @@ fn main() {
         }
     }
     pbar.finish();
-
+    info!("genotype counts: {:#?}", writer.gtcounts);
     info!("finished");
 }

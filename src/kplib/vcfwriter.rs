@@ -1,10 +1,9 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 
-use petgraph::graph::NodeIndex;
-
-use crate::kanpig::{metrics, FiltFlags, PathScore};
+use crate::kplib::{metrics::GTstate, GenotypeAnno};
 
 use noodles_vcf::{
     self as vcf,
@@ -17,6 +16,7 @@ pub struct VcfWriter {
     writer: vcf::Writer<BufWriter<File>>,
     header: vcf::Header,
     keys: Keys,
+    pub gtcounts: HashMap<GTstate, usize>,
 }
 
 impl VcfWriter {
@@ -125,7 +125,10 @@ impl VcfWriter {
         all_formats.insert(ssid, ssfmt);
 
         // Ready to make files
-        let out_buf = BufWriter::new(File::create(out_path).expect("Error Creating Output File"));
+        let out_buf = BufWriter::with_capacity(
+            page_size::get() * 1000,
+            File::create(out_path).expect("Error Creating Output File"),
+        );
         let mut writer = vcf::Writer::new(out_buf);
         let _ = writer.write_header(&header);
 
@@ -133,89 +136,16 @@ impl VcfWriter {
             writer,
             header,
             keys,
+            gtcounts: HashMap::new(),
         }
     }
 
-    pub fn anno_write(
-        &mut self,
-        mut entry: vcf::Record,
-        var_idx: &NodeIndex,
-        path1: &PathScore,
-        path2: &PathScore,
-        coverage: u64,
-        phase_group: i32,
-    ) {
-        let (gt_str, gt_path, alt_cov) =
-            match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
-                (true, true) if path1 != path2 => (
-                    "1|1",
-                    metrics::GTstate::Hom,
-                    (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
-                ),
-                // sometimes I used the same path twice
-                (true, true) => ("1|1", metrics::GTstate::Hom, path1.coverage.unwrap() as f64),
-                (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
-                (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
-                (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
-                (false, false) => ("./.", metrics::GTstate::Ref, 0.0),
-            };
+    pub fn anno_write(&mut self, mut annot: GenotypeAnno, phase_group: i32) {
+        *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
+        *annot.entry.genotypes_mut() =
+            Genotypes::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
 
-        let ref_cov = (coverage as f64) - alt_cov;
-        let gt_obs = metrics::genotyper(ref_cov, alt_cov);
-        // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
-        let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
-
-        let ad = Value::from(vec![Some(ref_cov as i32), Some(alt_cov as i32)]);
-
-        let zs = Value::from(vec![
-            Some((path1.sizesim * 100.0) as i32),
-            Some((path2.sizesim * 100.0) as i32),
-        ]);
-
-        let ss = Value::from(vec![
-            Some((path1.seqsim * 100.0) as i32),
-            Some((path2.seqsim * 100.0) as i32),
-        ]);
-
-        let mut filt = FiltFlags::PASS;
-        // The genotype from AD doesn't match path genotype
-        if gt_obs != gt_path {
-            filt |= FiltFlags::GTMISMATCH;
-        }
-        if gq < 5.0 {
-            filt |= FiltFlags::LOWGQ;
-        }
-        if coverage < 5 {
-            filt |= FiltFlags::LOWCOV;
-        }
-        if gt_path != metrics::GTstate::Ref {
-            if sq < 5.0 {
-                filt |= FiltFlags::LOWSQ;
-            }
-            if alt_cov < 5.0 {
-                filt |= FiltFlags::LOWALT;
-            }
-        }
-        if (path1.align_pct != 1.0) || (path2.align_pct != 1.0) {
-            filt |= FiltFlags::PARTIAL;
-        }
-
-        *entry.genotypes_mut() = Genotypes::new(
-            self.keys.clone(),
-            vec![vec![
-                Some(Value::from(gt_str)),             // GT
-                Some(Value::from(filt.bits() as i32)), // FT
-                Some(Value::from(sq.round() as i32)),  // SQ
-                Some(Value::from(gq.round() as i32)),  // GQ
-                Some(Value::from(phase_group)),        // PG
-                Some(Value::from(coverage as i32)),    // DP
-                Some(ad),
-                Some(zs),
-                Some(ss),
-            ]],
-        );
-
-        let _result = self.writer.write_record(&self.header, &entry);
+        let _result = self.writer.write_record(&self.header, &annot.entry);
     }
 
     pub fn write_entry(&mut self, mut entry: vcf::Record) {
@@ -225,6 +155,7 @@ impl VcfWriter {
                 Some(Value::from("./.")), // GT
             ]],
         );
+        *self.gtcounts.entry(GTstate::Non).or_insert(0) += 1;
         let _result = self.writer.write_record(&self.header, &entry);
     }
 }
