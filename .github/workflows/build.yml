@@ -2,10 +2,13 @@ name: Cut Release
 
 on:
   workflow_dispatch:
+    branch:
+      description: 'test'
+      required: true
     tag:
       description: 'Tag to build'
       required: true
-      default: fill in version
+      default: fill in
 
 permissions:
   contents: write
