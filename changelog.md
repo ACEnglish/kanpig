@@ -1,9 +1,14 @@
 v0.1.2
-*in progress*
+*May 5, 2024*
 
-* IO improvements: Off-loaded annotation work from the single writer thread to the worker threads and using a large
-  multiple of page size for the BufWriter capacity
+* New optional hompolymer filter doesn't kmerize long homopolymers
 * Improved logging info
+* Correcting GQ field
+* Correcting kmer counting
+* Small speed/memory/io improvements
+  * Off-loaded annotation work from the single writer thread to the worker threads and using a large
+  multiple of page size for the BufWriter capacity
+  * Fewer bam file opens
 
 v0.1.1
 *Apr 11, 2024*
