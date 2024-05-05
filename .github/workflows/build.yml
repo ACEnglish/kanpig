@@ -3,12 +3,12 @@ name: Cut Release
 on:
   workflow_dispatch:
     branch:
-      description: 'test'
+      description: 'Keep as deelop'
       required: true
-    tag:
-      description: 'Tag to build'
-      required: true
-      default: fill in
+    inputs:
+      tag:
+        description: 'Tag to build'
+        required: true
 
 permissions:
   contents: write
