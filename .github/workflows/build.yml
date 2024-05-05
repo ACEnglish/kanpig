@@ -1,4 +1,4 @@
-name: Deploy
+name: Cut Release
 
 on:
   workflow_dispatch:
