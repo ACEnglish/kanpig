@@ -10,7 +10,7 @@ create() {
         --sizemin 50 \
         --sizesim 0.95 --seqsim 0.90 --threads 4 \
         --maxpaths 10000 --mapq 5 --hapsim 0.98 \
-        --chunksize 100 --maxhom 5 \
+        --chunksize 100 --maxhom 5 --prune --try-exact \
         -o test_rs/hc.vcf --bed $bed 
     # --bed /Users/english/code/kanpig/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \
     # --bam /Users/english/code/kanpig/experiments/test_rs/GIABHG002.bam \

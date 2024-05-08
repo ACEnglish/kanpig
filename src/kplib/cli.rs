@@ -71,7 +71,7 @@ pub struct KDParams {
     pub sizemax: u64,
 
     /// Maximum number of paths in a graph to traverse
-    #[arg(long, default_value_t = 1000)]
+    #[arg(long, default_value_t = 10000)]
     pub maxpaths: u64,
 
     /// Minimum sequence similarity for paths
@@ -87,7 +87,7 @@ pub struct KDParams {
     pub minkfreq: u64,
 
     /// Haplotype size similarity collapse threshold
-    #[arg(long, default_value_t = 0.95)]
+    #[arg(long, default_value_t = 0.99)]
     pub hapsim: f32,
 
     /// Search for a 1-to-1 match before graph traversal

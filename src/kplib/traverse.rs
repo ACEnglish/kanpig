@@ -2,17 +2,38 @@
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeIndex;
 use petgraph::visit::{Dfs, EdgeRef};
-use std::collections::HashSet;
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashSet};
 use std::iter::FromIterator;
 
 use crate::kplib::{Haplotype, KDParams, PathScore, VarNode};
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct PathNodeState {
-    pub size: i64,
     pub dist: u64,
+    pub size: i64,
     pub node: NodeIndex,
     pub path: Vec<NodeIndex>,
+}
+
+impl Ord for PathNodeState {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Opposite for reverse
+        other.dist.cmp(&self.dist)
+    }
+}
+
+impl PartialOrd for PathNodeState {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // Opposite for reverse
+        Some(other.cmp(self))
+    }
+}
+
+impl PartialEq for PathNodeState {
+    fn eq(&self, other: &Self) -> bool {
+        self.dist == other.dist
+    }
 }
 
 /// Search of a VarGraph that's guided by size similarity
@@ -26,20 +47,19 @@ pub fn brute_force_find_path(
     skip_edges: &[EdgeIndex],
 ) -> PathScore {
     let start_path = PathNodeState {
-        size: 0,
         dist: target.size.unsigned_abs(), // this is for sorting
+        size: 0,
         node: NodeIndex::new(0),
         path: vec![],
     };
-    let mut stack: Vec<PathNodeState> = vec![start_path];
+    let mut stack: BinaryHeap<PathNodeState> = BinaryHeap::new();
+    stack.push(start_path);
     let mut best_path = PathScore::default();
     let mut npaths = 0;
     let partial_haps = target.partial_haplotypes(params.kmer);
     let snk_node = NodeIndex::new(graph.node_count() - 1);
 
     while let Some(cur_path) = stack.pop() {
-        let mut any_push = false;
-
         // Throw all of cur_node's neighbors on the stack
         // Except snk_node, which is an indicator that the
         // current path has ended
@@ -61,22 +81,16 @@ pub fn brute_force_find_path(
                 debug!("best path {:?}", best_path);
                 npaths += 1;
             } else {
-                any_push = true;
                 let nsize = cur_path.size + graph.node_weight(next_node).unwrap().size;
                 let mut npath = cur_path.path.clone();
                 npath.push(next_node);
                 stack.push(PathNodeState {
-                    size: nsize,
                     dist: target.size.abs_diff(nsize),
+                    size: nsize,
                     node: next_node,
                     path: npath,
                 });
             }
-        }
-
-        // Only need to sort when we've added to the stack
-        if any_push {
-            stack.sort_by_key(|node| std::cmp::Reverse(node.dist));
         }
 
         if npaths > params.maxpaths {
