@@ -3,12 +3,12 @@ name: Cut Release
 on:
   workflow_dispatch:
     branch:
-      description: 'test'
+      description: 'Keep as deelop'
       required: true
-    tag:
-      description: 'Tag to build'
-      required: true
-      default: fill in
+    inputs:
+      tag:
+        description: 'Tag to build'
+        required: true
 
 permissions:
   contents: write
@@ -34,7 +34,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          ref: tags/${{ github.event.inputs.tag }}
+          ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
   
       - name: Get the release version from the tag
@@ -77,9 +77,9 @@ jobs:
             tar -czf "$dirname.tar.gz" "$dirname"
             echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
           fi
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      
+      - name: Uploading asset
+        uses: actions/upload-artifact@v3
         with:
-          files: |
-            ${{ env.ASSET }}
+          name: asset
+          path: ${{ env.ASSET }}
