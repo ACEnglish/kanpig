@@ -8,7 +8,7 @@ use crate::kplib::{KDParams, KdpVcf, Regions, VcfWriter};
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
 pub struct VcfChunker<'a, R: BufRead> {
-    pub m_vcf: vcf::reader::Reader<R>,
+    pub m_vcf: vcf::io::Reader<R>,
     pub m_header: vcf::Header,
     regions: Regions,
     params: KDParams,
@@ -27,7 +27,7 @@ pub struct VcfChunker<'a, R: BufRead> {
 
 impl<'a, R: BufRead> VcfChunker<'a, R> {
     pub fn new(
-        m_vcf: vcf::reader::Reader<R>,
+        m_vcf: vcf::io::Reader<R>,
         m_header: vcf::Header,
         regions: Regions,
         params: KDParams,

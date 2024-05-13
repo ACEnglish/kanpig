@@ -1,6 +1,8 @@
 use crate::kplib::seq_to_kmer;
 use noodles_vcf::{
-    self as vcf, record::alternate_bases::allele, record::info::field, record::Filters,
+    self as vcf,
+    variant::record::info::field::value::Value,
+    variant::record::info::field::key::Key,
 };
 use std::cmp::Ordering;
 use std::str::FromStr;
@@ -74,11 +76,11 @@ impl KdpVcf for vcf::Record {
     fn size(&self) -> u64 {
         let svlen = self
             .info()
-            .get(&field::Key::from_str("SVLEN").unwrap_or_else(|_| panic!("No SVLEN INFO")));
+            .get(&Key::from_str("SVLEN").unwrap_or_else(|_| panic!("No SVLEN INFO")));
 
-        if let Some(Some(field::Value::Integer(svlen))) = svlen {
+        if let Some(Some(Value::Integer(svlen))) = svlen {
             return svlen.unsigned_abs() as u64;
-        } else if let Some(Some(field::Value::Array(field::value::Array::Integer(svlen)))) = svlen {
+        } else if let Some(Some(Value::Array(field::value::Array::Integer(svlen)))) = svlen {
             return svlen
                 .first()
                 .unwrap_or_else(|| panic!("Bad SVLEN"))
@@ -119,11 +121,11 @@ impl KdpVcf for vcf::Record {
     fn variant_type(&self) -> Svtype {
         match self
             .info()
-            .get(&field::Key::from_str("SVTYPE").expect("Unable to make key"))
+            .get(&Key::from_str("SVTYPE").expect("Unable to make key"))
         {
             // INFO/SVTYPE
-            Some(Some(field::Value::String(svtype))) => svtype.parse().expect("Bad SVTYPE"),
-            Some(Some(field::Value::Array(field::value::Array::String(svtype)))) => svtype
+            Some(Some(Value::String(svtype))) => svtype.parse().expect("Bad SVTYPE"),
+            Some(Some(Value::Array(field::value::Array::String(svtype)))) => svtype
                 .first()
                 .cloned()
                 .unwrap_or_else(|| panic!("Bad SVTYPE"))

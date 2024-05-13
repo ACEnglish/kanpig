@@ -13,7 +13,7 @@ use noodles_vcf::{
 };
 
 pub struct VcfWriter {
-    writer: vcf::Writer<BufWriter<File>>,
+    writer: vcf::io::Writer<BufWriter<File>>,
     header: vcf::Header,
     keys: Keys,
     pub gtcounts: HashMap<GTstate, usize>,
@@ -129,7 +129,7 @@ impl VcfWriter {
             page_size::get() * 1000,
             File::create(out_path).expect("Error Creating Output File"),
         );
-        let mut writer = vcf::Writer::new(out_buf);
+        let mut writer = vcf::io::Writer::new(out_buf);
         let _ = writer.write_header(&header);
 
         Self {

@@ -3,7 +3,7 @@ use bitflags::bitflags;
 
 use petgraph::graph::NodeIndex;
 
-use noodles_vcf::{self as vcf, record::genotypes::sample::Value};
+use noodles_vcf::{self as vcf, record::sample::Value};
 
 bitflags! {
     pub struct FiltFlags: u32 {

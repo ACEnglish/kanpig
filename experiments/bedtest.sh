@@ -3,14 +3,14 @@ bed=test_rs/test.chr20.bed
 
 create() {
     #../target/release/kanpig \
-    time cargo run --release -- \
+    time cargo run -- \
         --input test_rs/test2.vcf.gz \
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
         --sizemin 50 \
         --sizesim 0.95 --seqsim 0.90 --threads 4 \
         --maxpaths 20000 --mapq 5 --hapsim 0.98 \
-        --chunksize 100 --maxhom 5 \
+        --chunksize 100 --maxhom 5 --prune --try-exact \
         -o test_rs/hc.vcf --bed $bed 
     # --bed /Users/english/code/kanpig/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \
     # --bam /Users/english/code/kanpig/experiments/test_rs/GIABHG002.bam \
@@ -29,6 +29,7 @@ bench_medium() {
     truvari bench --includebed $bed \
         -b test_rs/GRCh38_HG002-T2TQ100-V1.0_stvar.vcf.gz \
         -c test_rs/hc.vcf.gz --no-ref a -o test_rs/hcbench_noref/ \
+        -s 5 \
         --pctsize 0.90 --pctseq 0.90
 }
 
@@ -42,4 +43,4 @@ bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
 tabix test_rs/hc.vcf.gz
 #bench_lite
 bench_medium
-#bench_full
+bench_full
