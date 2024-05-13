@@ -11,7 +11,7 @@ use std::thread;
 mod kplib;
 
 use kplib::{
-    build_region_tree, cluster_haplotypes, ArgParser, BamParser, GenotypeAnno, Variants,
+    build_region_tree, diploid_haplotypes, ArgParser, BamParser, GenotypeAnno, PathScore, Variants,
     VcfChunker, VcfWriter,
 };
 
@@ -69,11 +69,13 @@ fn main() {
             for chunk in receiver.into_iter().flatten() {
                 let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-                let (h1, h2) = cluster_haplotypes(haps, coverage, &m_args.kd);
-                let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
-                let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
+                let haps = diploid_haplotypes(haps, coverage, &m_args.kd);
+                let mut paths = Vec::<PathScore>::with_capacity(haps.len());
+                for h in haps {
+                    paths.push(m_graph.apply_coverage(&h, &m_args.kd));
+                }
                 result_sender
-                    .send(m_graph.take_annotated(&p1, &p2, coverage))
+                    .send(m_graph.take_annotated(&paths, coverage))
                     .unwrap();
             }
         });

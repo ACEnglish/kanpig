@@ -3,16 +3,16 @@ use crate::kplib::{kmeans, metrics, Haplotype, KDParams};
 /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
 /// This is 'actually' the genotyper. Whatever come out of here is mapped to the variants
 /// So inaccurate descriptions of the two haplotypes can not produce good genotypes.
-pub fn cluster_haplotypes(
+pub fn diploid_haplotypes(
     mut m_haps: Vec<Haplotype>,
     coverage: u64,
     params: &KDParams,
-) -> (Haplotype, Haplotype) {
+) -> Vec<Haplotype> {
     if coverage == 0 || m_haps.is_empty() {
-        return (
+        return vec![
             Haplotype::blank(params.kmer, coverage),
             Haplotype::blank(params.kmer, coverage),
-        );
+        ];
     };
 
     // Nothing to cluster
@@ -22,9 +22,9 @@ pub fn cluster_haplotypes(
         match metrics::genotyper(ref_cov, hap2.coverage as f64) {
             // And if Ref, should probably be set to lowq
             metrics::GTstate::Ref | metrics::GTstate::Het => {
-                return (Haplotype::blank(params.kmer, ref_cov as u64), hap2)
+                return vec![Haplotype::blank(params.kmer, ref_cov as u64), hap2]
             }
-            metrics::GTstate::Hom => return (hap2.clone(), hap2),
+            metrics::GTstate::Hom => return vec![hap2.clone(), hap2],
             _ => panic!("The genotyper can't do this, yet"),
         }
     }
@@ -60,10 +60,10 @@ pub fn cluster_haplotypes(
     } else {
         // make a ref haplotype from the remaining coverage
         // No deduping needed
-        return (
+        return vec![
             Haplotype::blank(params.kmer, coverage - hap2.coverage),
             hap2,
-        );
+        ];
     };
 
     // hap2 should always be the more supported event
@@ -95,18 +95,18 @@ pub fn cluster_haplotypes(
         // and probably should assign this GT as lowq if REF
         metrics::GTstate::Ref | metrics::GTstate::Het => {
             hap2.coverage += hap1.coverage;
-            (
+            vec![
                 Haplotype::blank(params.kmer, remaining_coverage as u64),
                 hap2,
-            )
+            ]
         }
         metrics::GTstate::Hom => {
             if hap1.n == 0 {
                 // HOMALT
-                (hap2.clone(), hap2)
+                vec![hap2.clone(), hap2]
             } else {
                 // Compound Het
-                (hap1, hap2)
+                vec![hap1, hap2]
             }
         }
         _ => panic!("The genotyper can't do this, yet"),

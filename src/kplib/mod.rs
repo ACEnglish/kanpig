@@ -8,7 +8,7 @@ mod cli;
 pub use crate::kplib::cli::{ArgParser, KDParams};
 
 mod cluster;
-pub use crate::kplib::cluster::cluster_haplotypes;
+pub use crate::kplib::cluster::diploid_haplotypes;
 
 mod annotator;
 pub use crate::kplib::annotator::GenotypeAnno;

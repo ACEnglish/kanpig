@@ -36,10 +36,13 @@ impl GenotypeAnno {
     pub fn new(
         entry: vcf::Record,
         var_idx: &NodeIndex,
-        path1: &PathScore,
-        path2: &PathScore,
+        paths: &[PathScore],
         coverage: u64,
     ) -> Self {
+        // Diploid Annotator
+        let path1 = &paths[0];
+        let path2 = &paths[1];
+
         let (gt_str, gt_path, alt_cov) =
             match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
                 (true, true) if path1 != path2 => (
