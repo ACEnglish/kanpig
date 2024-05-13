@@ -39,6 +39,8 @@ pub trait KdpVcf {
     fn size(&self) -> u64;
     fn is_filtered(&self) -> bool;
     fn variant_type(&self) -> Svtype;
+    fn is_symbolic(&self) -> bool;
+    fn is_bnd(&self) -> bool;
 }
 
 impl KdpVcf for vcf::Record {
@@ -89,13 +91,14 @@ impl KdpVcf for vcf::Record {
         }
 
         let r_len: u64 = self.reference_bases().len() as u64;
-        let a_len: u64 = match self.alternate_bases().first() {
-            Some(allele::Allele::Bases(alt)) => alt.len() as u64,
-            Some(allele::Allele::Symbol(_alt)) => {
+        let a_len: u64 = if self.is_symbolic() {
                 let (start, end) = self.boundaries();
                 start.abs_diff(end) + 1
-            }
-            _ => 0,
+            } else {
+                match self.alternate_bases().first() {
+                    Some(alt) => alt.len(),
+                    None => 0
+                }
         };
 
         if r_len == a_len {
@@ -146,6 +149,22 @@ impl KdpVcf for vcf::Record {
                     .unwrap_or_else(|_| panic!("Bad Symbolic Alt")),
                 _ => Svtype::Unk,
             },
+        }
+    }
+
+    /// Checks if its a symbolic allele e.g. <DEL>
+    /// Returns false if its a monozygotic reference
+    fn is_symbolic(&self) -> bool {
+        match self.alternate_bases().first() {
+            Some(alt) => alt.contains('<'),
+            None => false
+        }
+    }
+
+    fn is_bnd(&self) -> bool {
+        match self.alternate_bases().first() {
+            Some(alt) => (alt.contains('[') || alt.contains(']')) && alt.contains(':'),
+            None => false
         }
     }
 }
