@@ -9,7 +9,7 @@ pub enum Ploidy {
     Zero,
     Haploid,
     Diploid,
-    Poly,
+    Polyploid,
     Unset,
 }
 
@@ -31,7 +31,7 @@ impl Ploidy {
             0 => Ploidy::Zero,
             1 => Ploidy::Haploid,
             2 => Ploidy::Diploid,
-            3 => Ploidy::Poly,
+            3 => Ploidy::Polyploid,
             _ => Ploidy::Unset,
         }
     }

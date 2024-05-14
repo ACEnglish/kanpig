@@ -1,3 +1,6 @@
+mod annotator;
+pub use crate::kplib::annotator::GenotypeAnno;
+
 mod bamparser;
 pub use crate::kplib::bamparser::BamParser;
 
@@ -9,9 +12,6 @@ pub use crate::kplib::cli::{ArgParser, KDParams};
 
 mod cluster;
 pub use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};
-
-mod annotator;
-pub use crate::kplib::annotator::GenotypeAnno;
 
 mod haplotype;
 pub use crate::kplib::haplotype::Haplotype;
