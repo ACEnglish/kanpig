@@ -1,5 +1,27 @@
 use crate::kplib::{kmeans, metrics, Haplotype, KDParams};
 
+/// Simply takes the best-covered haplotype as the representative
+pub fn haploid_haplotypes(
+    mut m_haps: Vec<Haplotype>,
+    coverage: u64,
+    params: &KDParams,
+) -> Vec<Haplotype> {
+    if coverage == 0 || m_haps.is_empty() {
+        return vec![Haplotype::blank(params.kmer, coverage)];
+    }
+
+    if m_haps.len() == 1 {
+        return m_haps;
+    }
+
+    m_haps.sort();
+
+    let mut hap = m_haps.pop().unwrap();
+    hap.coverage += m_haps.iter().map(|i| i.coverage).sum::<u64>();
+
+    vec![hap]
+}
+
 /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
 /// This is 'actually' the genotyper. Whatever come out of here is mapped to the variants
 /// So inaccurate descriptions of the two haplotypes can not produce good genotypes.

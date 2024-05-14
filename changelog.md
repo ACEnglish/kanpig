@@ -1,3 +1,9 @@
+v0.1.3
+*in progress*
+
+* Up to 40% reduction in runtime
+* Hemizygous and sex chromosome aware genotyping with new `--ploidy-bed`
+
 v0.1.2
 *May 5, 2024*
 

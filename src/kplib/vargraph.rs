@@ -1,6 +1,7 @@
 use crate::kplib::traverse::{get_one_to_one, prune_graph};
 use crate::kplib::{
     brute_force_find_path, metrics::overlaps, GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore,
+    Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::{self as vcf};
@@ -163,7 +164,12 @@ impl Variants {
 
     /// Transform the graph back into annotated variants
     /// Note that this will take the entries out of the graph's VarNodes
-    pub fn take_annotated(&mut self, paths: &[PathScore], coverage: u64) -> Vec<GenotypeAnno> {
+    pub fn take_annotated(
+        &mut self,
+        paths: &[PathScore],
+        coverage: u64,
+        ploidy: &Ploidy,
+    ) -> Vec<GenotypeAnno> {
         self.node_indices
             .iter_mut()
             .filter_map(|var_idx| {
@@ -172,7 +178,7 @@ impl Variants {
                     .unwrap()
                     .entry
                     .take()
-                    .map(|entry| GenotypeAnno::new(entry, var_idx, paths, coverage))
+                    .map(|entry| GenotypeAnno::new(entry, var_idx, paths, coverage, ploidy))
             })
             .collect::<Vec<GenotypeAnno>>()
     }
@@ -188,7 +194,9 @@ impl Variants {
                     .unwrap()
                     .entry
                     .as_ref()
-                    .map(|entry| GenotypeAnno::new(entry.clone(), &var_idx, paths, coverage))
+                    .map(|entry| {
+                        GenotypeAnno::new(entry.clone(), &var_idx, paths, coverage, &Ploidy::Unset)
+                    })
             })
             .collect::<Vec<GenotypeAnno>>()
     }

@@ -21,6 +21,14 @@ pub struct BedParser {
     prev_start: u64,
 }
 
+#[derive(Debug)]
+pub struct BedEntry {
+    pub chrom: String,
+    pub start: u64,
+    pub end: u64,
+    pub data: Option<Vec<String>>,
+}
+
 impl BedParser {
     pub fn new(path: &Path) -> Self {
         Self {
@@ -30,7 +38,7 @@ impl BedParser {
         }
     }
 
-    pub fn parse(&mut self) -> Vec<(String, u64, u64)> {
+    pub fn parse(&mut self) -> Vec<BedEntry> {
         if let Ok(lines) = read_lines(&mut self.file) {
             lines
                 .map_while(Result::ok)
@@ -41,26 +49,36 @@ impl BedParser {
                         std::process::exit(1);
                     }
                     let chrom = collection[0].to_string();
-                    let m_start = collection[1].parse::<u64>().unwrap();
-                    let m_stop = collection[2].parse::<u64>().unwrap();
+                    let start = collection[1].parse::<u64>().unwrap();
+                    let end = collection[2].parse::<u64>().unwrap();
+                    let data = if collection.len() >= 4 {
+                        Some(collection[3..].iter().map(|x| x.to_string()).collect())
+                    } else {
+                        None
+                    };
 
                     if chrom != self.prev_chrom {
                         self.prev_chrom = chrom.clone();
                         self.prev_start = 0;
                     }
 
-                    if m_stop <= m_start {
+                    if end <= start {
                         error!("malformed bed line: stop <= start {}", line);
                         std::process::exit(1);
                     }
-                    if m_start < self.prev_start {
+                    if start < self.prev_start {
                         error!(
                             "bed file unordered `sort -k3n -k1,2n` offending line {}",
                             line
                         );
                         std::process::exit(1);
                     }
-                    (chrom, m_start, m_stop)
+                    BedEntry {
+                        chrom,
+                        start,
+                        end,
+                        data,
+                    }
                 })
                 .collect()
         } else {

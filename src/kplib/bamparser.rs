@@ -26,7 +26,7 @@ impl BamParser {
         }
     }
 
-    // Two possible haplotypes and coverage observed over the window
+    /// Returns all unique haplotypes over a region
     pub fn find_haps(&mut self, chrom: &String, start: u64, end: u64) -> (Vec<Haplotype>, u64) {
         // We pileup a little outside the region for variants
         let window_start = if start < self.params.chunksize {

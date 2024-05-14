@@ -18,6 +18,7 @@ page_size = "0.6.0"
 petgraph = { version = "0.6.2" }
 pretty_env_logger = { version = "0.4.0" }
 rust-htslib = { version = "0.46.0" }
+rust-lapper = "1.1.0"
 
 [profile.release]
 lto = true

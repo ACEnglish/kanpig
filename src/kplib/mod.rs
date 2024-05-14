@@ -8,7 +8,7 @@ mod cli;
 pub use crate::kplib::cli::{ArgParser, KDParams};
 
 mod cluster;
-pub use crate::kplib::cluster::diploid_haplotypes;
+pub use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};
 
 mod annotator;
 pub use crate::kplib::annotator::GenotypeAnno;
@@ -29,6 +29,9 @@ pub use crate::kplib::pathscore::PathScore;
 
 mod pileup;
 pub use crate::kplib::pileup::PileupVariant;
+
+mod ploidy;
+pub use crate::kplib::ploidy::{Ploidy, PloidyRegions};
 
 mod regions;
 pub use crate::kplib::regions::{build_region_tree, Regions};

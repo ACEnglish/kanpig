@@ -34,6 +34,10 @@ pub struct IOParams {
     #[arg(long)]
     pub bed: Option<std::path::PathBuf>,
 
+    /// Bed file of non-diploid regions
+    #[arg(long)]
+    pub ploidy_bed: Option<std::path::PathBuf>,
+
     /// Sample to apply genotypes to, default first column
     #[arg(long)]
     pub sample: Option<String>,

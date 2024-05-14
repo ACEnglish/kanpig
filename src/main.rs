@@ -11,8 +11,8 @@ use std::thread;
 mod kplib;
 
 use kplib::{
-    build_region_tree, diploid_haplotypes, ArgParser, BamParser, GenotypeAnno, PathScore, Variants,
-    VcfChunker, VcfWriter,
+    build_region_tree, diploid_haplotypes, haploid_haplotypes, ArgParser, BamParser, GenotypeAnno,
+    PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
 type InputType = Vec<vcf::Record>;
@@ -44,6 +44,17 @@ fn main() {
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
 
+    // So this object... will have a bed file of chrom\tstart\tend\tploidy
+    // if its 0, we will put everything as ./.
+    // if its 1, we'll make 1 or 0
+    // default is diploid e.g. 0/1
+    // And we'll only allow 0,1
+    // So this means there will be a make and female bed.
+    // female bed will set chrY to 0
+    // male bed will chrY 1 and non-par chrX 1
+    // After you build this thing, test it by seeing if you can get Zero to mask out variants
+    let ploidy = PloidyRegions::new(&args.io.ploidy_bed);
+
     let mut writer = VcfWriter::new(&args.io.out, input_header.clone(), &args.io.sample);
 
     // We send the writer to the reader so that we can pipe filtered variants forward
@@ -64,18 +75,31 @@ fn main() {
         let m_args = args.clone();
         let receiver = receiver.clone();
         let result_sender = result_sender.clone();
+        let m_ploidy = ploidy.clone();
         thread::spawn(move || {
             let mut m_bam = BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
             for chunk in receiver.into_iter().flatten() {
                 let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
+
+                // For zero, we don't have to waste time going into the bam... so figure that out
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-                let haps = diploid_haplotypes(haps, coverage, &m_args.kd);
+
+                let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
+                let haps = match ploidy {
+                    Ploidy::Zero => vec![],
+                    Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),
+                    _ => diploid_haplotypes(haps, coverage, &m_args.kd),
+                    // and then eventually this could allow a --ploidy flag to branch to
+                    // polyploid_haplotypes
+                };
+
                 let mut paths = Vec::<PathScore>::with_capacity(haps.len());
                 for h in haps {
                     paths.push(m_graph.apply_coverage(&h, &m_args.kd));
                 }
+
                 result_sender
-                    .send(m_graph.take_annotated(&paths, coverage))
+                    .send(m_graph.take_annotated(&paths, coverage, &ploidy))
                     .unwrap();
             }
         });
