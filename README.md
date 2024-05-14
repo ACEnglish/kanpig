@@ -82,6 +82,12 @@ also added to the written vcf entry.
 ## `--bed`
 Sorted bed file restricts kanpig to only analyzing variants with starts and ends within a single bed entry.
 
+## `--ploidy-bed`
+This bed file informs kanpig of special regions of chromosomes with have non-diploid genotypes. For example, a female
+sample shouldn't have any genotypes on chrY. A male sample should have hemizygous genotypes on chrY and the
+non-pseudoautosomal regions of chrX. The `ploidy_beds/` directory has example bed files for GRCh38. All regions not
+within the `ploidy-bed` (or if no bed is provided) are assumed to be diploid.
+
 ## `--hapsim`
 Wh
 

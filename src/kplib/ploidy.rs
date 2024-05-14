@@ -26,7 +26,7 @@ impl FromStr for Ploidy {
 }
 
 impl Ploidy {
-    fn from_value(value: u64) -> Self {
+    pub fn from_value(value: u64) -> Self {
         match value {
             0 => Ploidy::Zero,
             1 => Ploidy::Haploid,
