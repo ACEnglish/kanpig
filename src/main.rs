@@ -44,15 +44,6 @@ fn main() {
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
 
-    // So this object... will have a bed file of chrom\tstart\tend\tploidy
-    // if its 0, we will put everything as ./.
-    // if its 1, we'll make 1 or 0
-    // default is diploid e.g. 0/1
-    // And we'll only allow 0,1
-    // So this means there will be a make and female bed.
-    // female bed will set chrY to 0
-    // male bed will chrY 1 and non-par chrX 1
-    // After you build this thing, test it by seeing if you can get Zero to mask out variants
     let ploidy = PloidyRegions::new(&args.io.ploidy_bed);
 
     let mut writer = VcfWriter::new(&args.io.out, input_header.clone(), &args.io.sample);
