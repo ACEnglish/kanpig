@@ -2,7 +2,7 @@ set -e
 bed=test_rs/test.chr20.bed
 
 create() {
-    #../target/release/kanpig \
+    #time ../target/release/kanpig \
     time cargo run --release -- \
         --input test_rs/test2.vcf.gz \
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \

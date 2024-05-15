@@ -81,22 +81,28 @@ fn main() {
             for chunk in receiver.into_iter().flatten() {
                 let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
 
-                // For zero, we don't have to waste time going into the bam... so figure that out
+                let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
+                // For zero, we don't have to waste time going into the bam
+                if ploidy == Ploidy::Zero {
+                    result_sender
+                        .send(m_graph.take_annotated(&[], 0, &ploidy))
+                        .unwrap();
+                    continue;
+                }
+
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
 
-                let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 let haps = match ploidy {
-                    Ploidy::Zero => vec![],
                     Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),
                     _ => diploid_haplotypes(haps, coverage, &m_args.kd),
                     // and then eventually this could allow a --ploidy flag to branch to
                     // polyploid_haplotypes
                 };
 
-                let mut paths = Vec::<PathScore>::with_capacity(haps.len());
-                for h in haps {
-                    paths.push(m_graph.apply_coverage(&h, &m_args.kd));
-                }
+                let paths: Vec<PathScore> = haps
+                    .iter()
+                    .map(|h| m_graph.apply_coverage(h, &m_args.kd))
+                    .collect();
 
                 result_sender
                     .send(m_graph.take_annotated(&paths, coverage, &ploidy))

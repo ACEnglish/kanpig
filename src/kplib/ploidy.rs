@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Ploidy {
     Zero,
     Haploid,
