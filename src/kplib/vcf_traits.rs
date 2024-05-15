@@ -37,6 +37,7 @@ pub trait KdpVcf {
     fn size(&self) -> u64;
     fn is_filtered(&self) -> bool;
     fn variant_type(&self) -> Svtype;
+    fn valid_alt(&self) -> bool;
 }
 
 impl KdpVcf for vcf::Record {
@@ -112,6 +113,17 @@ impl KdpVcf for vcf::Record {
         match &self.filters() {
             Some(map) => **map != Filters::Pass,
             None => false,
+        }
+    }
+
+    /// Alternate sequence isn't '.' or '*'
+    fn valid_alt(&self) -> bool {
+        match self.alternate_bases().first() {
+            Some(alt) => {
+                let alt = alt.to_string();
+                alt != "." && alt != "*" && !alt.contains(':')
+            }
+            _ => false,
         }
     }
 

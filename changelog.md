@@ -1,8 +1,9 @@
-v0.1.3
+v0.2.0
 *in progress*
 
 * Up to 40% reduction in runtime
 * Hemizygous and sex chromosome aware genotyping with new `--ploidy-bed`
+* Variants with alternate alleles of stars, monozygotic reference, and BNDs are filtered out
 
 v0.1.2
 *May 5, 2024*

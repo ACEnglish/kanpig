@@ -51,6 +51,19 @@ impl<'a, R: BufRead> VcfChunker<'a, R> {
     /// Checks if entry passes all parameter conditions including
     /// within --bed regions, passing, and within expected size
     fn filter_entry(&mut self, entry: &vcf::Record) -> bool {
+        if self.params.passonly & entry.is_filtered() {
+            return false;
+        }
+
+        let size = entry.size();
+        if self.params.sizemin > size || self.params.sizemax < size {
+            return false;
+        }
+
+        if !entry.valid_alt() {
+            return false;
+        }
+
         // Is it inside a region
         let mut default = VecDeque::new();
         let m_coords = self
@@ -76,15 +89,6 @@ impl<'a, R: BufRead> VcfChunker<'a, R> {
         }
 
         if !(reg_up <= var_up && var_dn <= reg_dn) {
-            return false;
-        }
-
-        if self.params.passonly & entry.is_filtered() {
-            return false;
-        }
-
-        let size = entry.size();
-        if self.params.sizemin > size || self.params.sizemax < size {
             return false;
         }
 
