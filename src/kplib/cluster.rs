@@ -70,6 +70,9 @@ pub fn diploid_haplotypes(
     // Which is reasonably within the thresholds of size/seqsim's search space
     hap_a.sort();
     hap_b.sort();
+    if hap_a.len() < hap_b.len() {
+        std::mem::swap(&mut hap_a, &mut hap_b);
+    }
 
     // Guaranteed to have one cluster
     let mut hap2 = hap_a.pop().unwrap();
@@ -93,9 +96,6 @@ pub fn diploid_haplotypes(
         std::mem::swap(&mut hap1, &mut hap2);
     }
 
-    debug!("Hap1 in {:?}", hap1);
-    debug!("Hap2 in {:?}", hap2);
-
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar
     let (hap1, mut hap2) = if (hap1.size.signum() == hap2.size.signum())
@@ -106,6 +106,9 @@ pub fn diploid_haplotypes(
     } else {
         (hap1, hap2)
     };
+
+    debug!("Hap1 in {:?}", hap1);
+    debug!("Hap2 in {:?}", hap2);
 
     // Now we figure out if the we need two alt alleles or not
     // The reason this takes two steps is the above code is just trying to figure out if
