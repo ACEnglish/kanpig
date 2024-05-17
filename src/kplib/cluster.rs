@@ -99,7 +99,7 @@ pub fn diploid_haplotypes(
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar
     let (hap1, mut hap2) = if (hap1.size.signum() == hap2.size.signum())
-        && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs()) >= params.hapsim
+        && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs()) > params.hapsim
     {
         hap2.coverage += hap1.coverage;
         (Haplotype::blank(params.kmer, 0), hap2)
