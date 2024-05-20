@@ -61,13 +61,6 @@ fn main() {
     let (sender, receiver): (Sender<Option<InputType>>, Receiver<Option<InputType>>) = unbounded();
     let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) = unbounded();
 
-    // Need to put panic handlers on
-    //let builder = thread::Builder::new();
-    // Configure the panic handler for the thread builder
-    //     let builder = builder.panic_handler(|panic_info| {
-    //             // Handle the panic gracefully
-    //                     println!("Panic occurred in spawned thread: {:?}", panic_info);
-    //                         });
     info!("spawning {} threads", args.io.threads);
     for _ in 0..args.io.threads {
         let m_args = args.clone();

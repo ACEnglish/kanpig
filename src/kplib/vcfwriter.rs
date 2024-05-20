@@ -36,7 +36,7 @@ impl VcfWriter {
             }
         };
 
-        if header.sample_names().len() > 1 {
+        if header.sample_names().len() >= 1 {
             warn!(
                 "clearing {} sample columns in output",
                 header.sample_names().len()
