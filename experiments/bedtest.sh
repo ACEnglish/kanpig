@@ -11,7 +11,7 @@ create() {
         --sizemin 50 \
         --sizesim 0.95 --seqsim 0.90 --threads 4 \
         --maxpaths 20000 --mapq 5 --hapsim 0.98 \
-        --chunksize 100 --maxhom 5 \
+        --chunksize 100 --maxhom 5 --try-exact --prune \
         --sample doesthiswork \
         -o test_rs/hc.vcf --bed $bed 
     # --bed /Users/english/code/kanpig/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \
@@ -43,5 +43,5 @@ create
 bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
 tabix test_rs/hc.vcf.gz
 #bench_lite
-#bench_medium
+bench_medium
 #bench_full
