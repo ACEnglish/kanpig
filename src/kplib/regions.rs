@@ -36,35 +36,29 @@ pub fn build_region_tree(
     let mut prev_chrom = String::new();
     let mut prev_start: u64 = 0;
 
-    for (chrom, m_start, m_stop) in m_parser
+    for entry in m_parser
         .parse()
         .into_iter()
-        .filter(|(chrom, _, _)| m_contigs.contains_key(chrom))
+        .filter(|entry| m_contigs.contains_key(&entry.chrom))
     {
-        if chrom != prev_chrom {
-            prev_chrom = chrom.clone();
+        if entry.chrom != prev_chrom {
+            prev_chrom = entry.chrom.clone();
             prev_start = 0;
         }
 
-        if m_stop <= m_start {
-            error!(
-                "malformed bed line: stop <= start @ {}:{}-{}",
-                chrom, m_start, m_stop
-            );
+        if entry.end <= entry.start {
+            error!("malformed bed line: end <= start @ {:?}", entry);
             std::process::exit(1);
         }
 
-        if m_start < prev_start {
-            error!(
-                "bed file unordered `sort -k3n -k1,2n` @ {}:{}-{}",
-                chrom, m_start, m_stop
-            );
+        if entry.end < prev_start {
+            error!("bed file unordered `sort -k3n -k1,2n` @ {:?}", entry);
             std::process::exit(1);
         }
 
-        ret.entry(chrom)
+        ret.entry(entry.chrom)
             .or_insert_with(VecDeque::new)
-            .push_back((m_start, m_stop));
+            .push_back((entry.start, entry.end));
     }
 
     ret

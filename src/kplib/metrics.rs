@@ -30,6 +30,7 @@ pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
 /// size similarity of two variant sizes
 /// sizes must be positive
 pub fn sizesim(size_a: u64, size_b: u64) -> f32 {
+    debug!("sz: {} <-> {}", size_a, size_b);
     if ((size_a == 0) || (size_b == 0)) && size_a == size_b {
         return 1.0;
     }

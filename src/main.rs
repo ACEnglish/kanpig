@@ -11,8 +11,8 @@ use std::thread;
 mod kplib;
 
 use kplib::{
-    build_region_tree, cluster_haplotypes, ArgParser, BamParser, GenotypeAnno, Variants,
-    VcfChunker, VcfWriter,
+    build_region_tree, diploid_haplotypes, haploid_haplotypes, ArgParser, BamParser, GenotypeAnno,
+    PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
 type InputType = Vec<vcf::Record>;
@@ -44,6 +44,8 @@ fn main() {
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
 
+    let ploidy = PloidyRegions::new(&args.io.ploidy_bed);
+
     let mut writer = VcfWriter::new(&args.io.out, input_header.clone(), &args.io.sample);
 
     // We send the writer to the reader so that we can pipe filtered variants forward
@@ -64,16 +66,37 @@ fn main() {
         let m_args = args.clone();
         let receiver = receiver.clone();
         let result_sender = result_sender.clone();
+        let m_ploidy = ploidy.clone();
         thread::spawn(move || {
             let mut m_bam = BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
             for chunk in receiver.into_iter().flatten() {
                 let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
+
+                let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
+                // For zero, we don't have to waste time going into the bam
+                if ploidy == Ploidy::Zero {
+                    result_sender
+                        .send(m_graph.take_annotated(&[], 0, &ploidy))
+                        .unwrap();
+                    continue;
+                }
+
                 let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-                let (h1, h2) = cluster_haplotypes(haps, coverage, &m_args.kd);
-                let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
-                let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
+
+                let haps = match ploidy {
+                    Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),
+                    _ => diploid_haplotypes(haps, coverage, &m_args.kd),
+                    // and then eventually this could allow a --ploidy flag to branch to
+                    // polyploid_haplotypes
+                };
+
+                let paths: Vec<PathScore> = haps
+                    .iter()
+                    .map(|h| m_graph.apply_coverage(h, &m_args.kd))
+                    .collect();
+
                 result_sender
-                    .send(m_graph.take_annotated(&p1, &p2, coverage))
+                    .send(m_graph.take_annotated(&paths, coverage, &ploidy))
                     .unwrap();
             }
         });

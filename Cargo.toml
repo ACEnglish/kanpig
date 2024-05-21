@@ -1,6 +1,6 @@
 [package]
 name = "kanpig"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
@@ -18,9 +18,11 @@ page_size = "0.6.0"
 petgraph = { version = "0.6.2" }
 pretty_env_logger = { version = "0.4.0" }
 rust-htslib = { version = "0.46.0" }
+rust-lapper = "1.1.0"
 
 [profile.release]
+opt-level = 3
+debug = true
 lto = true
 codegen-units = 1
-panic = "abort"
-opt-level = 3
+incremental = false

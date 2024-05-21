@@ -1,3 +1,10 @@
+v0.2.0
+
+* Up to 40% reduction in runtime
+* Hemizygous and sex chromosome aware genotyping with new `--ploidy-bed`
+* Variants with alternate alleles of stars, monozygotic reference, and BNDs are filtered out
+* PathScores now compared with average of size and sequence similarity for increased accuracy
+
 v0.1.2
 *May 5, 2024*
 

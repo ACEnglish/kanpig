@@ -17,7 +17,8 @@ pub struct BamParser {
 
 impl BamParser {
     pub fn new(bam_name: PathBuf, ref_name: PathBuf, params: KDParams) -> Self {
-        let bam = IndexedReader::from_path(bam_name).unwrap();
+        let mut bam = IndexedReader::from_path(bam_name).unwrap();
+        let _ = bam.set_reference(ref_name.clone());
         let reference = faidx::Reader::from_path(ref_name).unwrap();
         BamParser {
             bam,
@@ -26,7 +27,7 @@ impl BamParser {
         }
     }
 
-    // Two possible haplotypes and coverage observed over the window
+    /// Returns all unique haplotypes over a region
     pub fn find_haps(&mut self, chrom: &String, start: u64, end: u64) -> (Vec<Haplotype>, u64) {
         // We pileup a little outside the region for variants
         let window_start = if start < self.params.chunksize {
