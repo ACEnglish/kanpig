@@ -164,7 +164,7 @@ fn main() {
 
     // Send items to worker threads
     let mut num_chunks: u64 = 0;
-    info!("parsing input");
+    info!("building variant graphs");
     for i in &mut m_input {
         task_sender.send(Some(i)).unwrap();
         num_chunks += 1;
@@ -181,7 +181,7 @@ fn main() {
         task_sender.send(None).unwrap();
     }
 
-    info!("running");
+    info!("genotyping");
     for handle in task_handles {
         handle.join().unwrap();
     }

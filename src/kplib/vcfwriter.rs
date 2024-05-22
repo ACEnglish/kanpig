@@ -125,7 +125,7 @@ impl VcfWriter {
 
         // Ready to make files
         let out_buf = BufWriter::with_capacity(
-            page_size::get() * 1000,
+            page_size::get() * 500,
             File::create(out_path).expect("Error Creating Output File"),
         );
         let mut writer = vcf::Writer::new(out_buf);

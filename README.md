@@ -101,6 +101,16 @@ Details of `FT`
 | 0x16   | The number of reads supporting the alternate allele less than 5 (only present on non-ref variants) |
 | 0x32   | The best scoring path through the variant graph only used part of the haplotype. This may be indicative of a false-negative in the variant graph. |
 
+# 🔌 Compute Resources
+
+Kanpig is highly parallelized and will fully utilize all threads it is given. However, hyperthreading doesn't seem to
+help and therefore the number of threads should probably be limited to the number of physical processors available. 
+
+For memory, a general rule is kanpig will need about 20x the size of the compressed `.vcf.gz`. The minimum required 
+memory is also dependent on the number of threads running as each will need space for its processing. For example, 
+a 1.6Gb vcf (~5 million SVs) using 16 cores needs at least 32Gb of RAM. That same vcf with 8 or 4 cores needs at least
+ 24Gb and 20Gb of RAM, respectively. 
+
 # 🔬 Experimental Parameter Details
 
 These parameters have a varying effect on the results and are not guaranteed to be stable across releases. 
