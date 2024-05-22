@@ -17,8 +17,8 @@ use kplib::{
     PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
-type InputType = Vec<vcf::Record>;
-type OutputType = Vec<GenotypeAnno>;
+type InputType = Option<Vec<vcf::Record>>;
+type OutputType = Option<Vec<GenotypeAnno>>;
 
 fn main() {
     let args = ArgParser::parse();
@@ -48,47 +48,15 @@ fn main() {
 
     let ploidy = PloidyRegions::new(&args.io.ploidy_bed);
 
-    let (result_sender, result_receiver): (
-        Sender<Option<OutputType>>,
-        Receiver<Option<OutputType>>,
-    ) = unbounded();
-    /*
-     * Each Thread is given a result_sender
-     *  They don't need to do anything different except
-     *  But spawning them I do need to collect JoinHandlers
-     * The VcfWriter needs to start first
-     *  Needs to be joinable
-     * Then VcfChunker is run, sending things to the Threads
-     * We then join the threads
-     * We then send a None to VcfWriter so it knows when to stop
-     * We then join the VcfWriter
-     * We are then finished
-     */
-    // This needs a channel for results
-    // These results may be genotype annos or blanks.
-    // But I have to make them a single type, so I'll send filtered as genotype anno from
-    // take_annotated(&[], 0, Ploidy::Zero)
-    let writer = Arc::new(Mutex::new(VcfWriter::new(
-        &args.io.out,
-        input_header.clone(),
-        &args.io.sample,
-    )));
-
-    // This blanks work will need to be done by the chunker. So the chunker doesn't get
-    // the writer but the channel and it won't write_entry it will write_anno
-    // We send the writer to the reader so that we can pipe filtered variants forward
-    let mut m_input = VcfChunker::new(
-        input_vcf,
-        input_header.clone(),
-        tree,
-        args.kd.clone(),
-        result_sender.clone(),
-    );
-
     // Create channels for communication between threads
-    let (task_sender, task_receiver): (Sender<Option<InputType>>, Receiver<Option<InputType>>) =
+    let (task_sender, task_receiver): (Sender<InputType>, Receiver<InputType>) =
         unbounded();
+    let (result_sender, result_receiver): (
+        Sender<OutputType>,
+        Receiver<OutputType>,
+    ) = unbounded();
 
+   
     info!("spawning {} threads", args.io.threads);
     let task_handles: Vec<JoinHandle<()>> = (0..args.io.threads)
         .map(|_| {
@@ -141,9 +109,14 @@ fn main() {
         })
         .collect();
 
-    let num_variants = Arc::new(Mutex::new(0));
     //Before we start the workers, we'll start the writer
+    let writer = Arc::new(Mutex::new(VcfWriter::new(
+        &args.io.out,
+        input_header.clone(),
+        &args.io.sample,
+    )));
     let cloned_writer = writer.clone();
+    let num_variants = Arc::new(Mutex::new(0));
     let cloned_num_variants = num_variants.clone();
     let write_handler = std::thread::spawn(move || {
         let sty = ProgressStyle::with_template(
@@ -186,9 +159,17 @@ fn main() {
         }
     });
 
+    info!("building variant graphs");
+    let mut m_input = VcfChunker::new(
+        input_vcf,
+        input_header.clone(),
+        tree,
+        args.kd.clone(),
+        result_sender.clone(),
+    );
+
     // Send items to worker threads
     let mut num_chunks: u64 = 0;
-    info!("building variant graphs");
     for i in &mut m_input {
         task_sender.send(Some(i)).unwrap();
         num_chunks += 1;
@@ -204,12 +185,13 @@ fn main() {
         task_sender.send(None).unwrap();
     }
 
-    info!("genotyping");
     // We now know how many variants will be parsed and can turn on the bar
     {
         let mut value_guard = num_variants.lock().unwrap();
         *value_guard = m_input.call_count + m_input.skip_count;
     }
+
+    info!("genotyping");
     for handle in task_handles {
         handle.join().unwrap();
     }
@@ -217,7 +199,7 @@ fn main() {
     // There will be no more results made
     result_sender.send(None).unwrap();
 
-    // Join on the tasks
+    // Wait on the writer
     write_handler.join().unwrap();
     let writer = writer.lock().unwrap();
     info!("genotype counts: {:#?}", writer.gtcounts);
