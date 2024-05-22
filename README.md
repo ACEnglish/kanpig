@@ -45,16 +45,14 @@ non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEng
 has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
 ### `--chunksize`
-Kanpig will build local variant graphs from windows of the genome. These windows are determined by `--chunksize` where
-the maximum end position of an upstream window's variants is at least `--chunksize` base-pairs away from the next window's
-variants' minimum start position.
+Kanpig will build local variant graphs from windows of the genome. These windows are determined by making the maximum end position
+of an upstream window's variants at least `chunksize` base-pairs away from the next window's variants' minimum start position.
 
-This chunksize also determins the region over which read pileups are generated. Only reads which pass the `--mapq` and
-`--mapflag` filter are considered. Also, reads must fully span the minimum variant start and maximum variant end. 
+This chunksize also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
+passing the `mapflag` filter, and which fully span the minimum variant start and maximum variant end are considered. 
 
-This is an important parameter because too small of a `--chunksize` may not recruit read pileups which support variants
-but are far away. Similarly, too large of a value may create windows with many SVs which are also too large for reads to have a
-fully-spanning alignment. 
+This is an important parameter because too small of a `chunksize` may not recruit read pileups that support variants but are 
+further away. Similarly, too large of a value may create windows with many SVs which are also too large for reads to fully-span. 
 
 ### `--sizemin` and `--sizemax`
 Variant sizes are determined by `INFO/SVLEN`. If `INFO/SVLEN` tag is not in the VCF entry, the variant's size is set as
@@ -66,13 +64,13 @@ paths above the threshold, the one with the highest `(sizesim + seqsim) / 2` is 
 whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds.
 
 ### `--maxpaths`
-When performing path-finding, this threshold limits the number of paths which are checked. A lower `--maxpaths` will
-speed up runtime but may come at a cost of recall. A higher `--maxpaths` is slower and may come at a cost to
+When performing path-finding, this threshold limits the number of paths which are checked. A lower `maxpaths` will
+speed up runtime but may come at a cost of recall. A higher `maxpaths` is slower and may come at a cost to
 specificity.
 
 ### `--hapsim`
 After performing kmeans clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
-above `--hapsim`, they are consolidated into a homozygous allele.
+above `hapsim`, they are consolidated into a homozygous allele.
 
 ### `--threads`
 Number of analysis threads to use. Note that in addition to the analysis threads, kanpig keeps one dedicated IO thread
@@ -109,21 +107,21 @@ These parameters have a varying effect on the results and are not guaranteed to 
 
 ### `--try-exact`
 Before performing the path-finding algorithm that applies a haplotype to the variant graph, perform a 1-to-1 comparison
-of the haplotype to each node in the variant graph. If a single node matches above `--sizesim` and `--seqsim`, the
+of the haplotype to each node in the variant graph. If a single node matches above `sizesim` and `seqsim`, the
 path-finding is skipped and haplotype applied to the node. 
 
 This parameter will boost the specificity and speed of kanpig at the cost of recall.
 
 ### `--prune`
-Similar to `--try-exact`, a 1-to-1 comparison is performed before path-finding. If any matches are found, all paths
+Similar to `try-exact`, a 1-to-1 comparison is performed before path-finding. If any matches are found, all paths
 which do not traverse the matching nodes are pruned from the variant graph. 
 
 This parameter will boost the specificity and speed of kanpig at the cost of recall.
 
 ### `--maxhom`
 
-When performing kmer-featurization of sequences (from reads or variants), homopolymer runs above `--maxhom` are trimmed
-to `--maxhom`. For example, `--maxhom 5` will only count two four-mers in all homopolymer runs above 5bp.
+When performing kmer-featurization of sequences (from reads or variants), homopolymer runs above `maxhom` are trimmed
+to `maxhom`. For example, `--maxhom 5` will only count two four-mers in homopolymer runs above 5bp.
 
 ### `--spanoff`
 
