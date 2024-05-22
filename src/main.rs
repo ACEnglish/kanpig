@@ -172,18 +172,15 @@ fn main() {
                         bar.inc(rsize);
                     } else {
                         completed_variants += rsize;
+                        // check if the reader is finished so we can setup the pbar
+                        let value_guard = cloned_num_variants.lock().unwrap();
+                        if *value_guard != 0 {
+                            let t_bar = ProgressBar::new(*value_guard).with_style(sty.clone());
+                            t_bar.inc(completed_variants);
+                            pbar = Some(t_bar);
+                        }
                     }
                     phase_group += 1;
-                }
-            }
-            // check if the reader is finished so we can setup the pbar
-            {
-                let mut value_guard = cloned_num_variants.lock().unwrap();
-                if *value_guard != 0 {
-                    let t_bar = ProgressBar::new(*value_guard).with_style(sty.clone());
-                    t_bar.inc(completed_variants);
-                    pbar = Some(t_bar);
-                    *value_guard = 0;
                 }
             }
         }
