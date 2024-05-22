@@ -56,14 +56,14 @@ fn main() {
         Receiver<OutputType>,
     ) = unbounded();
 
-   
     info!("spawning {} threads", args.io.threads);
     let task_handles: Vec<JoinHandle<()>> = (0..args.io.threads)
         .map(|_| {
             let m_args = args.clone();
             let m_receiver = task_receiver.clone();
-            let result_sender = result_sender.clone();
+            let m_result_sender = result_sender.clone();
             let m_ploidy = ploidy.clone();
+
             thread::spawn(move || {
                 let mut m_bam =
                     BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
@@ -77,7 +77,7 @@ fn main() {
                             let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                             // For zero, we don't have to waste time going into the bam
                             if ploidy == Ploidy::Zero {
-                                result_sender
+                                m_result_sender
                                     .send(Some(m_graph.take_annotated(&[], 0, &ploidy)))
                                     .unwrap();
                                 continue;
@@ -98,7 +98,7 @@ fn main() {
                                 .map(|h| m_graph.apply_coverage(h, &m_args.kd))
                                 .collect();
 
-                            result_sender
+                            m_result_sender
                                 .send(Some(m_graph.take_annotated(&paths, coverage, &ploidy)))
                                 .unwrap();
                         }
@@ -115,9 +115,11 @@ fn main() {
         input_header.clone(),
         &args.io.sample,
     )));
+
     let cloned_writer = writer.clone();
     let num_variants = Arc::new(Mutex::new(0));
     let cloned_num_variants = num_variants.clone();
+
     let write_handler = std::thread::spawn(move || {
         let sty = ProgressStyle::with_template(
             " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
@@ -128,6 +130,7 @@ fn main() {
         let mut phase_group: i32 = 0;
         let mut completed_variants: u64 = 0;
         let mut m_writer = cloned_writer.lock().unwrap();
+
         loop {
             match result_receiver.recv() {
                 Ok(None) | Err(_) => {
@@ -141,6 +144,7 @@ fn main() {
                         m_writer.anno_write(entry, phase_group);
                         rsize += 1;
                     }
+
                     if let Some(ref mut bar) = pbar {
                         bar.inc(rsize);
                     } else {
