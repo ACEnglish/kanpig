@@ -154,6 +154,7 @@ fn main() {
         let mut pbar: Option<ProgressBar> = None;
         let mut phase_group: i32 = 0;
         let mut completed_variants: u64 = 0;
+        let mut m_writer = cloned_writer.lock().unwrap();
         loop {
             match result_receiver.recv() {
                 Ok(None) | Err(_) => {
@@ -163,7 +164,6 @@ fn main() {
                 }
                 Ok(Some(result)) => {
                     let mut rsize: u64 = 0;
-                    let mut m_writer = cloned_writer.lock().unwrap();
                     for entry in result {
                         m_writer.anno_write(entry, phase_group);
                         rsize += 1;
@@ -196,7 +196,6 @@ fn main() {
 
     if num_chunks == 0 {
         error!("No variants to be analyzed");
-        // This might need to still join.
         std::process::exit(1);
     }
 
@@ -206,7 +205,6 @@ fn main() {
     }
 
     info!("genotyping");
-
     // We now know how many variants will be parsed and can turn on the bar
     {
         let mut value_guard = num_variants.lock().unwrap();
@@ -216,7 +214,7 @@ fn main() {
         handle.join().unwrap();
     }
 
-    // There will be no more results to be made
+    // There will be no more results made
     result_sender.send(None).unwrap();
 
     // Join on the tasks
