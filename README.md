@@ -44,10 +44,6 @@ human sample shouldn't have any genotypes on chrY. A male human sample should ha
 non-pseudoautosomal regions of chrX. The `ploidy_beds/` directory has example bed files for GRCh38. All regions not
 within the `ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
-### `--hapsim`
-After performing kmeans clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity above `hapsim`, they
-are consolidated into a homozygous allele.
-
 ### `--chunksize`
 Kanpig will build local variant graphs from windows of the genome. These windows are determined by `chunksize` where
 the maximum end position of an upstream window's variants is at least `chunksize` base-pairs away from the next window's
@@ -73,6 +69,10 @@ whereas lower thresholds will boost recall at the cost of precision and vice ver
 When performing path-finding, this threshold limits the number of paths which are checked. A lower `--maxpaths` will
 speed up runtime but may come at a cost of recall. A higher `--maxpaths` is slower and may come at a cost to
 specificity.
+
+### `--hapsim`
+After performing kmeans clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity above 
+`hapsim`, they are consolidated into a homozygous allele.
 
 ### `--threads`
 Number of analysis threads to use. Note that in addition to the analysis threads, kanpig keeps one dedicated IO thread

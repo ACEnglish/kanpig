@@ -1,13 +1,13 @@
+use crate::kplib::{GenotypeAnno, KDParams, KdpVcf, Ploidy, Regions};
+use crossbeam_channel::Sender;
+use noodles_vcf::{self as vcf};
+use petgraph::graph::NodeIndex;
 use std::collections::VecDeque;
 use std::io::BufRead;
 
-use noodles_vcf::{self as vcf};
-
-use crate::kplib::{KDParams, KdpVcf, Regions, VcfWriter};
-
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
-pub struct VcfChunker<'a, R: BufRead> {
+pub struct VcfChunker<R: BufRead> {
     pub m_vcf: vcf::reader::Reader<R>,
     pub m_header: vcf::Header,
     regions: Regions,
@@ -20,18 +20,18 @@ pub struct VcfChunker<'a, R: BufRead> {
     // next chunk
     hold_entry: Option<vcf::Record>,
     chunk_count: u64,
-    call_count: u64,
-    skip_count: u64,
-    writer: &'a mut VcfWriter,
+    pub call_count: u64,
+    pub skip_count: u64,
+    result_sender: Sender<Option<Vec<GenotypeAnno>>>,
 }
 
-impl<'a, R: BufRead> VcfChunker<'a, R> {
+impl<R: BufRead> VcfChunker<R> {
     pub fn new(
         m_vcf: vcf::reader::Reader<R>,
         m_header: vcf::Header,
         regions: Regions,
         params: KDParams,
-        writer: &'a mut VcfWriter,
+        result_sender: Sender<Option<Vec<GenotypeAnno>>>,
     ) -> Self {
         Self {
             m_vcf,
@@ -44,7 +44,7 @@ impl<'a, R: BufRead> VcfChunker<'a, R> {
             chunk_count: 0,
             call_count: 0,
             skip_count: 0,
-            writer,
+            result_sender,
         }
     }
 
@@ -99,7 +99,6 @@ impl<'a, R: BufRead> VcfChunker<'a, R> {
 
     /// Return the next vcf entry which passes parameter conditions
     fn get_next_entry(&mut self) -> Option<vcf::Record> {
-        //let mut entry = vcf::Record::default();
         let mut entry = vcf::Record::default();
 
         loop {
@@ -114,7 +113,13 @@ impl<'a, R: BufRead> VcfChunker<'a, R> {
                         return Some(entry);
                     } else {
                         self.skip_count += 1;
-                        self.writer.write_entry(entry.clone());
+                        let _ = self.result_sender.send(Some(vec![GenotypeAnno::new(
+                            entry.clone(),
+                            &NodeIndex::new(0),
+                            &[],
+                            0,
+                            &Ploidy::Zero,
+                        )]));
                     }
                 }
             }
@@ -144,7 +149,7 @@ impl<'a, R: BufRead> VcfChunker<'a, R> {
     }
 }
 
-impl<'a, R: BufRead> Iterator for VcfChunker<'a, R> {
+impl<R: BufRead> Iterator for VcfChunker<R> {
     type Item = Vec<vcf::Record>;
 
     fn next(&mut self) -> Option<Self::Item> {
