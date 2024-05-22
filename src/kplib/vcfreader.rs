@@ -171,8 +171,8 @@ impl<R: BufRead> Iterator for VcfChunker<R> {
             Some(ret)
         } else {
             info!(
-                "{} chunks of {} variants",
-                self.chunk_count, self.call_count
+                "{} variants in {} chunks",
+                self.call_count, self.chunk_count
             );
             info!("{} variants skipped", self.skip_count);
             None

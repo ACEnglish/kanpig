@@ -5,7 +5,7 @@ extern crate log;
 
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-//use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -136,27 +136,54 @@ fn main() {
                         }
                     }
                 }
-                info!("I finished");
                 // This should give a result
             })
         })
         .collect();
 
+    let num_variants = Arc::new(Mutex::new(0));
     //Before we start the workers, we'll start the writer
     let cloned_writer = writer.clone();
+    let cloned_num_variants = num_variants.clone();
     let write_handler = std::thread::spawn(move || {
-        // When this goes out of scope (the thread finishes)
-        // So the Mutex might be my write_handler
+        let sty = ProgressStyle::with_template(
+            " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
+        )
+        .unwrap()
+        .progress_chars("##-");
+        let mut pbar: Option<ProgressBar> = None;
         let mut phase_group: i32 = 0;
+        let mut completed_variants: u64 = 0;
         loop {
             match result_receiver.recv() {
-                Ok(None) | Err(_) => break,
+                Ok(None) | Err(_) => {
+                    pbar.expect("I actually shouldn't be expecting the bar")
+                        .finish();
+                    break;
+                }
                 Ok(Some(result)) => {
+                    let mut rsize: u64 = 0;
                     let mut m_writer = cloned_writer.lock().unwrap();
                     for entry in result {
                         m_writer.anno_write(entry, phase_group);
+                        rsize += 1;
+                    }
+                    if let Some(ref mut bar) = pbar {
+                        bar.inc(rsize);
+                    } else {
+                        completed_variants += rsize;
                     }
                     phase_group += 1;
+                }
+            }
+            // check if the reader is finished so we can setup the pbar
+            {
+                let mut value_guard = cloned_num_variants.lock().unwrap();
+                if *value_guard != 0 {
+                    let t_bar = ProgressBar::new(*value_guard).with_style(sty.clone());
+                    t_bar.inc(completed_variants);
+                    pbar = Some(t_bar);
+                    *value_guard = 0;
                 }
             }
         }
@@ -182,6 +209,12 @@ fn main() {
     }
 
     info!("genotyping");
+
+    // We now know how many variants will be parsed and can turn on the bar
+    {
+        let mut value_guard = num_variants.lock().unwrap();
+        *value_guard = m_input.call_count + m_input.skip_count;
+    }
     for handle in task_handles {
         handle.join().unwrap();
     }
@@ -190,7 +223,6 @@ fn main() {
     result_sender.send(None).unwrap();
 
     // Join on the tasks
-    info!("collecting output");
     write_handler.join().unwrap();
     let writer = writer.lock().unwrap();
     info!("genotype counts: {:#?}", writer.gtcounts);

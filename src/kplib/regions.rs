@@ -42,7 +42,7 @@ pub fn build_region_tree(
         .filter(|entry| m_contigs.contains_key(&entry.chrom))
     {
         if entry.chrom != prev_chrom {
-            prev_chrom = entry.chrom.clone();
+            prev_chrom.clone_from(&entry.chrom);
             prev_start = 0;
         }
 
