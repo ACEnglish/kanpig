@@ -47,8 +47,8 @@ pub struct IOParams {
     pub threads: usize,
 
     /// Maximum memory (in GB) - should be at least `2 * threads`
-    #[arg(long, default_value_t = 16.0)]
-    pub mem: f32,
+    #[arg(long, default_value_t = 16)]
+    pub mem: usize,
 
     /// Verbose logging
     #[arg(long, default_value_t = false)]
