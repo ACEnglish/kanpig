@@ -7,9 +7,11 @@ use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
+use peak_alloc::PeakAlloc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+
 mod kplib;
 
 use kplib::{
@@ -19,6 +21,9 @@ use kplib::{
 
 type InputType = Option<Vec<vcf::Record>>;
 type OutputType = Option<Vec<GenotypeAnno>>;
+
+#[global_allocator]
+static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 fn main() {
     let args = ArgParser::parse();
@@ -32,11 +37,11 @@ fn main() {
         .init();
 
     info!("starting");
+    info!("params: {:#?}", args);
     if !args.validate() {
         error!("please fix arguments");
         std::process::exit(1);
     }
-    info!("params: {:#?}", args);
 
     let mut input_vcf = vcf::reader::Builder::default()
         .build_from_path(args.io.input.clone())
@@ -49,12 +54,8 @@ fn main() {
     let ploidy = PloidyRegions::new(&args.io.ploidy_bed);
 
     // Create channels for communication between threads
-    let (task_sender, task_receiver): (Sender<InputType>, Receiver<InputType>) =
-        unbounded();
-    let (result_sender, result_receiver): (
-        Sender<OutputType>,
-        Receiver<OutputType>,
-    ) = unbounded();
+    let (task_sender, task_receiver): (Sender<InputType>, Receiver<InputType>) = unbounded();
+    let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) = unbounded();
 
     info!("spawning {} threads", args.io.threads);
     let task_handles: Vec<JoinHandle<()>> = (0..args.io.threads)
@@ -173,13 +174,34 @@ fn main() {
     );
 
     // Send items to worker threads
-    let mut num_chunks: u64 = 0;
+    let mut hang_tracker: i64 = 0;
     for i in &mut m_input {
         task_sender.send(Some(i)).unwrap();
-        num_chunks += 1;
+
+        // The reader can get way ahead of the tasks, so we monitor memory usage
+        // and let threads catch up
+        let mut num_waits = 0;
+        while PEAK_ALLOC.current_usage_as_gb() >= args.io.mem && num_waits < 10 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            warn!(
+                "throttling vcf reading with memory @ {}",
+                PEAK_ALLOC.current_usage_as_gb()
+            );
+            num_waits += 1;
+        }
+        if num_waits != 0 {
+            hang_tracker += 1;
+        } else {
+            hang_tracker -= 1;
+        }
+        if hang_tracker >= 10 {
+            warn!("memory seems pretty full, consider setting a higher --mem");
+            hang_tracker = 0;
+        }
+        hang_tracker = hang_tracker.max(-10);
     }
 
-    if num_chunks == 0 {
+    if m_input.chunk_count == 0 {
         error!("No variants to be analyzed");
         std::process::exit(1);
     }

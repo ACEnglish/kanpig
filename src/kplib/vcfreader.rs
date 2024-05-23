@@ -19,7 +19,7 @@ pub struct VcfChunker<R: BufRead> {
     // fits in the current chunk. We need to hold on to it for the
     // next chunk
     hold_entry: Option<vcf::Record>,
-    chunk_count: u64,
+    pub chunk_count: u64,
     pub call_count: u64,
     pub skip_count: u64,
     result_sender: Sender<Option<Vec<GenotypeAnno>>>,

@@ -46,6 +46,10 @@ pub struct IOParams {
     #[arg(long, default_value_t = 1)]
     pub threads: usize,
 
+    /// Maximum memory (in GB) - should be at least `2 * threads`
+    #[arg(long, default_value_t = 16.0)]
+    pub mem: f32,
+
     /// Verbose logging
     #[arg(long, default_value_t = false)]
     pub debug: bool,
@@ -163,6 +167,13 @@ impl ArgParser {
 
         if self.kd.kmer >= 8 {
             warn!("--kmer above 8 becomes memory intensive");
+        }
+
+        if self.io.mem < (self.io.threads as f32 * 2.0) {
+            warn!(
+                "{} GB of memory may be too little for {} threads",
+                self.io.mem, self.io.threads
+            );
         }
 
         is_ok
