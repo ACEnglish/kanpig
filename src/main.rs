@@ -175,18 +175,23 @@ fn main() {
 
     // Send items to worker threads
     let mut hang_tracker: i64 = 0;
+    // PEAK_ALLOC seems to be off by about 2x on memory usage
+    let alcor = 2.2;
     for i in &mut m_input {
         task_sender.send(Some(i)).unwrap();
 
         // The reader can get way ahead of the tasks, so we monitor memory usage
         // and let threads catch up
         let mut num_waits = 0;
-        while PEAK_ALLOC.current_usage_as_gb() >= args.io.mem && num_waits < 10 {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            warn!(
-                "throttling vcf reading with memory @ {}",
-                PEAK_ALLOC.current_usage_as_gb()
-            );
+        while (PEAK_ALLOC.current_usage_as_gb() * alcor) >= args.io.mem && num_waits < 10 {
+            let sleep_time = 100i64.max(hang_tracker * 100);
+            std::thread::sleep(std::time::Duration::from_millis(sleep_time as u64));
+            if num_waits >= 5 {
+                warn!(
+                    "throttling vcf reading with memory @ {}",
+                    PEAK_ALLOC.current_usage_as_gb() * alcor
+                );
+            }
             num_waits += 1;
         }
         if num_waits != 0 {
