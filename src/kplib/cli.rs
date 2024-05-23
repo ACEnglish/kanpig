@@ -169,7 +169,7 @@ impl ArgParser {
             warn!("--kmer above 8 becomes memory intensive");
         }
 
-        if self.io.mem < (self.io.threads as f32 * 2.0) {
+        if self.io.mem < (self.io.threads * 2) {
             warn!(
                 "{} GB of memory may be too little for {} threads",
                 self.io.mem, self.io.threads
