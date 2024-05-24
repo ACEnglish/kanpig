@@ -22,7 +22,23 @@ impl PartialEq for PathScore {
 }
 
 impl Ord for PathScore {
+    // Sort by mean of size and sequence
     fn cmp(&self, other: &Self) -> Ordering {
+        match self
+            .align_pct
+            .partial_cmp(&other.align_pct)
+            .unwrap_or(Ordering::Equal)
+        {
+            Ordering::Equal => {
+                let m_score = (self.sizesim + self.seqsim) / 2.0;
+                let o_score = (other.sizesim + other.seqsim) / 2.0;
+                m_score.partial_cmp(&o_score).unwrap_or(Ordering::Equal)
+            }
+            other_ordering => other_ordering,
+        }
+    }
+    // Sort by size then sequence
+    /*    fn cmp(&self, other: &Self) -> Ordering {
         match self
             .align_pct
             .partial_cmp(&other.align_pct)
@@ -41,7 +57,7 @@ impl Ord for PathScore {
             },
             other_ordering => other_ordering,
         }
-    }
+    }*/
 }
 
 impl PartialOrd for PathScore {

@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "kanpig"
-version = "0.1.3-dev"
+version = "0.2.1-dev"
 dependencies = [
  "bitflags",
  "clap",
@@ -468,9 +468,11 @@ dependencies = [
  "noodles-vcf",
  "ordered-float",
  "page_size",
+ "peak_alloc",
  "petgraph",
  "pretty_env_logger",
  "rust-htslib",
+ "rust-lapper",
 ]
 
 [[package]]
@@ -668,6 +670,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "peak_alloc"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29c4e8e2dd832fd76346468f822e4e600d30ba4e5aa545a128abf12cfae7ea3e"
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -778,6 +786,15 @@ dependencies = [
  "regex",
  "thiserror",
  "url",
+]
+
+[[package]]
+name = "rust-lapper"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee43d8e721ac803031dbab6a944b957b49a3b11eadbc099880c8aaaebf23ed27"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]

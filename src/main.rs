@@ -4,19 +4,22 @@ extern crate pretty_env_logger;
 extern crate log;
 
 use clap::Parser;
-use crossbeam_channel::{select, unbounded, Receiver, Sender};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
+use std::sync::{Arc, Mutex};
 use std::thread;
+use std::thread::JoinHandle;
+
 mod kplib;
 
 use kplib::{
-    build_region_tree, cluster_haplotypes, ArgParser, BamParser, GenotypeAnno, Variants,
-    VcfChunker, VcfWriter,
+    build_region_tree, diploid_haplotypes, haploid_haplotypes, ArgParser, BamParser, GenotypeAnno,
+    PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
-type InputType = Vec<vcf::Record>;
-type OutputType = Vec<GenotypeAnno>;
+type InputType = Option<Vec<vcf::Record>>;
+type OutputType = Option<Vec<GenotypeAnno>>;
 
 fn main() {
     let args = ArgParser::parse();
@@ -30,11 +33,11 @@ fn main() {
         .init();
 
     info!("starting");
+    info!("params: {:#?}", args);
     if !args.validate() {
         error!("please fix arguments");
         std::process::exit(1);
     }
-    info!("params: {:#?}", args);
 
     let mut input_vcf = vcf::reader::Builder::default()
         .build_from_path(args.io.input.clone())
@@ -44,91 +47,160 @@ fn main() {
     let m_contigs = input_header.contigs().clone();
     let tree = build_region_tree(&m_contigs, &args.io.bed);
 
-    let mut writer = VcfWriter::new(&args.io.out, input_header.clone(), &args.io.sample);
+    let ploidy = PloidyRegions::new(&args.io.ploidy_bed);
 
-    // We send the writer to the reader so that we can pipe filtered variants forward
+    // Create channels for communication between threads
+    let (task_sender, task_receiver): (Sender<InputType>, Receiver<InputType>) = unbounded();
+    let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) = unbounded();
+
+    info!("spawning {} threads", args.io.threads);
+    let task_handles: Vec<JoinHandle<()>> = (0..args.io.threads)
+        .map(|_| {
+            let m_args = args.clone();
+            let m_receiver = task_receiver.clone();
+            let m_result_sender = result_sender.clone();
+            let m_ploidy = ploidy.clone();
+
+            thread::spawn(move || {
+                let mut m_bam =
+                    BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
+                loop {
+                    match m_receiver.recv() {
+                        Ok(None) | Err(_) => break,
+                        Ok(Some(chunk)) => {
+                            let mut m_graph =
+                                Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
+
+                            let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
+                            // For zero, we don't have to waste time going into the bam
+                            if ploidy == Ploidy::Zero {
+                                m_result_sender
+                                    .send(Some(m_graph.take_annotated(&[], 0, &ploidy)))
+                                    .unwrap();
+                                continue;
+                            }
+
+                            let (haps, coverage) =
+                                m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
+
+                            let haps = match ploidy {
+                                Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),
+                                _ => diploid_haplotypes(haps, coverage, &m_args.kd),
+                                // and then eventually this could allow a --ploidy flag to branch to
+                                // polyploid_haplotypes
+                            };
+
+                            let paths: Vec<PathScore> = haps
+                                .iter()
+                                .map(|h| m_graph.apply_coverage(h, &m_args.kd))
+                                .collect();
+
+                            m_result_sender
+                                .send(Some(m_graph.take_annotated(&paths, coverage, &ploidy)))
+                                .unwrap();
+                        }
+                    }
+                }
+                // This should give a result
+            })
+        })
+        .collect();
+
+    //Before we start the workers, we'll start the writer
+    let writer = Arc::new(Mutex::new(VcfWriter::new(
+        &args.io.out,
+        input_header.clone(),
+        &args.io.sample,
+    )));
+
+    let cloned_writer = writer.clone();
+    let num_variants = Arc::new(Mutex::new(0));
+    let cloned_num_variants = num_variants.clone();
+
+    let write_handler = std::thread::spawn(move || {
+        let sty = ProgressStyle::with_template(
+            " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
+        )
+        .unwrap()
+        .progress_chars("##-");
+        let mut pbar: Option<ProgressBar> = None;
+        let mut phase_group: i32 = 0;
+        let mut completed_variants: u64 = 0;
+        let mut m_writer = cloned_writer.lock().unwrap();
+
+        loop {
+            match result_receiver.recv() {
+                Ok(None) | Err(_) => {
+                    pbar.expect("I actually shouldn't be expecting the bar")
+                        .finish();
+                    break;
+                }
+                Ok(Some(result)) => {
+                    let mut rsize: u64 = 0;
+                    for entry in result {
+                        m_writer.anno_write(entry, phase_group);
+                        rsize += 1;
+                    }
+
+                    if let Some(ref mut bar) = pbar {
+                        bar.inc(rsize);
+                    } else {
+                        completed_variants += rsize;
+                        // check if the reader is finished so we can setup the pbar
+                        let value_guard = cloned_num_variants.lock().unwrap();
+                        if *value_guard != 0 {
+                            let t_bar = ProgressBar::new(*value_guard).with_style(sty.clone());
+                            t_bar.inc(completed_variants);
+                            pbar = Some(t_bar);
+                        }
+                    }
+                    phase_group += 1;
+                }
+            }
+        }
+    });
+
+    info!("building variant graphs");
     let mut m_input = VcfChunker::new(
         input_vcf,
         input_header.clone(),
         tree,
         args.kd.clone(),
-        &mut writer,
+        result_sender.clone(),
     );
 
-    // Create channels for communication between threads
-    let (sender, receiver): (Sender<Option<InputType>>, Receiver<Option<InputType>>) = unbounded();
-    let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) = unbounded();
-
-    info!("spawning {} threads", args.io.threads);
-    for _ in 0..args.io.threads {
-        let m_args = args.clone();
-        let receiver = receiver.clone();
-        let result_sender = result_sender.clone();
-        thread::spawn(move || {
-            let mut m_bam = BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
-            for chunk in receiver.into_iter().flatten() {
-                let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
-                let (haps, coverage) = m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
-                let (h1, h2) = cluster_haplotypes(haps, coverage, &m_args.kd);
-                let p1 = m_graph.apply_coverage(&h1, &m_args.kd);
-                let p2 = m_graph.apply_coverage(&h2, &m_args.kd);
-                result_sender
-                    .send(m_graph.take_annotated(&p1, &p2, coverage))
-                    .unwrap();
-            }
-        });
-    }
-
     // Send items to worker threads
-    let mut num_chunks: u64 = 0;
-    info!("parsing input");
     for i in &mut m_input {
-        sender.send(Some(i)).unwrap();
-        num_chunks += 1;
+        task_sender.send(Some(i)).unwrap();
     }
 
-    if num_chunks == 0 {
+    if m_input.chunk_count == 0 {
         error!("No variants to be analyzed");
         std::process::exit(1);
     }
 
     // Signal worker threads to exit
     for _ in 0..args.io.threads {
-        sender.send(None).unwrap();
+        task_sender.send(None).unwrap();
     }
 
-    info!("collecting output");
-    let sty =
-        ProgressStyle::with_template(" [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed")
-            .unwrap()
-            .progress_chars("##-");
-    let pbar = ProgressBar::new(num_chunks);
-    pbar.set_style(sty.clone());
-
-    let mut phase_group: i32 = 0;
-    loop {
-        select! {
-            recv(result_receiver) -> result => {
-                match result {
-                    Ok(annotated_entries) => {
-                        for entry in annotated_entries {
-                            writer.anno_write(entry, phase_group);
-                        }
-                        phase_group += 1;
-                        pbar.inc(1);
-                        if phase_group as u64 == num_chunks {
-                            break;
-                        }
-                    },
-                    Err(e) => {
-                        debug!("Problem {:?}", e);
-                        break;
-                    }
-                }
-            },
-        }
+    // We now know how many variants will be parsed and can turn on the bar
+    {
+        let mut value_guard = num_variants.lock().unwrap();
+        *value_guard = m_input.call_count + m_input.skip_count;
     }
-    pbar.finish();
+
+    info!("genotyping");
+    for handle in task_handles {
+        handle.join().unwrap();
+    }
+
+    // There will be no more results made
+    result_sender.send(None).unwrap();
+
+    // Wait on the writer
+    write_handler.join().unwrap();
+    let writer = writer.lock().unwrap();
     info!("genotype counts: {:#?}", writer.gtcounts);
     info!("finished");
 }

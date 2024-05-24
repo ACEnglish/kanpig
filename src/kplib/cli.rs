@@ -34,6 +34,10 @@ pub struct IOParams {
     #[arg(long)]
     pub bed: Option<std::path::PathBuf>,
 
+    /// Bed file of non-diploid regions
+    #[arg(long)]
+    pub ploidy_bed: Option<std::path::PathBuf>,
+
     /// Sample to apply genotypes to, default first column
     #[arg(long)]
     pub sample: Option<String>,
@@ -54,7 +58,7 @@ pub struct KDParams {
     pub kmer: u8,
 
     /// Minimum distance between variants to create independent graphs
-    #[arg(long, default_value_t = 100)]
+    #[arg(long, default_value_t = 1000)]
     pub chunksize: u64,
 
     /// Only analyze reads with PASS FILTER
@@ -65,9 +69,8 @@ pub struct KDParams {
     #[arg(long, default_value_t = 50)]
     pub sizemin: u64,
 
-    // change this to 10k?
     /// Maximum size of variant to analyze
-    #[arg(long, default_value_t = 50000)]
+    #[arg(long, default_value_t = 10000)]
     pub sizemax: u64,
 
     /// Maximum number of paths in a graph to traverse
@@ -79,15 +82,15 @@ pub struct KDParams {
     pub seqsim: f32,
 
     /// Minimum size similarity for paths
-    #[arg(long, default_value_t = 0.95)]
+    #[arg(long, default_value_t = 0.90)]
     pub sizesim: f32,
 
     /// Minimum frequency of kmer
     #[arg(long, default_value_t = 1)]
     pub minkfreq: u64,
 
-    /// Haplotype size similarity collapse threshold
-    #[arg(long, default_value_t = 0.99)]
+    /// Haplotype size similarity collapse threshold (off=1)
+    #[arg(long, default_value_t = 1.0)]
     pub hapsim: f32,
 
     /// Search for a 1-to-1 match before graph traversal
@@ -111,7 +114,7 @@ pub struct KDParams {
     pub spanoff: bool,
 
     /// Maximum homopolymer length to kmerize (off=0)
-    #[arg(long, default_value_t = 5)]
+    #[arg(long, default_value_t = 0)]
     pub maxhom: usize,
 }
 

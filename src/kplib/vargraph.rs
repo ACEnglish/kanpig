@@ -1,6 +1,7 @@
 use crate::kplib::traverse::{get_one_to_one, prune_graph};
 use crate::kplib::{
     brute_force_find_path, metrics::overlaps, GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore,
+    Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::{self as vcf};
@@ -126,6 +127,7 @@ impl Variants {
     // the haplotype push coverage onto the VarNodes
     pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
         // if there are no variants in the hap, we don't want to apply the coverage.
+        debug!("applying coverage");
         if hap.n == 0 {
             return PathScore {
                 coverage: Some(hap.coverage),
@@ -165,9 +167,9 @@ impl Variants {
     /// Note that this will take the entries out of the graph's VarNodes
     pub fn take_annotated(
         &mut self,
-        path1: &PathScore,
-        path2: &PathScore,
+        paths: &[PathScore],
         coverage: u64,
+        ploidy: &Ploidy,
     ) -> Vec<GenotypeAnno> {
         self.node_indices
             .iter_mut()
@@ -177,19 +179,14 @@ impl Variants {
                     .unwrap()
                     .entry
                     .take()
-                    .map(|entry| GenotypeAnno::new(entry, var_idx, path1, path2, coverage))
+                    .map(|entry| GenotypeAnno::new(entry, var_idx, paths, coverage, ploidy))
             })
             .collect::<Vec<GenotypeAnno>>()
     }
 
     /// Transform the graph back into annotated variants
     /// Note that this will clone the entries from the graph's VarNodes
-    pub fn __clone_annotated(
-        &mut self,
-        path1: &PathScore,
-        path2: &PathScore,
-        coverage: u64,
-    ) -> Vec<GenotypeAnno> {
+    pub fn __clone_annotated(&mut self, paths: &[PathScore], coverage: u64) -> Vec<GenotypeAnno> {
         self.node_indices
             .iter()
             .filter_map(|&var_idx| {
@@ -198,7 +195,9 @@ impl Variants {
                     .unwrap()
                     .entry
                     .as_ref()
-                    .map(|entry| GenotypeAnno::new(entry.clone(), &var_idx, path1, path2, coverage))
+                    .map(|entry| {
+                        GenotypeAnno::new(entry.clone(), &var_idx, paths, coverage, &Ploidy::Unset)
+                    })
             })
             .collect::<Vec<GenotypeAnno>>()
     }

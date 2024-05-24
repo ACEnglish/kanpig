@@ -40,7 +40,7 @@ pub trait KdpVcf {
     fn is_filtered(&self) -> bool;
     fn variant_type(&self) -> Svtype;
     fn is_symbolic(&self) -> bool;
-    fn is_bnd(&self) -> bool;
+    fn valid_alt(&self) -> bool;
 }
 
 impl KdpVcf for vcf::Record {
@@ -120,6 +120,17 @@ impl KdpVcf for vcf::Record {
         }
     }
 
+    /// Alternate sequence isn't '.' or '*'
+    fn valid_alt(&self) -> bool {
+        match self.alternate_bases().first() {
+            Some(alt) => {
+                let alt = alt.to_string();
+                alt != "." && alt != "*" && !alt.contains(':')
+            }
+            _ => false,
+        }
+    }
+
     /// return the Svtype of a vcf entry
     fn variant_type(&self) -> Svtype {
         match self
@@ -157,13 +168,6 @@ impl KdpVcf for vcf::Record {
     fn is_symbolic(&self) -> bool {
         match self.alternate_bases().first() {
             Some(alt) => alt.contains('<'),
-            None => false
-        }
-    }
-
-    fn is_bnd(&self) -> bool {
-        match self.alternate_bases().first() {
-            Some(alt) => (alt.contains('[') || alt.contains(']')) && alt.contains(':'),
             None => false
         }
     }

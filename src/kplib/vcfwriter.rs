@@ -1,9 +1,8 @@
+use crate::kplib::{metrics::GTstate, GenotypeAnno};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
-
-use crate::kplib::{metrics::GTstate, GenotypeAnno};
 
 use noodles_vcf::{
     self as vcf,
@@ -36,7 +35,7 @@ impl VcfWriter {
             }
         };
 
-        if header.sample_names().len() > 1 {
+        if !header.sample_names().is_empty() {
             warn!(
                 "clearing {} sample columns in output",
                 header.sample_names().len()
@@ -126,7 +125,7 @@ impl VcfWriter {
 
         // Ready to make files
         let out_buf = BufWriter::with_capacity(
-            page_size::get() * 1000,
+            page_size::get() * 500,
             File::create(out_path).expect("Error Creating Output File"),
         );
         let mut writer = vcf::io::Writer::new(out_buf);
@@ -148,7 +147,7 @@ impl VcfWriter {
         let _result = self.writer.write_record(&self.header, &annot.entry);
     }
 
-    pub fn write_entry(&mut self, mut entry: vcf::Record) {
+    pub fn __write_entry(&mut self, mut entry: vcf::Record) {
         *entry.genotypes_mut() = Genotypes::new(
             "GT".parse().unwrap(),
             vec![vec![
