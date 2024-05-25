@@ -39,7 +39,7 @@ bench_full() {
 }
 
 create
-#bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
+bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
 #tabix test_rs/hc.vcf.gz
 #bench_lite
 #bench_medium

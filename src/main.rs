@@ -106,16 +106,13 @@ fn main() {
         .collect();
 
     //Before we start the workers, we'll start the writer
-    let writer = Arc::new(Mutex::new(VcfWriter::new(
-        &args.io.out,
-        input_header.clone(),
-        &args.io.sample,
-    )));
-
-    let cloned_writer = writer.clone();
+    // This is the semaphore for the progress bar that communicates between main and writer
     let num_variants = Arc::new(Mutex::new(0));
-    let cloned_num_variants = num_variants.clone();
 
+    let wthread_num_variants = num_variants.clone();
+    let wthread_io = args.io.clone();
+    let wthread_header = input_header.clone();
+    
     let write_handler = std::thread::spawn(move || {
         let sty = ProgressStyle::with_template(
             " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
@@ -125,7 +122,11 @@ fn main() {
         let mut pbar: Option<ProgressBar> = None;
         let mut phase_group: i32 = 0;
         let mut completed_variants: u64 = 0;
-        let mut m_writer = cloned_writer.lock().unwrap();
+        let mut m_writer = VcfWriter::new(
+            &wthread_io.out,
+            wthread_header.clone(),
+            &wthread_io.sample,
+        );
 
         loop {
             match result_receiver.recv() {
@@ -146,7 +147,7 @@ fn main() {
                     } else {
                         completed_variants += rsize;
                         // check if the reader is finished so we can setup the pbar
-                        let value_guard = cloned_num_variants.lock().unwrap();
+                        let value_guard = wthread_num_variants.lock().unwrap();
                         if *value_guard != 0 {
                             let t_bar = ProgressBar::new(*value_guard).with_style(sty.clone());
                             t_bar.inc(completed_variants);
@@ -157,6 +158,7 @@ fn main() {
                 }
             }
         }
+        info!("genotype counts: {:#?}", m_writer.gtcounts);
     });
 
     info!("building variant graphs");
@@ -199,7 +201,5 @@ fn main() {
 
     // Wait on the writer
     write_handler.join().unwrap();
-    let writer = writer.lock().unwrap();
-    info!("genotype counts: {:#?}", writer.gtcounts);
     info!("finished");
 }
