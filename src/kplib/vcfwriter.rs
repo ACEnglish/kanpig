@@ -155,8 +155,9 @@ impl VcfWriter {
         *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
         *annot.entry.samples_mut() =
             Samples::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
-        //*annot.entry.reference_bases_mut() = replace_iupac(annot.entry.reference_bases());
+
         replace_iupac_inplace(annot.entry.reference_bases_mut());
+
         match self.writer.write_variant_record(&self.header, &annot.entry) {
             Ok(_) => {}
             Err(error) => panic!("Couldn't write record {:?}", error),
@@ -204,13 +205,3 @@ fn replace_iupac_inplace(sequence: &mut str) {
         });
     }
 }
-
-/*fn replace_iupac(sequence: &str) -> String {
-    let mut result = String::with_capacity(sequence.len());
-
-    for c in sequence.chars() {
-        result.push(REPLACEMENTS[c as usize]);
-    }
-
-    result
-}*/
