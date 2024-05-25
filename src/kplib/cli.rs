@@ -26,9 +26,9 @@ pub struct IOParams {
     #[arg(short = 'f', long)]
     pub reference: std::path::PathBuf,
 
-    /// Output vcf (unsorted)
+    /// Output vcf (unsorted, uncompressed, default stdout)
     #[arg(short, long)]
-    pub out: std::path::PathBuf,
+    pub out: Option<std::path::PathBuf>,
 
     /// Regions to analyze
     #[arg(long)]

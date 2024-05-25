@@ -1,19 +1,19 @@
 use crate::kplib::{metrics::GTstate, GenotypeAnno};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 use noodles_vcf::{
     self as vcf,
     header::record::value::map::format,
     header::record::value::Map,
-    variant::io::Write,
+    variant::io::Write as vcfWrite,
     variant::record_buf::samples::{keys::Keys, Samples},
 };
 
 pub struct VcfWriter {
-    writer: vcf::io::Writer<BufWriter<File>>,
+    writer: vcf::io::Writer<Box<dyn Write>>,
     header: vcf::Header,
     keys: Keys,
     pub gtcounts: HashMap<GTstate, usize>,
@@ -21,7 +21,11 @@ pub struct VcfWriter {
 
 impl VcfWriter {
     /// Given a path and a header, setup a new output vcf
-    pub fn new(out_path: &PathBuf, mut header: vcf::Header, sample: &Option<String>) -> Self {
+    pub fn new(
+        out_path: &Option<PathBuf>,
+        mut header: vcf::Header,
+        sample: &Option<String>,
+    ) -> Self {
         // Ensure sample is correctly setup
         let sample_name = match sample {
             Some(name) => name.clone(),
@@ -128,10 +132,14 @@ impl VcfWriter {
         all_formats.insert(ssid.to_string(), ssfmt);
 
         // Ready to make files
-        let out_buf = BufWriter::with_capacity(
-            page_size::get() * 500,
-            File::create(out_path).expect("Error Creating Output File"),
-        );
+        let m_page = page_size::get() * 1000;
+        let out_buf: Box<dyn Write> = match out_path {
+            Some(ref path) => {
+                let file = File::create(path).expect("Error Creating Output File");
+                Box::new(BufWriter::with_capacity(m_page, file))
+            }
+            None => Box::new(BufWriter::with_capacity(m_page, std::io::stdout())),
+        };
         let mut writer = vcf::io::Writer::new(out_buf);
         let _ = writer.write_header(&header);
 
@@ -185,11 +193,11 @@ lazy_static::lazy_static! {
     };
 }
 
-fn replace_iupac_inplace(sequence: &mut String) {
+fn replace_iupac_inplace(sequence: &mut str) {
     unsafe {
         let bytes = sequence.as_bytes_mut();
         bytes.iter_mut().for_each(|b| {
-            let t = IUPAC[*b as usize]; 
+            let t = IUPAC[*b as usize];
             if t != 0u8 {
                 *b = t;
             }

@@ -112,7 +112,7 @@ fn main() {
     let wthread_num_variants = num_variants.clone();
     let wthread_io = args.io.clone();
     let wthread_header = input_header.clone();
-    
+
     let write_handler = std::thread::spawn(move || {
         let sty = ProgressStyle::with_template(
             " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
@@ -122,11 +122,8 @@ fn main() {
         let mut pbar: Option<ProgressBar> = None;
         let mut phase_group: i32 = 0;
         let mut completed_variants: u64 = 0;
-        let mut m_writer = VcfWriter::new(
-            &wthread_io.out,
-            wthread_header.clone(),
-            &wthread_io.sample,
-        );
+        let mut m_writer =
+            VcfWriter::new(&wthread_io.out, wthread_header.clone(), &wthread_io.sample);
 
         loop {
             match result_receiver.recv() {
