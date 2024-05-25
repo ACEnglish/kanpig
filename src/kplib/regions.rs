@@ -1,9 +1,9 @@
 use indexmap::IndexMap;
-use noodles_vcf::header::record::value::{map::contig::Name, map::Contig, Map};
+use noodles_vcf::header::record::value::{map::contig::Contig, Map};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
-pub type ContigMap = IndexMap<Name, Map<Contig>>;
+pub type ContigMap = IndexMap<String, Map<Contig>>;
 pub type Regions = HashMap<String, VecDeque<(u64, u64)>>;
 use crate::kplib::BedParser;
 

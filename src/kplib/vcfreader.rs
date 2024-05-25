@@ -8,7 +8,7 @@ use std::io::BufRead;
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
 pub struct VcfChunker<R: BufRead> {
-    pub m_vcf: vcf::reader::Reader<R>,
+    pub m_vcf: vcf::io::Reader<R>,
     pub m_header: vcf::Header,
     regions: Regions,
     params: KDParams,
@@ -55,12 +55,12 @@ impl<R: BufRead> VcfChunker<R> {
             return false;
         }
 
-        let size = entry.size();
-        if self.params.sizemin > size || self.params.sizemax < size {
+        if !entry.valid_alt() {
             return false;
         }
 
-        if !entry.valid_alt() {
+        let size = entry.size();
+        if self.params.sizemin > size || self.params.sizemax < size {
             return false;
         }
 
@@ -68,7 +68,7 @@ impl<R: BufRead> VcfChunker<R> {
         let mut default = VecDeque::new();
         let m_coords = self
             .regions
-            .get_mut(&entry.chromosome().to_string())
+            .get_mut(&entry.reference_sequence_name().to_string())
             .unwrap_or(&mut default);
 
         if m_coords.is_empty() {
@@ -102,7 +102,7 @@ impl<R: BufRead> VcfChunker<R> {
         let mut entry = vcf::Record::default();
 
         loop {
-            match self.m_vcf.read_record(&self.m_header, &mut entry) {
+            match self.m_vcf.read_record(&mut entry) {
                 Ok(0) => return None,
                 Err(e) => {
                     error!("skipping invalid VCF entry {:?}", e);
@@ -132,7 +132,7 @@ impl<R: BufRead> VcfChunker<R> {
     /// cur_end but also the TR catalog. We want to chunk all TR changes together
     /// regardless of their distance.
     fn entry_in_chunk(&mut self, entry: &vcf::Record) -> bool {
-        let check_chrom = entry.chromosome().to_string();
+        let check_chrom = entry.reference_sequence_name().to_string();
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;
 
         let (start, end) = entry.boundaries();

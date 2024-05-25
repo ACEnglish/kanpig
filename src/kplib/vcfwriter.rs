@@ -5,10 +5,8 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 
 use noodles_vcf::{
-    self as vcf,
-    header::record::value::map::format,
-    header::record::value::Map,
-    record::genotypes::{keys::Keys, sample::Value, Genotypes},
+    self as vcf, header::record::value::map::format, header::record::value::Map,
+    header::record::Value, variant::record_buf::samples::keys::Keys,
 };
 
 pub struct VcfWriter {
@@ -47,81 +45,84 @@ impl VcfWriter {
         // Setup FORMAT header definitions
         // Overwrites existing definitions
         let all_formats = header.formats_mut();
-
-        let keys: Keys = "GT:FT:SQ:GQ:PG:DP:AD:ZS:SS".parse().unwrap();
+        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:PG:DP:AD:ZS:SS"
+            .split(':')
+            .map(String::from)
+            .collect();
+        let keys: Keys = Keys::from_iter(new_fmts);
 
         // GT
-        let gtid = keys[0].clone();
-        let mut gtfmt = Map::<format::Format>::from(&gtid);
-        *gtfmt.number_mut() = vcf::header::Number::Count(1);
+        let gtid = "GT";
+        let mut gtfmt = Map::<format::Format>::from(gtid);
+        *gtfmt.number_mut() = format::Number::Count(1);
         *gtfmt.type_mut() = format::Type::String;
         *gtfmt.description_mut() = "Kanplug genotype".to_string();
-        all_formats.insert(gtid, gtfmt);
+        all_formats.insert(gtid.to_string(), gtfmt);
 
         // FT
-        let ftid = keys[1].clone();
-        let mut ftfmt = Map::<format::Format>::from(&ftid);
-        *ftfmt.number_mut() = vcf::header::Number::Count(1);
+        let ftid = "FT";
+        let mut ftfmt = Map::<format::Format>::from(ftid);
+        *ftfmt.number_mut() = format::Number::Count(1);
         *ftfmt.type_mut() = format::Type::Integer;
         *ftfmt.description_mut() = "Kanpig filter".to_string();
-        all_formats.insert(ftid, ftfmt);
+        all_formats.insert(ftid.to_string(), ftfmt);
 
         // SQ
-        let sqid = keys[2].clone();
-        let mut sqfmt = Map::<format::Format>::from(&sqid);
-        *sqfmt.number_mut() = vcf::header::Number::Count(1);
+        let sqid = "SQ";
+        let mut sqfmt = Map::<format::Format>::from(sqid);
+        *sqfmt.number_mut() = format::Number::Count(1);
         *sqfmt.type_mut() = format::Type::Integer;
         *sqfmt.description_mut() =
             "Phred scaled quality of sample being non-ref at this variant".to_string();
-        all_formats.insert(sqid, sqfmt);
+        all_formats.insert(sqid.to_string(), sqfmt);
 
         // GQ
-        let gqid = keys[3].clone();
-        let mut gqfmt = Map::<format::Format>::from(&gqid);
-        *gqfmt.number_mut() = vcf::header::Number::Count(1);
+        let gqid = "GQ";
+        let mut gqfmt = Map::<format::Format>::from(gqid);
+        *gqfmt.number_mut() = format::Number::Count(1);
         *gqfmt.type_mut() = format::Type::Integer;
         *gqfmt.description_mut() = "Phred scaled quality of genotype".to_string();
-        all_formats.insert(gqid, gqfmt);
+        all_formats.insert(gqid.to_string(), gqfmt);
 
         // PG
-        let pgid = keys[4].clone();
-        let mut pgfmt = Map::<format::Format>::from(&pgid);
-        *pgfmt.number_mut() = vcf::header::Number::Count(1);
+        let pgid = "PG";
+        let mut pgfmt = Map::<format::Format>::from(pgid);
+        *pgfmt.number_mut() = format::Number::Count(1);
         *pgfmt.type_mut() = format::Type::Integer;
         *pgfmt.description_mut() = "Local phase group of entries".to_string();
-        all_formats.insert(pgid, pgfmt);
+        all_formats.insert(pgid.to_string(), pgfmt);
 
         // DP
-        let dpid = keys[5].clone();
-        let mut dpfmt = Map::<format::Format>::from(&dpid);
-        *dpfmt.number_mut() = vcf::header::Number::Count(1);
+        let dpid = "DP";
+        let mut dpfmt = Map::<format::Format>::from(dpid);
+        *dpfmt.number_mut() = format::Number::Count(1);
         *dpfmt.type_mut() = format::Type::Integer;
         *dpfmt.description_mut() = "Coverage over region".to_string();
-        all_formats.insert(dpid, dpfmt);
+        all_formats.insert(dpid.to_string(), dpfmt);
 
         // AD
-        let adid = keys[6].clone();
-        let mut adfmt = Map::<format::Format>::from(&adid);
-        *adfmt.number_mut() = vcf::header::Number::R;
+        let adid = "AD";
+        let mut adfmt = Map::<format::Format>::from(adid);
+        *adfmt.number_mut() = format::Number::ReferenceAlternateBases;
         *adfmt.type_mut() = format::Type::Integer;
         *adfmt.description_mut() = "Coverage for reference and alternate alleles".to_string();
-        all_formats.insert(adid, adfmt);
+        all_formats.insert(adid.to_string(), adfmt);
 
         // ZS
-        let zsid = keys[7].clone();
-        let mut zsfmt = Map::<format::Format>::from(&zsid);
-        *zsfmt.number_mut() = vcf::header::Number::R;
+        let zsid = "ZS";
+        let mut zsfmt = Map::<format::Format>::from(zsid);
+        *zsfmt.number_mut() = format::Number::ReferenceAlternateBases;
         *zsfmt.type_mut() = format::Type::Integer;
         *zsfmt.description_mut() = "Size similarity of path to entry".to_string();
-        all_formats.insert(zsid, zsfmt);
+        all_formats.insert(zsid.to_string(), zsfmt);
 
         // SS
-        let ssid = keys[8].clone();
-        let mut ssfmt = Map::<format::Format>::from(&ssid);
-        *ssfmt.number_mut() = vcf::header::Number::R;
+        let ssid = "SS";
+        let mut ssfmt = Map::<format::Format>::from(ssid);
+        *ssfmt.number_mut() = format::Number::ReferenceAlternateBases;
         *ssfmt.type_mut() = format::Type::Integer;
         *ssfmt.description_mut() = "Sequence similarity of path to entry".to_string();
-        all_formats.insert(ssid, ssfmt);
+        all_formats.insert(ssid.to_string(), ssfmt);
 
         // Ready to make files
         let out_buf = BufWriter::with_capacity(

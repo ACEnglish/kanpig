@@ -3,7 +3,10 @@ use bitflags::bitflags;
 
 use petgraph::graph::NodeIndex;
 
-use noodles_vcf::{self as vcf, record::sample::Value};
+use noodles_vcf::{
+    self as vcf, 
+    variant::record_buf::samples::sample::value::{Array, Value},
+};
 
 bitflags! {
     pub struct FiltFlags: u32 {
@@ -50,15 +53,15 @@ impl GenotypeAnno {
     // These are tied to VcfWriter.keys
     pub fn make_fields(&self, phase_group: i32) -> Vec<Option<Value>> {
         vec![
-            Some(Value::from(self.gt.clone())),
-            Some(Value::from(self.filt.bits() as i32)),
-            Some(Value::from(self.sq)),
-            Some(Value::from(self.gq)),
-            Some(Value::from(phase_group)),
-            Some(Value::from(self.dp)),
-            Some(Value::from(self.ad.clone())),
-            Some(Value::from(self.zs.clone())),
-            Some(Value::from(self.ss.clone())),
+            Some(Value::Genotype(self.gt.parse().expect("Should have made GT correctly"))),
+            Some(Value::Integer(self.filt.bits() as i32)),
+            Some(Value::Integer(self.sq)),
+            Some(Value::Integer(self.gq)),
+            Some(Value::Integer(phase_group)),
+            Some(Value::Integer(self.dp)),
+            Some(Value::Array(Array::Integer(self.ad.clone()))),
+            Some(Value::Array(Array::Integer(self.zs.clone()))),
+            Some(Value::Array(Array::Integer(self.ss.clone()))),
         ]
     }
 }

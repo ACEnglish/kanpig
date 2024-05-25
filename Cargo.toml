@@ -12,7 +12,7 @@ indicatif = "0.17.8"
 itertools = { version = "0.12.1" }
 lazy_static = "1.4.0"
 log = { version = "0.4", features = ["std", "serde"] }
-noodles-vcf = { version = "0.56.0" }
+noodles-vcf = { version = "0.57.0" }
 ordered-float = { version = "4.0", default-features = false }
 page_size = "0.6.0"
 petgraph = { version = "0.6.2" }

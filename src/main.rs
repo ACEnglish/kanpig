@@ -60,6 +60,7 @@ fn main() {
             let m_receiver = task_receiver.clone();
             let m_result_sender = result_sender.clone();
             let m_ploidy = ploidy.clone();
+            let m_header = input_header.clone();
 
             thread::spawn(move || {
                 let mut m_bam =
@@ -69,7 +70,7 @@ fn main() {
                         Ok(None) | Err(_) => break,
                         Ok(Some(chunk)) => {
                             let mut m_graph =
-                                Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
+                                Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom, &m_header);
 
                             let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                             // For zero, we don't have to waste time going into the bam
