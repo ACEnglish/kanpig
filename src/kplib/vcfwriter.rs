@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use noodles_vcf::{
     self as vcf, header::record::value::map::format, header::record::value::Map,
-    header::record::Value, variant::record_buf::samples::keys::Keys,
+    variant::record_buf::samples::{Sample, keys::Keys},
 };
 
 pub struct VcfWriter {
@@ -142,20 +142,9 @@ impl VcfWriter {
 
     pub fn anno_write(&mut self, mut annot: GenotypeAnno, phase_group: i32) {
         *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
-        *annot.entry.genotypes_mut() =
-            Genotypes::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
+        let sample = annot.entry.samples().get_index(0).unwrap();
+        //Sample::new(&self.keys, annot.make_fields(phase_group).as_slice());
 
         let _result = self.writer.write_record(&self.header, &annot.entry);
-    }
-
-    pub fn __write_entry(&mut self, mut entry: vcf::Record) {
-        *entry.genotypes_mut() = Genotypes::new(
-            "GT".parse().unwrap(),
-            vec![vec![
-                Some(Value::from("./.")), // GT
-            ]],
-        );
-        *self.gtcounts.entry(GTstate::Non).or_insert(0) += 1;
-        let _result = self.writer.write_record(&self.header, &entry);
     }
 }
