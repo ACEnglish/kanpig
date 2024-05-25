@@ -35,7 +35,7 @@ pub trait KdpVcf {
     fn size(&self) -> u64;
     fn is_filtered(&self, header: &Header) -> bool;
     fn valid_alt(&self) -> bool;
-    fn get_alt(&self) -> String;
+    fn get_alt(&self) -> &str;
 }
 
 impl KdpVcf for RecordBuf {
@@ -97,16 +97,12 @@ impl KdpVcf for RecordBuf {
     }
 
     /// Returns the first alternate allele or a blank string with '.' if there isn't any
-    fn get_alt(&self) -> String {
+    fn get_alt(&self) -> &str {
         let alts = self.alternate_bases();
         match alts.len() {
-            0 => ".".to_string(),
-            _ => alts
-                .iter()
-                .next()
-                .expect("I just checked")
-                .unwrap()
-                .to_string(), // I don't like all this String when str should be simplier
+            0 => ".",
+            _ => alts.iter().next().expect("I just checked").unwrap(),
+            //.to_string(), // I don't like all this String when str should be simplier
         }
     }
 }
