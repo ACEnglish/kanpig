@@ -51,12 +51,11 @@ of an upstream window's variants at least `chunksize` base-pairs away from the n
 This chunksize also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
 passing the `mapflag` filter, and which fully span the minimum variant start and maximum variant end are considered. 
 
-This is an important parameter because too small of a `chunksize` may not recruit read pileups that support variants but are 
-further away. Similarly, too large of a value may create windows with many SVs which are also too large for reads to fully-span. 
+This is an important parameter because too small of a `chunksize` may not recruit distant read pileups which support variants. Similarly, 
+too large of a value may create windows with many SVs which are also too large for reads to fully-span. 
 
 ### `--sizemin` and `--sizemax`
-Variant sizes are determined by `INFO/SVLEN`. If `INFO/SVLEN` tag is not in the VCF entry, the variant's size is set as
-`abs(length(ALT) - length(REF))`. Genotypes of variants not within the size boundaries are set to missing (`./.`).
+Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of variants not within the size boundaries are set to missing (`./.`).
 
 ### `--sizesim` and `--seqsim`
 When applying a haplotype to a variant graph, only paths above these two thresholds are allowed. If there are multiple
@@ -85,7 +84,7 @@ The `SAMPLE` column fields populated by kanpig are:
 | **FT**  | Bit flag for properties of the variant's genotyping. Flags == 0 are considered PASS. |
 | **SQ**  | Phred scaled likelihood variant alternate is present in the sample |
 | **GQ**  | Phred scale difference between most and second-most likely genotypes |
-| **PG**  | Each chunk of variants is assigned a phase group |
+| **PS**  | Each chunk of variants is assigned a phase set |
 | **DP**  | Read coverage over the region |
 | **AD**  | Read coverage supporting the reference and alternate alleles. |
 | **SZ**  | Size similarity of the two haplotypes to this variant |
