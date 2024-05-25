@@ -147,10 +147,62 @@ impl VcfWriter {
         *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
         *annot.entry.samples_mut() =
             Samples::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
-
+        //*annot.entry.reference_bases_mut() = replace_iupac(annot.entry.reference_bases());
+        replace_iupac_inplace(annot.entry.reference_bases_mut());
         match self.writer.write_variant_record(&self.header, &annot.entry) {
             Ok(_) => {}
             Err(error) => panic!("Couldn't write record {:?}", error),
         }
     }
 }
+
+lazy_static::lazy_static! {
+    static ref IUPAC: [u8; 128] = {
+        let mut arr = [0u8; 128];
+        arr[b'R' as usize] = b'A'; // A or G
+        arr[b'Y' as usize] = b'C'; // C or T
+        arr[b'S' as usize] = b'C'; // C or G
+        arr[b'W' as usize] = b'A'; // A or T
+        arr[b'K' as usize] = b'G'; // G or T
+        arr[b'M' as usize] = b'A'; // A or C
+        arr[b'B' as usize] = b'C'; // C, G, or T
+        arr[b'D' as usize] = b'A'; // A, G, or T
+        arr[b'H' as usize] = b'A'; // A, C, or T
+        arr[b'V' as usize] = b'A'; // A, C, or G
+        arr[b'N' as usize] = b'A'; // Any base (A, C, G, or T)
+        arr[b'r' as usize] = b'a'; // a or g
+        arr[b'y' as usize] = b'c'; // c or t
+        arr[b's' as usize] = b'c'; // c or g
+        arr[b'w' as usize] = b'a'; // a or t
+        arr[b'k' as usize] = b'g'; // g or t
+        arr[b'm' as usize] = b'a'; // a or c
+        arr[b'b' as usize] = b'c'; // c, g, or t
+        arr[b'd' as usize] = b'a'; // a, g, or t
+        arr[b'h' as usize] = b'a'; // a, c, or t
+        arr[b'v' as usize] = b'a'; // a, c, or g
+        arr[b'n' as usize] = b'a'; // any base (a, c, g, or t)
+        arr
+    };
+}
+
+fn replace_iupac_inplace(sequence: &mut String) {
+    unsafe {
+        let bytes = sequence.as_bytes_mut();
+        bytes.iter_mut().for_each(|b| {
+            let t = IUPAC[*b as usize]; 
+            if t != 0u8 {
+                *b = t;
+            }
+        });
+    }
+}
+
+/*fn replace_iupac(sequence: &str) -> String {
+    let mut result = String::with_capacity(sequence.len());
+
+    for c in sequence.chars() {
+        result.push(REPLACEMENTS[c as usize]);
+    }
+
+    result
+}*/
