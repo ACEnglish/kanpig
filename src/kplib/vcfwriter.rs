@@ -148,6 +148,9 @@ impl VcfWriter {
         *annot.entry.samples_mut() =
             Samples::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
 
-        let _result = self.writer.write_variant_record(&self.header, &annot.entry);
+        match self.writer.write_variant_record(&self.header, &annot.entry) {
+            Ok(_) => {}
+            Err(error) => panic!("Couldn't write record {:?}", error),
+        }
     }
 }
