@@ -17,12 +17,12 @@ pub struct VarNode {
     pub coverage: (Option<u64>, Option<u64>),
     pub seqsim: (Option<f32>, Option<f32>),
     pub sizesim: (Option<f32>, Option<f32>),
-    pub entry: Option<vcf::Record>,
+    pub entry: Option<vcf::variant::RecordBuf>,
     pub kfeat: Vec<f32>,
 }
 
 impl VarNode {
-    pub fn new(entry: vcf::Record, kmer: u8, maxhom: usize) -> Self {
+    pub fn new(entry: vcf::variant::RecordBuf, kmer: u8, maxhom: usize) -> Self {
         // Want to make a hash for these names for debugging, I think.
         let name = "".to_string();
         let (start, end) = entry.boundaries();
@@ -71,7 +71,7 @@ pub struct Variants {
 /// The graph has an upstream 'src' node that point to every variant node
 /// The graph has a dnstream 'snk' node that is pointed to by every variant node and 'src'
 impl Variants {
-    pub fn new(mut variants: Vec<vcf::Record>, kmer: u8, maxhom: usize) -> Self {
+    pub fn new(mut variants: Vec<vcf::variant::RecordBuf>, kmer: u8, maxhom: usize) -> Self {
         if variants.is_empty() {
             panic!("Cannot create a graph from no variants");
         }
@@ -112,7 +112,7 @@ impl Variants {
 
     /// Again, TR aware, we need to set the bounds for doing the pileup
     /// to the TR boundaries.
-    fn get_region(entries: &[vcf::Record]) -> (String, u64, u64) {
+    fn get_region(entries: &[vcf::variant::RecordBuf]) -> (String, u64, u64) {
         let chrom = entries[0].reference_sequence_name().to_string();
 
         let (min_start, max_end) = entries.iter().fold((u64::MAX, 0), |acc, e| {

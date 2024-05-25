@@ -1,5 +1,5 @@
 use crate::kplib::seq_to_kmer;
-use noodles_vcf::{self as vcf, variant::record::AlternateBases};
+use noodles_vcf::{self as vcf, variant::record::AlternateBases, variant::record::Filters};
 use std::str::FromStr;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -32,13 +32,12 @@ pub trait KdpVcf {
     fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64);
     fn boundaries(&self) -> (u64, u64);
     fn size(&self) -> u64;
-    fn is_filtered(&self) -> bool;
-    fn is_symbolic(&self) -> bool;
+    fn is_filtered(&self, header: &vcf::Header) -> bool;
     fn valid_alt(&self) -> bool;
     fn get_alt(&self) -> String;
 }
 
-impl KdpVcf for vcf::Record {
+impl KdpVcf for vcf::variant::RecordBuf {
     /// Convert variant sequence to Kfeat
     fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64) {
         let ref_seq = self.reference_bases().to_string();
@@ -60,10 +59,7 @@ impl KdpVcf for vcf::Record {
 
     /// start and end positions of an entry
     fn boundaries(&self) -> (u64, u64) {
-        let start = match self.variant_start().and_then(|res| res.ok()) {
-            Some(pos) => pos.get() as u64 - 1,
-            None => panic!("Variant doesn't have a start"),
-        };
+        let start: u64 = u64::try_from(usize::from(self.variant_start().unwrap())).unwrap() - 1;
         let end: u64 = start + self.reference_bases().len() as u64;
         (start, end)
     }
@@ -85,22 +81,18 @@ impl KdpVcf for vcf::Record {
     }
 
     /// checks if an entry's FILTER is '.' or PASS, true if it is filtered
-    fn is_filtered(&self) -> bool {
-        let binding = self.filters();
-        let mfilt = binding.as_ref();
-        mfilt == "." || mfilt == "PASS"
+    fn is_filtered(&self, header: &vcf::Header) -> bool {
+        !(self.filters().is_empty()
+            || self.filters().iter(header).any(|res| match res {
+                Ok(s) => s == "PASS",
+                Err(_) => false,
+            }))
     }
 
-    /// Alternate sequence isn't '.' or '*'
+    /// Alternate sequence isn't '.' or '*' or bnd or symbolic
     fn valid_alt(&self) -> bool {
         let alt = self.get_alt();
-        alt != "." && alt != "*" && !alt.contains(':')
-    }
-
-    /// Checks if its a symbolic allele e.g. <DEL>
-    /// Returns false if its a monozygotic reference
-    fn is_symbolic(&self) -> bool {
-        self.get_alt().contains('<')
+        alt != "." && alt != "*" && !alt.contains(':') && !alt.contains('<')
     }
 
     /// Returns the first alternate allele or a blank string with '.' if there isn't any

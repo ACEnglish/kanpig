@@ -5,8 +5,11 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 
 use noodles_vcf::{
-    self as vcf, header::record::value::map::format, header::record::value::Map,
-    variant::record_buf::samples::{Sample, keys::Keys},
+    self as vcf,
+    header::record::value::map::format,
+    header::record::value::Map,
+    variant::io::Write,
+    variant::record_buf::samples::{keys::Keys, Samples},
 };
 
 pub struct VcfWriter {
@@ -142,9 +145,9 @@ impl VcfWriter {
 
     pub fn anno_write(&mut self, mut annot: GenotypeAnno, phase_group: i32) {
         *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
-        let sample = annot.entry.samples().get_index(0).unwrap();
-        //Sample::new(&self.keys, annot.make_fields(phase_group).as_slice());
+        *annot.entry.samples_mut() =
+            Samples::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
 
-        let _result = self.writer.write_record(&self.header, &annot.entry);
+        let _result = self.writer.write_variant_record(&self.header, &annot.entry);
     }
 }

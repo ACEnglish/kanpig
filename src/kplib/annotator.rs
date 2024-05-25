@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use petgraph::graph::NodeIndex;
 
 use noodles_vcf::{
-    self as vcf, 
+    self as vcf,
     variant::record_buf::samples::sample::value::{Array, Value},
 };
 
@@ -23,7 +23,7 @@ bitflags! {
 //Format Integer Type Number = G
 type IntG = Vec<Option<i32>>;
 pub struct GenotypeAnno {
-    pub entry: vcf::Record,
+    pub entry: vcf::variant::RecordBuf,
     pub gt: String,
     pub filt: FiltFlags,
     pub sq: i32,
@@ -37,7 +37,7 @@ pub struct GenotypeAnno {
 
 impl GenotypeAnno {
     pub fn new(
-        entry: vcf::Record,
+        entry: vcf::variant::RecordBuf,
         var_idx: &NodeIndex,
         paths: &[PathScore],
         coverage: u64,
@@ -53,7 +53,9 @@ impl GenotypeAnno {
     // These are tied to VcfWriter.keys
     pub fn make_fields(&self, phase_group: i32) -> Vec<Option<Value>> {
         vec![
-            Some(Value::Genotype(self.gt.parse().expect("Should have made GT correctly"))),
+            Some(Value::Genotype(
+                self.gt.parse().expect("Should have made GT correctly"),
+            )),
             Some(Value::Integer(self.filt.bits() as i32)),
             Some(Value::Integer(self.sq)),
             Some(Value::Integer(self.gq)),
@@ -68,7 +70,7 @@ impl GenotypeAnno {
 
 /// For annotating a variant in diploid regions
 fn diploid(
-    entry: vcf::Record,
+    entry: vcf::variant::RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
@@ -146,7 +148,7 @@ fn diploid(
 }
 
 /// For annotating a variant in a zero ploidy region
-fn zero(entry: vcf::Record, coverage: u64) -> GenotypeAnno {
+fn zero(entry: vcf::variant::RecordBuf, coverage: u64) -> GenotypeAnno {
     GenotypeAnno {
         entry,
         gt: "./.".to_string(),
@@ -163,7 +165,7 @@ fn zero(entry: vcf::Record, coverage: u64) -> GenotypeAnno {
 
 /// For annotating a variant in a one ploidy region
 fn haploid(
-    entry: vcf::Record,
+    entry: vcf::variant::RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,

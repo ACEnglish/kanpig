@@ -18,7 +18,7 @@ use kplib::{
     PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
-type InputType = Option<Vec<vcf::Record>>;
+type InputType = Option<Vec<vcf::variant::RecordBuf>>;
 type OutputType = Option<Vec<GenotypeAnno>>;
 
 fn main() {
@@ -38,8 +38,7 @@ fn main() {
         error!("please fix arguments");
         std::process::exit(1);
     }
-
-    let mut input_vcf = vcf::reader::Builder::default()
+    let mut input_vcf = vcf::io::reader::Builder::default()
         .build_from_path(args.io.input.clone())
         .expect("Unable to parse vcf");
     let input_header = input_vcf.read_header().expect("Unable to parse vcf header");
@@ -60,7 +59,6 @@ fn main() {
             let m_receiver = task_receiver.clone();
             let m_result_sender = result_sender.clone();
             let m_ploidy = ploidy.clone();
-            let m_header = input_header.clone();
 
             thread::spawn(move || {
                 let mut m_bam =
@@ -70,7 +68,7 @@ fn main() {
                         Ok(None) | Err(_) => break,
                         Ok(Some(chunk)) => {
                             let mut m_graph =
-                                Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom, &m_header);
+                                Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
 
                             let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                             // For zero, we don't have to waste time going into the bam
