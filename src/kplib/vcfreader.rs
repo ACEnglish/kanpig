@@ -1,6 +1,6 @@
 use crate::kplib::{GenotypeAnno, KDParams, KdpVcf, Ploidy, Regions};
 use crossbeam_channel::Sender;
-use noodles_vcf::{self as vcf};
+use noodles_vcf::{self as vcf, variant::RecordBuf};
 use petgraph::graph::NodeIndex;
 use std::collections::VecDeque;
 use std::io::BufRead;
@@ -98,8 +98,8 @@ impl<R: BufRead> VcfChunker<R> {
     }
 
     /// Return the next vcf entry which passes parameter conditions
-    fn get_next_entry(&mut self) -> Option<vcf::variant::RecordBuf> {
-        let mut entry = vcf::variant::RecordBuf::default();
+    fn get_next_entry(&mut self) -> Option<RecordBuf> {
+        let mut entry = RecordBuf::default();
 
         loop {
             match self.m_vcf.read_record_buf(&self.m_header, &mut entry) {
@@ -131,7 +131,7 @@ impl<R: BufRead> VcfChunker<R> {
     /// If we wanted to be TR aware, when checking new_chunk, we don't just look at
     /// cur_end but also the TR catalog. We want to chunk all TR changes together
     /// regardless of their distance.
-    fn entry_in_chunk(&mut self, entry: &vcf::variant::RecordBuf) -> bool {
+    fn entry_in_chunk(&mut self, entry: &RecordBuf) -> bool {
         let check_chrom = entry.reference_sequence_name().to_string();
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;
 
@@ -150,7 +150,7 @@ impl<R: BufRead> VcfChunker<R> {
 }
 
 impl<R: BufRead> Iterator for VcfChunker<R> {
-    type Item = Vec<vcf::variant::RecordBuf>;
+    type Item = Vec<RecordBuf>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut ret = self.hold_entry.take().into_iter().collect::<Vec<_>>();

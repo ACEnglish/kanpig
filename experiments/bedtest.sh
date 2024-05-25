@@ -9,7 +9,7 @@ create() {
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
         --sizemin 50 \
         --sizesim 0.95 --seqsim 0.90 --threads 4 \
-        --maxpaths 20000 --mapq 5 --hapsim 0.98 \
+        --maxpaths 1000 --mapq 5 --hapsim 0.98 \
         --chunksize 100 --maxhom 5 \
         --sample doesthiswork \
         -o test_rs/hc.vcf --bed $bed 

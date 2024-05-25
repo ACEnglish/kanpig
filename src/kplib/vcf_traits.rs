@@ -1,5 +1,7 @@
 use crate::kplib::seq_to_kmer;
-use noodles_vcf::{self as vcf, variant::record::AlternateBases, variant::record::Filters};
+use noodles_vcf::{
+    variant::record::AlternateBases, variant::record::Filters, variant::RecordBuf, Header,
+};
 use std::str::FromStr;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -27,17 +29,16 @@ impl FromStr for Svtype {
     }
 }
 
-/// Convert vcf::Record to kfeat
 pub trait KdpVcf {
     fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64);
     fn boundaries(&self) -> (u64, u64);
     fn size(&self) -> u64;
-    fn is_filtered(&self, header: &vcf::Header) -> bool;
+    fn is_filtered(&self, header: &Header) -> bool;
     fn valid_alt(&self) -> bool;
     fn get_alt(&self) -> String;
 }
 
-impl KdpVcf for vcf::variant::RecordBuf {
+impl KdpVcf for RecordBuf {
     /// Convert variant sequence to Kfeat
     fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64) {
         let ref_seq = self.reference_bases().to_string();
@@ -81,7 +82,7 @@ impl KdpVcf for vcf::variant::RecordBuf {
     }
 
     /// checks if an entry's FILTER is '.' or PASS, true if it is filtered
-    fn is_filtered(&self, header: &vcf::Header) -> bool {
+    fn is_filtered(&self, header: &Header) -> bool {
         !(self.filters().is_empty()
             || self.filters().iter(header).any(|res| match res {
                 Ok(s) => s == "PASS",
