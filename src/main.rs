@@ -18,7 +18,7 @@ use kplib::{
     PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
-type InputType = Option<Vec<vcf::Record>>;
+type InputType = Option<Vec<vcf::variant::RecordBuf>>;
 type OutputType = Option<Vec<GenotypeAnno>>;
 
 fn main() {
@@ -38,8 +38,7 @@ fn main() {
         error!("please fix arguments");
         std::process::exit(1);
     }
-
-    let mut input_vcf = vcf::reader::Builder::default()
+    let mut input_vcf = vcf::io::reader::Builder::default()
         .build_from_path(args.io.input.clone())
         .expect("Unable to parse vcf");
     let input_header = input_vcf.read_header().expect("Unable to parse vcf header");

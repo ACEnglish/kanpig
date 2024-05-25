@@ -1,6 +1,6 @@
 use crate::kplib::{GenotypeAnno, KDParams, KdpVcf, Ploidy, Regions};
 use crossbeam_channel::Sender;
-use noodles_vcf::{self as vcf};
+use noodles_vcf::{self as vcf, variant::RecordBuf};
 use petgraph::graph::NodeIndex;
 use std::collections::VecDeque;
 use std::io::BufRead;
@@ -8,7 +8,7 @@ use std::io::BufRead;
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
 pub struct VcfChunker<R: BufRead> {
-    pub m_vcf: vcf::reader::Reader<R>,
+    pub m_vcf: vcf::io::Reader<R>,
     pub m_header: vcf::Header,
     regions: Regions,
     params: KDParams,
@@ -18,7 +18,7 @@ pub struct VcfChunker<R: BufRead> {
     // When iterating, we will encounter a variant that no longer
     // fits in the current chunk. We need to hold on to it for the
     // next chunk
-    hold_entry: Option<vcf::Record>,
+    hold_entry: Option<vcf::variant::RecordBuf>,
     pub chunk_count: u64,
     pub call_count: u64,
     pub skip_count: u64,
@@ -27,7 +27,7 @@ pub struct VcfChunker<R: BufRead> {
 
 impl<R: BufRead> VcfChunker<R> {
     pub fn new(
-        m_vcf: vcf::reader::Reader<R>,
+        m_vcf: vcf::io::Reader<R>,
         m_header: vcf::Header,
         regions: Regions,
         params: KDParams,
@@ -50,8 +50,12 @@ impl<R: BufRead> VcfChunker<R> {
 
     /// Checks if entry passes all parameter conditions including
     /// within --bed regions, passing, and within expected size
-    fn filter_entry(&mut self, entry: &vcf::Record) -> bool {
-        if self.params.passonly & entry.is_filtered() {
+    fn filter_entry(&mut self, entry: &vcf::variant::RecordBuf) -> bool {
+        if self.params.passonly & entry.is_filtered(&self.m_header) {
+            return false;
+        }
+
+        if !entry.valid_alt() {
             return false;
         }
 
@@ -60,15 +64,11 @@ impl<R: BufRead> VcfChunker<R> {
             return false;
         }
 
-        if !entry.valid_alt() {
-            return false;
-        }
-
         // Is it inside a region
         let mut default = VecDeque::new();
         let m_coords = self
             .regions
-            .get_mut(&entry.chromosome().to_string())
+            .get_mut(entry.reference_sequence_name())
             .unwrap_or(&mut default);
 
         if m_coords.is_empty() {
@@ -98,11 +98,11 @@ impl<R: BufRead> VcfChunker<R> {
     }
 
     /// Return the next vcf entry which passes parameter conditions
-    fn get_next_entry(&mut self) -> Option<vcf::Record> {
-        let mut entry = vcf::Record::default();
+    fn get_next_entry(&mut self) -> Option<RecordBuf> {
+        let mut entry = RecordBuf::default();
 
         loop {
-            match self.m_vcf.read_record(&self.m_header, &mut entry) {
+            match self.m_vcf.read_record_buf(&self.m_header, &mut entry) {
                 Ok(0) => return None,
                 Err(e) => {
                     error!("skipping invalid VCF entry {:?}", e);
@@ -131,8 +131,8 @@ impl<R: BufRead> VcfChunker<R> {
     /// If we wanted to be TR aware, when checking new_chunk, we don't just look at
     /// cur_end but also the TR catalog. We want to chunk all TR changes together
     /// regardless of their distance.
-    fn entry_in_chunk(&mut self, entry: &vcf::Record) -> bool {
-        let check_chrom = entry.chromosome().to_string();
+    fn entry_in_chunk(&mut self, entry: &RecordBuf) -> bool {
+        let check_chrom = entry.reference_sequence_name().to_string();
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;
 
         let (start, end) = entry.boundaries();
@@ -150,7 +150,7 @@ impl<R: BufRead> VcfChunker<R> {
 }
 
 impl<R: BufRead> Iterator for VcfChunker<R> {
-    type Item = Vec<vcf::Record>;
+    type Item = Vec<RecordBuf>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut ret = self.hold_entry.take().into_iter().collect::<Vec<_>>();

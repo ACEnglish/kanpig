@@ -4,21 +4,21 @@ version = "0.2.1-dev"
 edition = "2021"
 
 [dependencies]
-bitflags = "2.5.0"
+bitflags = { version = "2.5.0" }
 clap = { version = "4.0", features = ["derive"] }
 crossbeam-channel = { version = "0.5.12" }
-indexmap = "2.2.3"
-indicatif = "0.17.8"
+indexmap = { version = "2.2.3" }
+indicatif = { version = "0.17.8" }
 itertools = { version = "0.12.1" }
-lazy_static = "1.4.0"
+lazy_static = { version = "1.4.0" }
 log = { version = "0.4", features = ["std", "serde"] }
-noodles-vcf = { version = "0.49.0" }
+noodles-vcf = { version = "0.57.0" }
 ordered-float = { version = "4.0", default-features = false }
-page_size = "0.6.0"
+page_size = { version = "0.6.0" }
 petgraph = { version = "0.6.2" }
 pretty_env_logger = { version = "0.4.0" }
 rust-htslib = { version = "0.46.0" }
-rust-lapper = "1.1.0"
+rust-lapper = { version = "1.1.0" }
 
 [profile.release]
 opt-level = 3

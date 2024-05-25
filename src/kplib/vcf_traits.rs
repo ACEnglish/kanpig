@@ -1,8 +1,7 @@
 use crate::kplib::seq_to_kmer;
 use noodles_vcf::{
-    self as vcf, record::alternate_bases::allele, record::info::field, record::Filters,
+    variant::record::AlternateBases, variant::record::Filters, variant::RecordBuf, Header,
 };
-use std::cmp::Ordering;
 use std::str::FromStr;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -30,25 +29,20 @@ impl FromStr for Svtype {
     }
 }
 
-/// Convert vcf::Record to kfeat
 pub trait KdpVcf {
     fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64);
     fn boundaries(&self) -> (u64, u64);
     fn size(&self) -> u64;
-    fn is_filtered(&self) -> bool;
-    fn variant_type(&self) -> Svtype;
+    fn is_filtered(&self, header: &Header) -> bool;
     fn valid_alt(&self) -> bool;
+    fn get_alt(&self) -> &str;
 }
 
-impl KdpVcf for vcf::Record {
+impl KdpVcf for RecordBuf {
     /// Convert variant sequence to Kfeat
     fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64) {
         let ref_seq = self.reference_bases().to_string();
-        let alt_seq = self
-            .alternate_bases()
-            .first()
-            .expect("Can only work on sequence resolved variants")
-            .to_string();
+        let alt_seq = self.get_alt();
 
         let size = alt_seq.len() as i64 - ref_seq.len() as i64;
 
@@ -66,36 +60,15 @@ impl KdpVcf for vcf::Record {
 
     /// start and end positions of an entry
     fn boundaries(&self) -> (u64, u64) {
-        let start: u64 = u64::try_from(usize::from(self.position())).unwrap() - 1;
-        let end: u64 = u64::try_from(usize::from(self.end().expect("No Variant End"))).unwrap();
+        let start: u64 = u64::try_from(usize::from(self.variant_start().unwrap())).unwrap() - 1;
+        let end: u64 = start + self.reference_bases().len() as u64;
         (start, end)
     }
 
     /// grab entry's length from either SVLEN field or infer it from the REF ALT fields
     fn size(&self) -> u64 {
-        let svlen = self
-            .info()
-            .get(&field::Key::from_str("SVLEN").unwrap_or_else(|_| panic!("No SVLEN INFO")));
-
-        if let Some(Some(field::Value::Integer(svlen))) = svlen {
-            return svlen.unsigned_abs() as u64;
-        } else if let Some(Some(field::Value::Array(field::value::Array::Integer(svlen)))) = svlen {
-            return svlen
-                .first()
-                .unwrap_or_else(|| panic!("Bad SVLEN"))
-                .unwrap()
-                .unsigned_abs() as u64;
-        }
-
         let r_len: u64 = self.reference_bases().len() as u64;
-        let a_len: u64 = match self.alternate_bases().first() {
-            Some(allele::Allele::Bases(alt)) => alt.len() as u64,
-            Some(allele::Allele::Symbol(_alt)) => {
-                let (start, end) = self.boundaries();
-                start.abs_diff(end) + 1
-            }
-            _ => 0,
-        };
+        let a_len: u64 = self.get_alt().len() as u64;
 
         if r_len == a_len {
             if r_len == 1 {
@@ -109,53 +82,27 @@ impl KdpVcf for vcf::Record {
     }
 
     /// checks if an entry's FILTER is '.' or PASS, true if it is filtered
-    fn is_filtered(&self) -> bool {
-        match &self.filters() {
-            Some(map) => **map != Filters::Pass,
-            None => false,
-        }
+    fn is_filtered(&self, header: &Header) -> bool {
+        !(self.filters().is_empty()
+            || self.filters().iter(header).any(|res| match res {
+                Ok(s) => s == "PASS",
+                Err(_) => false,
+            }))
     }
 
-    /// Alternate sequence isn't '.' or '*'
+    /// Alternate sequence isn't '.' or '*' or bnd or symbolic
     fn valid_alt(&self) -> bool {
-        match self.alternate_bases().first() {
-            Some(alt) => {
-                let alt = alt.to_string();
-                alt != "." && alt != "*" && !alt.contains(':')
-            }
-            _ => false,
-        }
+        let alt = self.get_alt();
+        alt != "." && alt != "*" && !alt.contains(':') && !alt.contains('<')
     }
 
-    /// return the Svtype of a vcf entry
-    fn variant_type(&self) -> Svtype {
-        match self
-            .info()
-            .get(&field::Key::from_str("SVTYPE").expect("Unable to make key"))
-        {
-            // INFO/SVTYPE
-            Some(Some(field::Value::String(svtype))) => svtype.parse().expect("Bad SVTYPE"),
-            Some(Some(field::Value::Array(field::value::Array::String(svtype)))) => svtype
-                .first()
-                .cloned()
-                .unwrap_or_else(|| panic!("Bad SVTYPE"))
-                .expect("parsed")
-                .parse()
-                .unwrap(),
-            // Direct from REF/ALT
-            _ => match self.alternate_bases().first() {
-                Some(allele::Allele::Bases(alt)) => {
-                    match alt.len().cmp(&self.reference_bases().len()) {
-                        Ordering::Greater => Svtype::Ins,
-                        Ordering::Less => Svtype::Del,
-                        Ordering::Equal if alt.len() == 1 => Svtype::Snp,
-                        _ => Svtype::Unk,
-                    }
-                }
-                Some(allele::Allele::Symbol(alt)) => Svtype::from_str(&alt.to_string())
-                    .unwrap_or_else(|_| panic!("Bad Symbolic Alt")),
-                _ => Svtype::Unk,
-            },
+    /// Returns the first alternate allele or a blank string with '.' if there isn't any
+    fn get_alt(&self) -> &str {
+        let alts = self.alternate_bases();
+        match alts.len() {
+            0 => ".",
+            _ => alts.iter().next().expect("I just checked").unwrap(),
+            //.to_string(), // I don't like all this String when str should be simplier
         }
     }
 }
