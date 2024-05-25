@@ -12,7 +12,7 @@ fn encode_nuc(nuc: u8) -> u64 {
 /// Count kmers in a sequence
 pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool, maxhom: usize) -> Vec<f32> {
     if maxhom != 0 {
-        return seq_to_kmer(&compress_homopolymer(sequence, maxhom), kmer, negative, 0)
+        return seq_to_kmer(&compress_homopolymer(sequence, maxhom), kmer, negative, 0);
     }
 
     let ukmer = kmer as usize;
@@ -39,7 +39,6 @@ pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool, maxhom: usize) -> 
     // rolling sum masks off first nuc and adds the next one
     let mask: u64 = (1 << (2 * (kmer - 1) as usize)) - 1;
 
-    //for i in sequence[1..(sequence.len() - ukmer + 1)].iter() {
     for i in sequence.iter().skip(ukmer) {
         let f_nuc = encode_nuc(*i);
         f_result = ((f_result & mask) << 2) + f_nuc;

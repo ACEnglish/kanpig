@@ -48,7 +48,7 @@ impl VcfWriter {
         // Setup FORMAT header definitions
         // Overwrites existing definitions
         let all_formats = header.formats_mut();
-        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:PG:DP:AD:ZS:SS"
+        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:PS:DP:AD:ZS:SS"
             .split(':')
             .map(String::from)
             .collect();
@@ -87,13 +87,13 @@ impl VcfWriter {
         *gqfmt.description_mut() = "Phred scaled quality of genotype".to_string();
         all_formats.insert(gqid.to_string(), gqfmt);
 
-        // PG
-        let pgid = "PG";
-        let mut pgfmt = Map::<format::Format>::from(pgid);
-        *pgfmt.number_mut() = format::Number::Count(1);
-        *pgfmt.type_mut() = format::Type::Integer;
-        *pgfmt.description_mut() = "Local phase group of entries".to_string();
-        all_formats.insert(pgid.to_string(), pgfmt);
+        // PS
+        let psid = "PS";
+        let mut psfmt = Map::<format::Format>::from(psid);
+        *psfmt.number_mut() = format::Number::Count(1);
+        *psfmt.type_mut() = format::Type::Integer;
+        *psfmt.description_mut() = "Local phase group of entries".to_string();
+        all_formats.insert(psid.to_string(), psfmt);
 
         // DP
         let dpid = "DP";
