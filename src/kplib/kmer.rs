@@ -11,11 +11,10 @@ fn encode_nuc(nuc: u8) -> u64 {
 
 /// Count kmers in a sequence
 pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool, maxhom: usize) -> Vec<f32> {
-    let sequence = if maxhom != 0 {
-        compress_homopolymer(sequence, maxhom)
-    } else {
-        sequence.to_vec()
-    };
+    if maxhom != 0 {
+        return seq_to_kmer(&compress_homopolymer(sequence, maxhom), kmer, negative, 0)
+    }
+
     let ukmer = kmer as usize;
     let mut kcounts = vec![0f32; 1 << (2 * ukmer)];
     let cnt = if negative { -1.0 } else { 1.0 };

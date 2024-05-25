@@ -18,7 +18,7 @@ pub struct VcfChunker<R: BufRead> {
     // When iterating, we will encounter a variant that no longer
     // fits in the current chunk. We need to hold on to it for the
     // next chunk
-    hold_entry: Option<vcf::variant::RecordBuf>,
+    hold_entry: Option<RecordBuf>,
     pub chunk_count: u64,
     pub call_count: u64,
     pub skip_count: u64,
@@ -50,7 +50,7 @@ impl<R: BufRead> VcfChunker<R> {
 
     /// Checks if entry passes all parameter conditions including
     /// within --bed regions, passing, and within expected size
-    fn filter_entry(&mut self, entry: &vcf::variant::RecordBuf) -> bool {
+    fn filter_entry(&mut self, entry: &RecordBuf) -> bool {
         if self.params.passonly & entry.is_filtered(&self.m_header) {
             return false;
         }
