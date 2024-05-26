@@ -155,6 +155,9 @@ fn main() {
                 }
             }
         }
+        if m_writer.iupac_fixed {
+            warn!("Some IUPAC codes in REF sequences have been fixed in output");
+        }
         info!("genotype counts: {:#?}", m_writer.gtcounts);
     });
 

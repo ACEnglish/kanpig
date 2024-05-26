@@ -17,7 +17,7 @@ pub struct VcfWriter {
     header: vcf::Header,
     keys: Keys,
     pub gtcounts: HashMap<GTstate, usize>,
-    iupac_warned: bool,
+    pub iupac_fixed: bool,
 }
 
 impl VcfWriter {
@@ -149,7 +149,7 @@ impl VcfWriter {
             header,
             keys,
             gtcounts: HashMap::new(),
-            iupac_warned: false,
+            iupac_fixed: false,
         }
     }
 
@@ -159,10 +159,7 @@ impl VcfWriter {
             Samples::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
 
         let changed = replace_iupac_inplace(annot.entry.reference_bases_mut());
-        if changed && !self.iupac_warned {
-            warn!("Some IUPAC codes in REF sequences have been fixed");
-            self.iupac_warned = true;
-        }
+        self.iupac_fixed = self.iupac_fixed | changed;
 
         match self.writer.write_variant_record(&self.header, &annot.entry) {
             Ok(_) => {}
@@ -184,7 +181,6 @@ lazy_static::lazy_static! {
         arr[b'D' as usize] = b'A'; // A, G, or T
         arr[b'H' as usize] = b'A'; // A, C, or T
         arr[b'V' as usize] = b'A'; // A, C, or G
-        arr[b'N' as usize] = b'A'; // Any base (A, C, G, or T)
         arr[b'r' as usize] = b'a'; // a or g
         arr[b'y' as usize] = b'c'; // c or t
         arr[b's' as usize] = b'c'; // c or g
@@ -195,7 +191,6 @@ lazy_static::lazy_static! {
         arr[b'd' as usize] = b'a'; // a, g, or t
         arr[b'h' as usize] = b'a'; // a, c, or t
         arr[b'v' as usize] = b'a'; // a, c, or g
-        arr[b'n' as usize] = b'a'; // any base (a, c, g, or t)
         arr
     };
 }
