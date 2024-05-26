@@ -18,6 +18,7 @@ pub struct VcfWriter {
     keys: Keys,
     pub gtcounts: HashMap<GTstate, usize>,
     pub iupac_fixed: bool,
+    buf: Vec<u8>,
 }
 
 impl VcfWriter {
@@ -150,6 +151,7 @@ impl VcfWriter {
             keys,
             gtcounts: HashMap::new(),
             iupac_fixed: false,
+            buf: vec![],
         }
     }
 
@@ -158,12 +160,22 @@ impl VcfWriter {
         *annot.entry.samples_mut() =
             Samples::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
 
-        let changed = replace_iupac_inplace(annot.entry.reference_bases_mut());
-        self.iupac_fixed = self.iupac_fixed | changed;
-
-        match self.writer.write_variant_record(&self.header, &annot.entry) {
-            Ok(_) => {}
-            Err(error) => panic!("Couldn't write record {:?}", error),
+        self.buf.clear();
+        let mut tmp = vcf::io::Writer::new(&mut self.buf);
+        // Let noodles check it, first
+        match tmp.write_variant_record(&self.header, &annot.entry) {
+            Ok(_) => {
+                let _ = self.writer.get_mut().write_all(&self.buf);
+            }
+            Err(_) => {
+                let changed = replace_iupac_inplace(annot.entry.reference_bases_mut());
+                self.iupac_fixed |= changed;
+                // Assuming it will work now
+                match self.writer.write_variant_record(&self.header, &annot.entry) {
+                    Ok(_) => {}
+                    Err(error) => panic!("Couldn't write record {:?}", error),
+                }
+            }
         }
     }
 }
