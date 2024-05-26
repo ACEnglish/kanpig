@@ -109,22 +109,22 @@ fn main() {
     // This is the semaphore for the progress bar that communicates between main and writer
     let num_variants = Arc::new(Mutex::new(0));
 
-    let wthread_io = args.io.clone();
-    let wthread_header = input_header.clone();
-    let wthread_num_variants = num_variants.clone();
+    let wt_io = args.io.clone();
+    let wt_header = input_header.clone();
+    let wt_num_variants = num_variants.clone();
 
     let write_handler = std::thread::spawn(move || {
+        let mut m_writer = VcfWriter::new(&wt_io.out, wt_header.clone(), &wt_io.sample);
+
+        let mut pbar: Option<ProgressBar> = None;
         let sty = ProgressStyle::with_template(
             " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
         )
         .unwrap()
         .progress_chars("##-");
-        let mut pbar: Option<ProgressBar> = None;
+
         let mut phase_group: i32 = 0;
         let mut completed_variants: u64 = 0;
-        let mut m_writer =
-            VcfWriter::new(&wthread_io.out, wthread_header.clone(), &wthread_io.sample);
-
         loop {
             match result_receiver.recv() {
                 Ok(None) | Err(_) => {
@@ -144,9 +144,9 @@ fn main() {
                     } else {
                         completed_variants += rsize;
                         // check if the reader is finished so we can setup the pbar
-                        let value_guard = wthread_num_variants.lock().unwrap();
-                        if *value_guard != 0 {
-                            let t_bar = ProgressBar::new(*value_guard).with_style(sty.clone());
+                        let value = *wt_num_variants.lock().unwrap();
+                        if value != 0 {
+                            let t_bar = ProgressBar::new(value).with_style(sty.clone());
                             t_bar.inc(completed_variants);
                             pbar = Some(t_bar);
                         }
