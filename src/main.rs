@@ -109,9 +109,9 @@ fn main() {
     // This is the semaphore for the progress bar that communicates between main and writer
     let num_variants = Arc::new(Mutex::new(0));
 
-    let wthread_num_variants = num_variants.clone();
     let wthread_io = args.io.clone();
     let wthread_header = input_header.clone();
+    let wthread_num_variants = num_variants.clone();
 
     let write_handler = std::thread::spawn(move || {
         let sty = ProgressStyle::with_template(

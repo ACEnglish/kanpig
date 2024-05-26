@@ -17,6 +17,7 @@ pub struct VcfWriter {
     header: vcf::Header,
     keys: Keys,
     pub gtcounts: HashMap<GTstate, usize>,
+    iupac_warned: bool,
 }
 
 impl VcfWriter {
@@ -148,6 +149,7 @@ impl VcfWriter {
             header,
             keys,
             gtcounts: HashMap::new(),
+            iupac_warned: false,
         }
     }
 
@@ -156,7 +158,11 @@ impl VcfWriter {
         *annot.entry.samples_mut() =
             Samples::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
 
-        replace_iupac_inplace(annot.entry.reference_bases_mut());
+        let changed = replace_iupac_inplace(annot.entry.reference_bases_mut());
+        if changed && !self.iupac_warned {
+            warn!("Some IUPAC codes in REF sequences have been fixed");
+            self.iupac_warned = true;
+        }
 
         match self.writer.write_variant_record(&self.header, &annot.entry) {
             Ok(_) => {}
@@ -194,14 +200,17 @@ lazy_static::lazy_static! {
     };
 }
 
-fn replace_iupac_inplace(sequence: &mut str) {
+fn replace_iupac_inplace(sequence: &mut str) -> bool {
+    let mut any_change = false;
     unsafe {
         let bytes = sequence.as_bytes_mut();
         bytes.iter_mut().for_each(|b| {
             let t = IUPAC[*b as usize];
             if t != 0u8 {
+                any_change = true;
                 *b = t;
             }
         });
     }
+    any_change
 }
