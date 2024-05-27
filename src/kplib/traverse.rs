@@ -52,10 +52,11 @@ pub fn brute_force_find_path(
         path: vec![],
     };
     let mut stack: BinaryHeap<PathNodeState> = BinaryHeap::new();
-    //let mut stack: Vec<PathNodeState> = Vec::new();
     stack.push(start_path);
+
     let mut best_path = PathScore::default();
     let mut npaths = 0;
+
     let partial_haps = target.partial_haplotypes(params.kmer);
     let snk_node = NodeIndex::new(graph.node_count() - 1);
 
@@ -63,7 +64,6 @@ pub fn brute_force_find_path(
         // Throw all of cur_node's neighbors on the stack
         // Except snk_node, which is an indicator that the
         // current path has ended
-        //let mut any_push = false;
         for next_node in graph.edges(cur_path.node).filter_map(|edge| {
             if skip_edges.contains(&edge.id()) {
                 None
@@ -83,7 +83,6 @@ pub fn brute_force_find_path(
                 npaths += 1;
             } else {
                 let nsize = cur_path.size + graph.node_weight(next_node).unwrap().size;
-                //any_push = true;
                 let mut npath = cur_path.path.clone();
                 npath.push(next_node);
                 stack.push(PathNodeState {
@@ -94,10 +93,6 @@ pub fn brute_force_find_path(
                 });
             }
         }
-
-        /*if any_push {
-            stack.sort_by_key(|node| std::cmp::Reverse(node.dist));
-        }*/
 
         if npaths > params.maxpaths {
             break;
@@ -128,7 +123,6 @@ pub fn get_one_to_one(
             } else {
                 None
             }
-            //(node.size >= size_range_lower) & (node.size <= size_range_upper) & (
         })
         .collect()
 }

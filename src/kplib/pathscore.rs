@@ -37,27 +37,6 @@ impl Ord for PathScore {
             other_ordering => other_ordering,
         }
     }
-    // Sort by size then sequence
-    /*    fn cmp(&self, other: &Self) -> Ordering {
-        match self
-            .align_pct
-            .partial_cmp(&other.align_pct)
-            .unwrap_or(Ordering::Equal)
-        {
-            Ordering::Equal => match self
-                .sizesim
-                .partial_cmp(&other.sizesim)
-                .unwrap_or(Ordering::Equal)
-            {
-                Ordering::Equal => self
-                    .seqsim
-                    .partial_cmp(&other.seqsim)
-                    .unwrap_or(Ordering::Equal),
-                other_ordering => other_ordering,
-            },
-            other_ordering => other_ordering,
-        }
-    }*/
 }
 
 impl PartialOrd for PathScore {

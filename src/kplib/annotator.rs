@@ -36,6 +36,17 @@ pub struct GenotypeAnno {
 }
 
 impl GenotypeAnno {
+    /// Constructs a new `GenotypeAnno` instance based on the provided parameters.
+    ///
+    /// # Parameters
+    /// - `entry`: A `RecordBuf` representing the variant record.
+    /// - `var_idx`: A reference to the node index.
+    /// - `paths`: A slice of `PathScore` representing the paths.
+    /// - `coverage`: An unsigned 64-bit integer representing the coverage.
+    /// - `ploidy`: A reference to the `Ploidy` enum representing the ploidy level.
+    ///
+    /// # Returns
+    /// A `GenotypeAnno` instance initialized based on the provided parameters.
     pub fn new(
         entry: RecordBuf,
         var_idx: &NodeIndex,
@@ -50,7 +61,14 @@ impl GenotypeAnno {
         }
     }
 
-    // These are tied to VcfWriter.keys
+    /// Generates fields for the `GenotypeAnno` instance.
+    /// These fields correspond to the keys defined in `VcfWriter`.
+    ///
+    /// # Parameters
+    /// - `phase_group`: An integer representing the phase group.
+    ///
+    /// # Returns
+    /// A vector containing optional `Value` instances representing the fields of the `GenotypeAnno`.
     pub fn make_fields(&self, phase_group: i32) -> Vec<Option<Value>> {
         vec![
             Some(Value::Genotype(

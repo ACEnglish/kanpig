@@ -3,9 +3,10 @@ use noodles_vcf::header::record::value::{map::contig::Contig, Map};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
+use crate::kplib::BedParser;
+
 pub type ContigMap = IndexMap<String, Map<Contig>>;
 pub type Regions = HashMap<String, VecDeque<(u64, u64)>>;
-use crate::kplib::BedParser;
 
 /// create a HashMap with keys of chromsome names and
 /// values a list of start, end positions with regions
