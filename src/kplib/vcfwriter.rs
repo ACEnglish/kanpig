@@ -134,13 +134,13 @@ impl VcfWriter {
         all_formats.insert(ssid.to_string(), ssfmt);
 
         // Ready to make files
-        let m_page = page_size::get() * 1000;
         let out_buf: Box<dyn Write> = match out_path {
             Some(ref path) => {
+                let m_page = page_size::get() * 1000;
                 let file = File::create(path).expect("Error Creating Output File");
                 Box::new(BufWriter::with_capacity(m_page, file))
             }
-            None => Box::new(BufWriter::with_capacity(m_page, std::io::stdout())),
+            None => Box::new(BufWriter::new(std::io::stdout())),
         };
         let mut writer = vcf::io::Writer::new(out_buf);
         let _ = writer.write_header(&header);
