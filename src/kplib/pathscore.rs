@@ -61,26 +61,12 @@ impl PathScore {
     pub fn new(
         graph: &DiGraph<VarNode, ()>,
         path: Vec<NodeIndex>,
+        path_size: i64,
         targets: &Vec<Haplotype>,
         target_size: i64,
         params: &KDParams,
     ) -> Self {
-        let path_size: i64 = path
-            .iter()
-            .filter_map(|&node_index| graph.node_weight(node_index))
-            .map(|x| x.size)
-            .sum();
-
-        let path_k: Vec<f32> = path
-            .iter()
-            .filter_map(|&node_index| graph.node_weight(node_index))
-            .map(|x| x.kfeat.as_ref())
-            .fold(
-                vec![0f32; 4_usize.pow(params.kmer.into())],
-                |acc: Vec<f32>, other: &Vec<f32>| {
-                    acc.iter().zip(other).map(|(x, y)| x + y).collect()
-                },
-            );
+        let mut path_k: Option<Vec<f32>> = None;
 
         // Return the partials in order from all to least
         for hap_parts in targets {
@@ -94,7 +80,26 @@ impl PathScore {
                 continue;
             }
 
-            let seqsim = metrics::seqsim(&path_k, &hap_parts.kfeat, params.minkfreq as f32);
+            if !path_k.is_some() {
+                // only make if it is ever needed
+                path_k = Some(
+                    path.iter()
+                        .filter_map(|&node_index| graph.node_weight(node_index))
+                        .map(|x| x.kfeat.as_ref())
+                        .fold(
+                            vec![0f32; 4_usize.pow(params.kmer.into())],
+                            |acc: Vec<f32>, other: &Vec<f32>| {
+                                acc.iter().zip(other).map(|(x, y)| x + y).collect()
+                            },
+                        ),
+                );
+            }
+
+            let seqsim = metrics::seqsim(
+                path_k.as_ref().unwrap(),
+                &hap_parts.kfeat,
+                params.minkfreq as f32,
+            );
             debug!("sqsim: {}", seqsim);
             if seqsim < params.seqsim {
                 continue;

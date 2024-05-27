@@ -45,20 +45,18 @@ pub fn brute_force_find_path(
     params: &KDParams,
     skip_edges: &[EdgeIndex],
 ) -> PathScore {
-    let start_path = PathNodeState {
+    let mut npaths = 0;
+    let mut best_path = PathScore::default();
+    let snk_node = NodeIndex::new(graph.node_count() - 1);
+    let partial_haps = target.partial_haplotypes(params.kmer);
+
+    let mut stack: BinaryHeap<PathNodeState> = BinaryHeap::new();
+    stack.push(PathNodeState {
         dist: target.size.unsigned_abs(), // this is for sorting
         size: 0,
         node: NodeIndex::new(0),
         path: vec![],
-    };
-    let mut stack: BinaryHeap<PathNodeState> = BinaryHeap::new();
-    stack.push(start_path);
-
-    let mut best_path = PathScore::default();
-    let mut npaths = 0;
-
-    let partial_haps = target.partial_haplotypes(params.kmer);
-    let snk_node = NodeIndex::new(graph.node_count() - 1);
+    });
 
     while let Some(cur_path) = stack.pop() {
         // Throw all of cur_node's neighbors on the stack
@@ -75,6 +73,7 @@ pub fn brute_force_find_path(
                 best_path = best_path.max(PathScore::new(
                     graph,
                     cur_path.path.clone(),
+                    cur_path.size,
                     &partial_haps,
                     target.size,
                     params,
@@ -114,6 +113,7 @@ pub fn get_one_to_one(
             let candidate = PathScore::new(
                 graph,
                 vec![target_node],
+                graph.node_weight(target_node).unwrap().size,
                 vec![target.clone()].as_ref(),
                 target.size,
                 params,
