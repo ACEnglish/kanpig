@@ -49,7 +49,7 @@ pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
 /// - If both sizes are zero, the function returns 1.0.
 /// - Otherwise, the similarity is calculated as the ratio of the smaller size to the larger size.
 pub fn sizesim(size_a: u64, size_b: u64) -> f32 {
-    if size_a == 0 && size_b == 0 {
+    if size_a == size_b {
         return 1.0;
     }
     let min_size = size_a.min(size_b).max(1) as f32;
