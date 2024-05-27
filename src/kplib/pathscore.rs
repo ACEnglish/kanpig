@@ -80,7 +80,7 @@ impl PathScore {
                 continue;
             }
 
-            if !path_k.is_some() {
+            if path_k.is_none() {
                 // only make if it is ever needed
                 path_k = Some(
                     path.iter()
