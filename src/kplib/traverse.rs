@@ -78,7 +78,6 @@ pub fn brute_force_find_path(
                     target.size,
                     params,
                 ));
-                debug!("best path {:?}", best_path);
                 npaths += 1;
             } else {
                 let nsize = cur_path.size + graph.node_weight(next_node).unwrap().size;
@@ -98,6 +97,7 @@ pub fn brute_force_find_path(
         }
     }
 
+    debug!("best path {:?}", best_path);
     best_path
 }
 

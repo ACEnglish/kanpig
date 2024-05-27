@@ -75,7 +75,7 @@ impl PathScore {
             }
 
             let sizesim = metrics::sizesim(path_size.unsigned_abs(), hap_parts.size.unsigned_abs());
-            debug!("szsim: {}", sizesim);
+            //debug!("szsim: {}", sizesim);
             if sizesim < params.sizesim {
                 continue;
             }
@@ -100,7 +100,7 @@ impl PathScore {
                 &hap_parts.kfeat,
                 params.minkfreq as f32,
             );
-            debug!("sqsim: {}", seqsim);
+            //debug!("sqsim: {}", seqsim);
             if seqsim < params.seqsim {
                 continue;
             }

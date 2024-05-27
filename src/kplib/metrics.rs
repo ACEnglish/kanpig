@@ -15,14 +15,14 @@ use ordered_float::OrderedFloat;
 pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
     let mut deno: f32 = 0.0;
     let mut neum: f32 = 0.0;
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        let d = x.abs() + y.abs();
-        if d <= mink {
-            continue;
-        }
-        deno += d;
+    let mut total_d: f32;
 
-        neum += (x - y).abs();
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        total_d = x.abs() + y.abs();
+        if total_d > mink {
+            deno += total_d;
+            neum += (x - y).abs();
+        }
     }
 
     if deno == 0.0 {
@@ -49,12 +49,12 @@ pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
 /// - If both sizes are zero, the function returns 1.0.
 /// - Otherwise, the similarity is calculated as the ratio of the smaller size to the larger size.
 pub fn sizesim(size_a: u64, size_b: u64) -> f32 {
-    debug!("sz: {} <-> {}", size_a, size_b);
-    if ((size_a == 0) || (size_b == 0)) && size_a == size_b {
+    if size_a == 0 && size_b == 0 {
         return 1.0;
     }
-    std::cmp::max(std::cmp::min(size_a, size_b), 1) as f32
-        / std::cmp::max(std::cmp::max(size_a, size_b), 1) as f32
+    let min_size = size_a.min(size_b).max(1) as f32;
+    let max_size = size_a.max(size_b).max(1) as f32;
+    min_size / max_size
 }
 
 /// Determines if two intervals overlap.
