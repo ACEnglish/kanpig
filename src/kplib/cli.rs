@@ -165,6 +165,36 @@ impl ArgParser {
             warn!("--kmer above 8 becomes memory intensive");
         }
 
+        if self.kd.kmer < 1 {
+            error!("--kmer must be at least 1");
+            is_ok = false;
+        }
+
+        if self.kd.sizesim < 0.0 || self.kd.sizesim > 1.0 {
+            error!("--sizesim must be between 0.0 and 1.0");
+            is_ok = false;
+        }
+
+        if self.kd.seqsim < 0.0 || self.kd.seqsim > 1.0 {
+            error!("--seqsim must be between 0.0 and 1.0");
+            is_ok = false;
+        }
+
+        if self.kd.hapsim < 0.0 || self.kd.hapsim >= 1.0 {
+            error!("--hapsim must be between 0.0 and 1.0");
+            is_ok = false;
+        }
+
+        if self.kd.maxpaths < 1 {
+            error!("--maxpaths must be at least 1");
+            is_ok = false;
+        }
+
+        if self.io.threads < 1 {
+            error!("--threads must be at least 1");
+            is_ok = false;
+        }
+
         is_ok
     }
 }

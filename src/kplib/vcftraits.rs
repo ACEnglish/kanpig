@@ -41,7 +41,7 @@ pub trait KdpVcf {
 impl KdpVcf for RecordBuf {
     /// Convert variant sequence to Kfeat
     fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64) {
-        let ref_seq = self.reference_bases().to_string();
+        let ref_seq = self.reference_bases();
         let alt_seq = self.get_alt();
 
         let size = alt_seq.len() as i64 - ref_seq.len() as i64;
@@ -101,8 +101,8 @@ impl KdpVcf for RecordBuf {
         let alts = self.alternate_bases();
         match alts.len() {
             0 => ".",
-            _ => alts.iter().next().expect("I just checked").unwrap(),
-            //.to_string(), // I don't like all this String when str should be simplier
+            1 => alts.iter().next().expect("I just checked").unwrap(),
+            _ => panic!("multi-allelic records not supported"),
         }
     }
 }
