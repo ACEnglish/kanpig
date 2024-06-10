@@ -180,7 +180,7 @@ impl ArgParser {
             is_ok = false;
         }
 
-        if self.kd.hapsim < 0.0 || self.kd.hapsim >= 1.0 {
+        if self.kd.hapsim < 0.0 || self.kd.hapsim > 1.0 {
             error!("--hapsim must be between 0.0 and 1.0");
             is_ok = false;
         }
