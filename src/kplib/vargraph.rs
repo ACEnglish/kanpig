@@ -131,6 +131,7 @@ impl Variants {
         if hap.n == 0 {
             return PathScore {
                 coverage: Some(hap.coverage),
+                is_ref: true,
                 ..Default::default()
             };
         }

@@ -9,6 +9,7 @@ pub struct PathScore {
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
     pub full_target: bool, // is this path against the full target
+    pub is_ref: bool,      // This path tried to use a reference allele
 }
 
 impl Eq for PathScore {}
@@ -53,6 +54,7 @@ impl Default for PathScore {
             seqsim: 0.0,
             coverage: None,
             full_target: false,
+            is_ref: true,
         }
     }
 }
@@ -111,8 +113,13 @@ impl PathScore {
                 seqsim,
                 coverage: None,
                 full_target: i == 0,
+                is_ref: false,
             };
         }
-        PathScore::default()
+        PathScore {
+            is_ref: false,
+            ..Default::default()
+        }
+        //PathScore::default()
     }
 }
