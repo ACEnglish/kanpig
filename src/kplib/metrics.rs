@@ -157,7 +157,13 @@ fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
 /// - The second value is the sample quality (SQ).
 pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
     let mut gt_lplist = genotype_scores(ref_cov, alt_cov);
-    let sq = f64::min((-10.0 * (gt_lplist[0] - (gt_lplist[1] + gt_lplist[2]))).abs(), 100.0);
+
+    let mut gt_sum = 0.0;
+    for gt in &gt_lplist {
+        gt_sum += 10.0_f64.powf(*gt);
+    }
+    let gt_sum_log = gt_sum.log10();
+    let sq = f64::min((-10.0 * (gt_lplist[0] - gt_sum_log)).abs(), 100.0);
 
     gt_lplist.sort_by(|a, b| b.partial_cmp(a).unwrap());
     let best = gt_lplist[0];
