@@ -2,18 +2,18 @@ set -e
 bed=test_rs/test.chr20.bed
 
 create() {
+    #time ../target/release/kanpig \
     #time kanpig-v0.2.0-x86_64-apple-darwin/kanpig \
-    #time cargo run --release -- \
-    time ../target/release/kanpig \
+    time cargo run --release -- \
         --input test_rs/test2.vcf.gz \
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
         --sizemin 50 \
         --sizesim 0.95 --seqsim 0.90 --threads 5 \
-        --maxpaths 1000 --mapq 5 --hapsim 0.98 \
+        --maxpaths 1000 --mapq 20 --hapsim 0.98 \
         --chunksize 100 --maxhom 0 \
         --sample doesthiswork \
-        --bed $bed -o test_rs/hc.vcf.gz
+        --bed $bed -o test_rs/hc.vcf
             #| bcftools sort -O z -o test_rs/hc.vcf.gz
     # --bed /Users/english/code/kanpig/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \
     # --bam /Users/english/code/kanpig/experiments/test_rs/GIABHG002.bam \
@@ -41,8 +41,8 @@ bench_full() {
 }
 
 create
-#bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
-#tabix test_rs/hc.vcf.gz
+bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
+tabix test_rs/hc.vcf.gz
 #bench_lite
-#bench_medium
+bench_medium
 #bench_full

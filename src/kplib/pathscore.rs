@@ -8,14 +8,14 @@ pub struct PathScore {
     pub seqsim: f32,
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
-    pub align_pct: f32, // percent of the haplotype used
+    pub full_target: bool, // is this path against the full target
 }
 
 impl Eq for PathScore {}
 
 impl PartialEq for PathScore {
     fn eq(&self, other: &Self) -> bool {
-        self.align_pct == other.align_pct
+        self.full_target == other.full_target
             && self.sizesim == other.sizesim
             && self.seqsim == other.seqsim
     }
@@ -25,8 +25,8 @@ impl Ord for PathScore {
     // Sort by mean of size and sequence
     fn cmp(&self, other: &Self) -> Ordering {
         match self
-            .align_pct
-            .partial_cmp(&other.align_pct)
+            .full_target
+            .partial_cmp(&other.full_target)
             .unwrap_or(Ordering::Equal)
         {
             Ordering::Equal => {
@@ -52,7 +52,7 @@ impl Default for PathScore {
             sizesim: 0.0,
             seqsim: 0.0,
             coverage: None,
-            align_pct: 0.0,
+            full_target: false,
         }
     }
 }
@@ -62,14 +62,13 @@ impl PathScore {
         graph: &DiGraph<VarNode, ()>,
         path: Vec<NodeIndex>,
         path_size: i64,
-        targets: &Vec<Haplotype>,
-        target_size: i64,
+        targets: &[Haplotype],
         params: &KDParams,
     ) -> Self {
         let mut path_k: Option<Vec<f32>> = None;
 
         // Return the partials in order from all to least
-        for hap_parts in targets {
+        for (i, hap_parts) in targets.iter().enumerate() {
             if path_size.signum() != hap_parts.size.signum() {
                 continue;
             }
@@ -111,9 +110,7 @@ impl PathScore {
                 sizesim,
                 seqsim,
                 coverage: None,
-                align_pct: (hap_parts.size.unsigned_abs() as f32
-                    / target_size.unsigned_abs() as f32)
-                    .abs(),
+                full_target: i == 0,
             };
         }
         PathScore::default()

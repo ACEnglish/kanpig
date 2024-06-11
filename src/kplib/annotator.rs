@@ -10,13 +10,13 @@ use noodles_vcf::{
 
 bitflags! {
     pub struct FiltFlags: u32 {
-        const PASS       = 0x0;  // passing
-        const GTMISMATCH = 0x1;  // genotype from AD doesn't match path genotype
-        const LOWGQ      = 0x2;  // genotype quality below 5
-        const LOWCOV     = 0x4;  // coverage below 5
-        const LOWSQ      = 0x8;  // sample quality below below 5 (only on non-ref genotypes)
-        const LOWALT     = 0x16; // alt coverage below 5 (only on non-ref genotypes)
-        const PARTIAL    = 0x32; // best scoring path only used part of the haplotype
+        const PASS       = 0b00000000;  // passing
+        const GTMISMATCH = 0b00000001;  // genotype from AD doesn't match path genotype
+        const LOWGQ      = 0b00000010;  // genotype quality below 5
+        const LOWCOV     = 0b00000100;  // coverage below 5
+        const LOWSQ      = 0b00001000;  // sample quality below below 5 (only on non-ref genotypes)
+        const LOWALT     = 0b00010000; // alt coverage below 5 (only on non-ref genotypes)
+        const PARTIAL    = 0b00100000; // best scoring path only used part of the haplotype
     }
 }
 
@@ -96,19 +96,35 @@ fn diploid(
     let path1 = &paths[0];
     let path2 = &paths[1];
 
-    let (gt_str, gt_path, alt_cov) =
+    let (gt_str, gt_path, alt_cov, full_target) =
         match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
             (true, true) if path1 != path2 => (
                 "1|1",
                 metrics::GTstate::Hom,
                 (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+                path1.full_target && path2.full_target,
             ),
             // sometimes I used the same path twice
-            (true, true) => ("1|1", metrics::GTstate::Hom, path1.coverage.unwrap() as f64),
-            (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
-            (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
-            (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
-            (false, false) => ("./.", metrics::GTstate::Non, 0.0),
+            (true, true) => (
+                "1|1",
+                metrics::GTstate::Hom,
+                path1.coverage.unwrap() as f64,
+                path1.full_target,
+            ),
+            (true, false) => (
+                "1|0",
+                metrics::GTstate::Het,
+                path1.coverage.unwrap() as f64,
+                path1.full_target,
+            ),
+            (false, true) => (
+                "0|1",
+                metrics::GTstate::Het,
+                path2.coverage.unwrap() as f64,
+                path2.full_target,
+            ),
+            (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0, true),
+            (false, false) => ("./.", metrics::GTstate::Non, 0.0, true),
         };
 
     let ref_cov = (coverage as f64) - alt_cov;
@@ -147,7 +163,7 @@ fn diploid(
             filt |= FiltFlags::LOWALT;
         }
     }
-    if (path1.align_pct != 1.0) || (path2.align_pct != 1.0) {
+    if !full_target {
         filt |= FiltFlags::PARTIAL;
     }
 
@@ -221,7 +237,7 @@ fn haploid(
             filt |= FiltFlags::LOWALT;
         }
     }
-    if path1.align_pct != 1.0 {
+    if !path1.full_target {
         filt |= FiltFlags::PARTIAL;
     }
 
