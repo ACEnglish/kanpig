@@ -52,7 +52,7 @@ impl Haplotype {
     pub fn partial_haplotypes(&self, kmer: u8) -> Vec<Haplotype> {
         // Consider putting these as parameters. But really we just need smarter clustering
         let max_fns = 3; // Most number of false-negatives we'll attempt to apply to the graph
-        let max_parts = 500; // Most number of pileups we'll even attempt to split
+        let max_parts = 100; // Most number of pileups we'll even attempt to split
                              // If its more than this, we can't evaluate the region reasonably,
                              // anyway.
         let mut ret = vec![];

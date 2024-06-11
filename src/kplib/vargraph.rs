@@ -4,7 +4,7 @@ use crate::kplib::{
     Ploidy,
 };
 use itertools::Itertools;
-use noodles_vcf::{self as vcf};
+use noodles_vcf::variant::RecordBuf;
 use petgraph::graph::{DiGraph, NodeIndex};
 
 /// Every --input variant is placed inside a node is turned into a graph.
@@ -17,12 +17,12 @@ pub struct VarNode {
     pub coverage: (Option<u64>, Option<u64>),
     pub seqsim: (Option<f32>, Option<f32>),
     pub sizesim: (Option<f32>, Option<f32>),
-    pub entry: Option<vcf::Record>,
+    pub entry: Option<RecordBuf>,
     pub kfeat: Vec<f32>,
 }
 
 impl VarNode {
-    pub fn new(entry: vcf::Record, kmer: u8, maxhom: usize) -> Self {
+    pub fn new(entry: RecordBuf, kmer: u8, maxhom: usize) -> Self {
         // Want to make a hash for these names for debugging, I think.
         let name = "".to_string();
         let (start, end) = entry.boundaries();
@@ -71,7 +71,7 @@ pub struct Variants {
 /// The graph has an upstream 'src' node that point to every variant node
 /// The graph has a dnstream 'snk' node that is pointed to by every variant node and 'src'
 impl Variants {
-    pub fn new(mut variants: Vec<vcf::Record>, kmer: u8, maxhom: usize) -> Self {
+    pub fn new(mut variants: Vec<RecordBuf>, kmer: u8, maxhom: usize) -> Self {
         if variants.is_empty() {
             panic!("Cannot create a graph from no variants");
         }
@@ -112,8 +112,8 @@ impl Variants {
 
     /// Again, TR aware, we need to set the bounds for doing the pileup
     /// to the TR boundaries.
-    fn get_region(entries: &[vcf::Record]) -> (String, u64, u64) {
-        let chrom = entries[0].chromosome().to_string();
+    fn get_region(entries: &[RecordBuf]) -> (String, u64, u64) {
+        let chrom = entries[0].reference_sequence_name().to_string();
 
         let (min_start, max_end) = entries.iter().fold((u64::MAX, 0), |acc, e| {
             let (start, end) = e.boundaries();
@@ -131,6 +131,7 @@ impl Variants {
         if hap.n == 0 {
             return PathScore {
                 coverage: Some(hap.coverage),
+                is_ref: true,
                 ..Default::default()
             };
         }

@@ -58,7 +58,7 @@ impl BedParser {
                     };
 
                     if chrom != self.prev_chrom {
-                        self.prev_chrom = chrom.clone();
+                        self.prev_chrom.clone_from(&chrom);
                         self.prev_start = 0;
                     }
 

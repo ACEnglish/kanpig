@@ -129,6 +129,9 @@ pub fn diploid_haplotypes(
             if hap1.n == 0 {
                 // HOMALT
                 vec![hap2.clone(), hap2]
+            } else if hap2.n == 0 {
+                // Doesn't happen?
+                vec![hap1.clone(), hap1]
             } else {
                 // Compound Het
                 vec![hap1, hap2]

@@ -42,8 +42,8 @@ pub use crate::kplib::traverse::brute_force_find_path;
 mod vargraph;
 pub use crate::kplib::vargraph::{VarNode, Variants};
 
-mod vcf_traits;
-pub use crate::kplib::vcf_traits::{KdpVcf, Svtype};
+mod vcftraits;
+pub use crate::kplib::vcftraits::{KdpVcf, Svtype};
 
 mod vcfreader;
 pub use crate::kplib::vcfreader::VcfChunker;

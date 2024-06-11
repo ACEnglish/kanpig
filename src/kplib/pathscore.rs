@@ -8,14 +8,15 @@ pub struct PathScore {
     pub seqsim: f32,
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
-    pub align_pct: f32, // percent of the haplotype used
+    pub full_target: bool, // is this path against the full target
+    pub is_ref: bool,      // This path tried to use a reference allele
 }
 
 impl Eq for PathScore {}
 
 impl PartialEq for PathScore {
     fn eq(&self, other: &Self) -> bool {
-        self.align_pct == other.align_pct
+        self.full_target == other.full_target
             && self.sizesim == other.sizesim
             && self.seqsim == other.seqsim
     }
@@ -25,8 +26,8 @@ impl Ord for PathScore {
     // Sort by mean of size and sequence
     fn cmp(&self, other: &Self) -> Ordering {
         match self
-            .align_pct
-            .partial_cmp(&other.align_pct)
+            .full_target
+            .partial_cmp(&other.full_target)
             .unwrap_or(Ordering::Equal)
         {
             Ordering::Equal => {
@@ -37,27 +38,6 @@ impl Ord for PathScore {
             other_ordering => other_ordering,
         }
     }
-    // Sort by size then sequence
-    /*    fn cmp(&self, other: &Self) -> Ordering {
-        match self
-            .align_pct
-            .partial_cmp(&other.align_pct)
-            .unwrap_or(Ordering::Equal)
-        {
-            Ordering::Equal => match self
-                .sizesim
-                .partial_cmp(&other.sizesim)
-                .unwrap_or(Ordering::Equal)
-            {
-                Ordering::Equal => self
-                    .seqsim
-                    .partial_cmp(&other.seqsim)
-                    .unwrap_or(Ordering::Equal),
-                other_ordering => other_ordering,
-            },
-            other_ordering => other_ordering,
-        }
-    }*/
 }
 
 impl PartialOrd for PathScore {
@@ -73,7 +53,8 @@ impl Default for PathScore {
             sizesim: 0.0,
             seqsim: 0.0,
             coverage: None,
-            align_pct: 0.0,
+            full_target: false,
+            is_ref: true,
         }
     }
 }
@@ -82,41 +63,45 @@ impl PathScore {
     pub fn new(
         graph: &DiGraph<VarNode, ()>,
         path: Vec<NodeIndex>,
-        targets: &Vec<Haplotype>,
-        target_size: i64,
+        path_size: i64,
+        targets: &[Haplotype],
         params: &KDParams,
     ) -> Self {
-        let path_size: i64 = path
-            .iter()
-            .filter_map(|&node_index| graph.node_weight(node_index))
-            .map(|x| x.size)
-            .sum();
-
-        let path_k: Vec<f32> = path
-            .iter()
-            .filter_map(|&node_index| graph.node_weight(node_index))
-            .map(|x| x.kfeat.as_ref())
-            .fold(
-                vec![0f32; 4_usize.pow(params.kmer.into())],
-                |acc: Vec<f32>, other: &Vec<f32>| {
-                    acc.iter().zip(other).map(|(x, y)| x + y).collect()
-                },
-            );
+        let mut path_k: Option<Vec<f32>> = None;
 
         // Return the partials in order from all to least
-        for hap_parts in targets {
+        for (i, hap_parts) in targets.iter().enumerate() {
             if path_size.signum() != hap_parts.size.signum() {
                 continue;
             }
 
             let sizesim = metrics::sizesim(path_size.unsigned_abs(), hap_parts.size.unsigned_abs());
-            debug!("szsim: {}", sizesim);
+            //debug!("szsim: {}", sizesim);
             if sizesim < params.sizesim {
                 continue;
             }
 
-            let seqsim = metrics::seqsim(&path_k, &hap_parts.kfeat, params.minkfreq as f32);
-            debug!("sqsim: {}", seqsim);
+            if path_k.is_none() {
+                // only make if it is ever needed
+                path_k = Some(
+                    path.iter()
+                        .filter_map(|&node_index| graph.node_weight(node_index))
+                        .map(|x| x.kfeat.as_ref())
+                        .fold(
+                            vec![0f32; 4_usize.pow(params.kmer.into())],
+                            |acc: Vec<f32>, other: &Vec<f32>| {
+                                acc.iter().zip(other).map(|(x, y)| x + y).collect()
+                            },
+                        ),
+                );
+            }
+
+            let seqsim = metrics::seqsim(
+                path_k.as_ref().unwrap(),
+                &hap_parts.kfeat,
+                params.minkfreq as f32,
+            );
+            //debug!("sqsim: {}", seqsim);
             if seqsim < params.seqsim {
                 continue;
             }
@@ -127,11 +112,14 @@ impl PathScore {
                 sizesim,
                 seqsim,
                 coverage: None,
-                align_pct: (hap_parts.size.unsigned_abs() as f32
-                    / target_size.unsigned_abs() as f32)
-                    .abs(),
+                full_target: i == 0,
+                is_ref: false,
             };
         }
-        PathScore::default()
+        PathScore {
+            is_ref: false,
+            ..Default::default()
+        }
+        //PathScore::default()
     }
 }

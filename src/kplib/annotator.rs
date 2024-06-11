@@ -3,24 +3,27 @@ use bitflags::bitflags;
 
 use petgraph::graph::NodeIndex;
 
-use noodles_vcf::{self as vcf, record::genotypes::sample::Value};
+use noodles_vcf::{
+    variant::record_buf::samples::sample::value::{Array, Value},
+    variant::RecordBuf,
+};
 
 bitflags! {
     pub struct FiltFlags: u32 {
-        const PASS       = 0x0;  // passing
-        const GTMISMATCH = 0x1;  // genotype from AD doesn't match path genotype
-        const LOWGQ      = 0x2;  // genotype quality below 5
-        const LOWCOV     = 0x4;  // coverage below 5
-        const LOWSQ      = 0x8;  // sample quality below below 5 (only on non-ref genotypes)
-        const LOWALT     = 0x16; // alt coverage below 5 (only on non-ref genotypes)
-        const PARTIAL    = 0x32; // best scoring path only used part of the haplotype
+        const PASS       = 0b00000000;  // passing
+        const GTMISMATCH = 0b00000001;  // genotype from AD doesn't match path genotype
+        const LOWGQ      = 0b00000010;  // genotype quality below 5
+        const LOWCOV     = 0b00000100;  // coverage below 5
+        const LOWSQ      = 0b00001000;  // sample quality below below 5 (only on non-ref genotypes)
+        const LOWALT     = 0b00010000; // alt coverage below 5 (only on non-ref genotypes)
+        const PARTIAL    = 0b00100000; // best scoring path only used part of the haplotype
     }
 }
 
 //Format Integer Type Number = G
 type IntG = Vec<Option<i32>>;
 pub struct GenotypeAnno {
-    pub entry: vcf::Record,
+    pub entry: RecordBuf,
     pub gt: String,
     pub filt: FiltFlags,
     pub sq: i32,
@@ -33,8 +36,19 @@ pub struct GenotypeAnno {
 }
 
 impl GenotypeAnno {
+    /// Constructs a new `GenotypeAnno` instance based on the provided parameters.
+    ///
+    /// # Parameters
+    /// - `entry`: A `RecordBuf` representing the variant record.
+    /// - `var_idx`: A reference to the node index.
+    /// - `paths`: A slice of `PathScore` representing the paths.
+    /// - `coverage`: An unsigned 64-bit integer representing the coverage.
+    /// - `ploidy`: A reference to the `Ploidy` enum representing the ploidy level.
+    ///
+    /// # Returns
+    /// A `GenotypeAnno` instance initialized based on the provided parameters.
     pub fn new(
-        entry: vcf::Record,
+        entry: RecordBuf,
         var_idx: &NodeIndex,
         paths: &[PathScore],
         coverage: u64,
@@ -47,25 +61,34 @@ impl GenotypeAnno {
         }
     }
 
-    // These are tied to VcfWriter.keys
+    /// Generates fields for the `GenotypeAnno` instance.
+    /// These fields correspond to the keys defined in `VcfWriter`.
+    ///
+    /// # Parameters
+    /// - `phase_group`: An integer representing the phase group.
+    ///
+    /// # Returns
+    /// A vector containing optional `Value` instances representing the fields of the `GenotypeAnno`.
     pub fn make_fields(&self, phase_group: i32) -> Vec<Option<Value>> {
         vec![
-            Some(Value::from(self.gt.clone())),
-            Some(Value::from(self.filt.bits() as i32)),
-            Some(Value::from(self.sq)),
-            Some(Value::from(self.gq)),
-            Some(Value::from(phase_group)),
-            Some(Value::from(self.dp)),
-            Some(Value::from(self.ad.clone())),
-            Some(Value::from(self.zs.clone())),
-            Some(Value::from(self.ss.clone())),
+            Some(Value::Genotype(
+                self.gt.parse().expect("Should have made GT correctly"),
+            )),
+            Some(Value::Integer(self.filt.bits() as i32)),
+            Some(Value::Integer(self.sq)),
+            Some(Value::Integer(self.gq)),
+            Some(Value::Integer(phase_group)),
+            Some(Value::Integer(self.dp)),
+            Some(Value::Array(Array::Integer(self.ad.clone()))),
+            Some(Value::Array(Array::Integer(self.zs.clone()))),
+            Some(Value::Array(Array::Integer(self.ss.clone()))),
         ]
     }
 }
 
 /// For annotating a variant in diploid regions
 fn diploid(
-    entry: vcf::Record,
+    entry: RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
@@ -73,23 +96,51 @@ fn diploid(
     let path1 = &paths[0];
     let path2 = &paths[1];
 
-    let (gt_str, gt_path, alt_cov) =
+    let (mut gt_str, gt_path, alt_cov, full_target) =
         match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
             (true, true) if path1 != path2 => (
                 "1|1",
                 metrics::GTstate::Hom,
                 (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+                path1.full_target && path2.full_target,
             ),
             // sometimes I used the same path twice
-            (true, true) => ("1|1", metrics::GTstate::Hom, path1.coverage.unwrap() as f64),
-            (true, false) => ("1|0", metrics::GTstate::Het, path1.coverage.unwrap() as f64),
-            (false, true) => ("0|1", metrics::GTstate::Het, path2.coverage.unwrap() as f64),
-            (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0),
-            (false, false) => ("./.", metrics::GTstate::Non, 0.0),
+            (true, true) => (
+                "1|1",
+                metrics::GTstate::Hom,
+                path1.coverage.unwrap() as f64,
+                path1.full_target,
+            ),
+            (true, false) => (
+                "1|0",
+                metrics::GTstate::Het,
+                path1.coverage.unwrap() as f64,
+                path1.full_target,
+            ),
+            (false, true) => (
+                "0|1",
+                metrics::GTstate::Het,
+                path2.coverage.unwrap() as f64,
+                path2.full_target,
+            ),
+            (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0, true),
+            (false, false) => ("./.", metrics::GTstate::Non, 0.0, true),
         };
-
     let ref_cov = (coverage as f64) - alt_cov;
     let gt_obs = metrics::genotyper(ref_cov, alt_cov);
+
+    // Alt haplotypes without a path can be filtered if we think it is
+    // more likely to be an error
+    let bcov = path1.coverage.unwrap() as f64;
+    if !path1.is_ref && *path1 == PathScore::default() && bcov < ref_cov && gt_path != gt_obs {
+        gt_str = match gt_obs {
+            metrics::GTstate::Ref => "0|0",
+            metrics::GTstate::Het => "0|1",
+            metrics::GTstate::Hom => "1|1",
+            _ => "./.",
+        };
+    }
+
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
 
@@ -124,7 +175,7 @@ fn diploid(
             filt |= FiltFlags::LOWALT;
         }
     }
-    if (path1.align_pct != 1.0) || (path2.align_pct != 1.0) {
+    if !full_target {
         filt |= FiltFlags::PARTIAL;
     }
 
@@ -143,7 +194,7 @@ fn diploid(
 }
 
 /// For annotating a variant in a zero ploidy region
-fn zero(entry: vcf::Record, coverage: u64) -> GenotypeAnno {
+fn zero(entry: RecordBuf, coverage: u64) -> GenotypeAnno {
     GenotypeAnno {
         entry,
         gt: "./.".to_string(),
@@ -160,7 +211,7 @@ fn zero(entry: vcf::Record, coverage: u64) -> GenotypeAnno {
 
 /// For annotating a variant in a one ploidy region
 fn haploid(
-    entry: vcf::Record,
+    entry: RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
@@ -198,7 +249,7 @@ fn haploid(
             filt |= FiltFlags::LOWALT;
         }
     }
-    if path1.align_pct != 1.0 {
+    if !path1.full_target {
         filt |= FiltFlags::PARTIAL;
     }
 

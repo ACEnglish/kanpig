@@ -3,17 +3,18 @@ bed=test_rs/test.chr20.bed
 
 create() {
     #time ../target/release/kanpig \
-    #--ploidy-bed test_rs/test.chr20.karyo.zero.bed \
+    #time kanpig-v0.2.0-x86_64-apple-darwin/kanpig \
     time cargo run --release -- \
         --input test_rs/test2.vcf.gz \
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
         --sizemin 50 \
-        --sizesim 0.95 --seqsim 0.90 --threads 4 \
-        --maxpaths 20000 --mapq 5 --hapsim 0.98 \
-        --chunksize 100 --maxhom 5 --try-exact --prune \
+        --sizesim 0.95 --seqsim 0.90 --threads 5 \
+        --maxpaths 1000 --mapq 20 --hapsim 0.98 \
+        --chunksize 100 --maxhom 0 \
         --sample doesthiswork \
-        -o test_rs/hc.vcf --bed $bed 
+        --bed $bed -o test_rs/hc.vcf
+            #| bcftools sort -O z -o test_rs/hc.vcf.gz
     # --bed /Users/english/code/kanpig/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \
     # --bam /Users/english/code/kanpig/experiments/test_rs/GIABHG002.bam \
 }

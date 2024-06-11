@@ -1,25 +1,34 @@
 use ordered_float::OrderedFloat;
 
-/// Canberra distance of featurized kmers
+/// Computes the Canberra distance similarity between two featurized k-mer vectors.
+/// The similarity is calculated as 1 minus the Canberra distance, providing a measure of similarity between 0 and 1.
+///
+/// # Parameters
+/// - `a`: A slice of floating-point numbers representing the first k-mer vector.
+/// - `b`: A slice of floating-point numbers representing the second k-mer vector.
+/// - `mink`: A floating-point threshold below which differences are ignored.
+///
+/// # Returns
+/// A floating-point value representing the similarity between the two vectors:
+/// - 1.0 indicates identical vectors.
+/// - 0.0 indicates no kmers or maximum dissimilarity.
 pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
     let mut deno: f32 = 0.0;
     let mut neum: f32 = 0.0;
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        let d = x.abs() + y.abs();
-        if d <= mink {
-            continue;
-        }
-        deno += d;
+    let mut total_d: f32;
 
-        neum += (x - y).abs();
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        total_d = x.abs() + y.abs();
+        if total_d > mink {
+            deno += total_d;
+            neum += (x - y).abs();
+        }
     }
 
-    // no kmers
     if deno == 0.0 {
         return 0.0;
     }
 
-    // identical
     if neum == 0.0 {
         return 1.0;
     }
@@ -27,18 +36,39 @@ pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
     1.0 - (neum / deno)
 }
 
-/// size similarity of two variant sizes
-/// sizes must be positive
+/// Computes size similarity
+/// The similarity is defined as the ratio of the smaller size to the larger size,
+/// with special handling for cases where either size is zero.
+///
+/// # Parameters
+/// - `size_a`: The first size as a 64-bit unsigned integer.
+/// - `size_b`: The second size as a 64-bit unsigned integer.
+///
+/// # Returns
+/// A floating-point value representing the similarity score between the two sizes.
+/// - If both sizes are zero, the function returns 1.0.
+/// - Otherwise, the similarity is calculated as the ratio of the smaller size to the larger size.
 pub fn sizesim(size_a: u64, size_b: u64) -> f32 {
-    debug!("sz: {} <-> {}", size_a, size_b);
-    if ((size_a == 0) || (size_b == 0)) && size_a == size_b {
+    if size_a == size_b {
         return 1.0;
     }
-    std::cmp::max(std::cmp::min(size_a, size_b), 1) as f32
-        / std::cmp::max(std::cmp::max(size_a, size_b), 1) as f32
+    let min_size = size_a.min(size_b).max(1) as f32;
+    let max_size = size_a.max(size_b).max(1) as f32;
+    min_size / max_size
 }
 
-/// do two intervals overlap
+/// Determines if two intervals overlap.
+/// Each interval is defined by a start and an end position.
+/// The intervals overlap if the maximum of the start positions is less than the minimum of the end positions.
+///
+/// # Parameters
+/// - `s1`: The start position of the first interval as a 64-bit unsigned integer.
+/// - `e1`: The end position of the first interval as a 64-bit unsigned integer.
+/// - `s2`: The start position of the second interval as a 64-bit unsigned integer.
+/// - `e2`: The end position of the second interval as a 64-bit unsigned integer.
+///
+/// # Returns
+/// A boolean value indicating whether the intervals overlap (`true`) or not (`false`).
 pub fn overlaps(s1: u64, e1: u64, s2: u64, e2: u64) -> bool {
     std::cmp::max(s1, s2) < std::cmp::min(e1, e2)
 }
@@ -52,7 +82,19 @@ pub enum GTstate {
     //Hemi should be a thing
 }
 
-/// Generate genotypes given observed allele coverages
+/// Determines the genotype state based on coverage values for two alternate alleles.
+/// The genotype state can be one of three: reference (Ref), heterozygous (Het), or homozygous (Hom).
+/// If both coverage values are zero, the state is `Non`.
+///
+/// # Parameters
+/// - `alt1_cov`: The coverage value for the first alternate allele as a floating-point number.
+/// - `alt2_cov`: The coverage value for the second alternate allele as a floating-point number.
+///
+/// # Returns
+/// A `GTstate` enum value representing the genotype state
+///
+/// # Panics
+/// This function will panic if an invalid state is encountered, which should be impossible under normal circumstances.
 pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
     if (alt1_cov + alt2_cov) == 0.0 {
         return GTstate::Non;
@@ -72,7 +114,19 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
     ret
 }
 
-/// Probabilities of each genotype given the allele coveages
+/// Calculates genotype scores for three possible genotypes (reference, heterozygous, homozygous)
+/// based on the coverage values for two alternate alleles.
+/// The scores are adjusted based on the total coverage to account for lower coverage scenarios.
+///
+/// # Parameters
+/// - `alt1_cov`: The coverage value for the first alternate allele as a floating-point number.
+/// - `alt2_cov`: The coverage value for the second alternate allele as a floating-point number.
+///
+/// # Returns
+/// An array of three floating-point values representing the log-probabilities for each genotype:
+/// - The first value corresponds to the reference genotype.
+/// - The second value corresponds to the heterozygous genotype.
+/// - The third value corresponds to the homozygous genotype.
 fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
     // Needs to be more pure for lower coverage
     let p_alt: &[f64] = if alt1_cov + alt2_cov < 10.0 {
@@ -91,23 +145,31 @@ fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
     ]
 }
 
-/// Genotype quality: confidence in the assigned genotype
-/// Sample quality: confidence that there is non-reference present
+/// Calculates genotype quality (GQ) and sample quality (SQ) based on the coverage values for reference and alternate alleles.
+///
+/// # Parameters
+/// - `ref_cov`: The coverage value for the reference allele as a floating-point number.
+/// - `alt_cov`: The coverage value for the alternate allele as a floating-point number.
+///
+/// # Returns
+/// A tuple containing two floating-point values:
+/// - The first value is the genotype quality (GQ).
+/// - The second value is the sample quality (SQ).
 pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
     let mut gt_lplist = genotype_scores(ref_cov, alt_cov);
-    gt_lplist.sort_by(|a, b| b.partial_cmp(a).unwrap());
-
-    let best = gt_lplist[0];
-    let second_best = gt_lplist[1];
-    let gq = f64::min(-10.0 * (second_best - best), 100.0);
 
     let mut gt_sum = 0.0;
     for gt in &gt_lplist {
         gt_sum += 10.0_f64.powf(*gt);
     }
-
     let gt_sum_log = gt_sum.log10();
     let sq = f64::min((-10.0 * (gt_lplist[0] - gt_sum_log)).abs(), 100.0);
+
+    gt_lplist.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    let best = gt_lplist[0];
+    let second_best = gt_lplist[1];
+    let gq = f64::min(-10.0 * (second_best - best), 100.0);
+
     (gq, sq)
 }
 

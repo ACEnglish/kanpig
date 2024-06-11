@@ -1,11 +1,12 @@
 use indexmap::IndexMap;
-use noodles_vcf::header::record::value::{map::contig::Name, map::Contig, Map};
+use noodles_vcf::header::record::value::{map::contig::Contig, Map};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
-pub type ContigMap = IndexMap<Name, Map<Contig>>;
-pub type Regions = HashMap<String, VecDeque<(u64, u64)>>;
 use crate::kplib::BedParser;
+
+pub type ContigMap = IndexMap<String, Map<Contig>>;
+pub type Regions = HashMap<String, VecDeque<(u64, u64)>>;
 
 /// create a HashMap with keys of chromsome names and
 /// values a list of start, end positions with regions
@@ -42,7 +43,7 @@ pub fn build_region_tree(
         .filter(|entry| m_contigs.contains_key(&entry.chrom))
     {
         if entry.chrom != prev_chrom {
-            prev_chrom = entry.chrom.clone();
+            prev_chrom.clone_from(&entry.chrom);
             prev_start = 0;
         }
 
