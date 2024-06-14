@@ -96,7 +96,7 @@ fn diploid(
     let path1 = &paths[0];
     let path2 = &paths[1];
 
-    let (mut gt_str, gt_path, alt_cov, full_target) =
+    let (mut gt_str, mut gt_path, mut alt_cov, full_target) =
         match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
             (true, true) if path1 != path2 => (
                 "1|1",
@@ -126,19 +126,22 @@ fn diploid(
             (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0, true),
             (false, false) => ("./.", metrics::GTstate::Non, 0.0, true),
         };
-    let ref_cov = (coverage as f64) - alt_cov;
+    let mut ref_cov = (coverage as f64) - alt_cov;
     let gt_obs = metrics::genotyper(ref_cov, alt_cov);
 
     // Alt haplotypes without a path can be filtered if we think it is
     // more likely to be an error
-    let bcov = path1.coverage.unwrap() as f64;
-    if !path1.is_ref && *path1 == PathScore::default() && bcov < ref_cov && gt_path != gt_obs {
+    if !path1.is_ref && *path1 == PathScore::default() && gt_path != gt_obs {
+        let bcov = path1.coverage.unwrap() as f64;
+        ref_cov += bcov;
+        alt_cov -= bcov;
         gt_str = match gt_obs {
             metrics::GTstate::Ref => "0|0",
             metrics::GTstate::Het => "0|1",
             metrics::GTstate::Hom => "1|1",
             _ => "./.",
         };
+        gt_path = gt_obs;
     }
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
