@@ -93,6 +93,10 @@ pub struct KDParams {
     #[arg(long, default_value_t = 1.0)]
     pub hapsim: f32,
 
+    /// Scoring factor for path searching
+    #[arg(long, default_value_t = 0.01)]
+    pub factor: f32,
+
     /// Search for a 1-to-1 match before graph traversal
     #[arg(long, default_value_t = false)]
     pub try_exact: bool,

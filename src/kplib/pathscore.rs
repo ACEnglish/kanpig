@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
 pub struct PathScore {
+    pub score: f32, // Score(P) = S((SS + SZ) / 2) − λ ⋅ ∣L(P)−E∣
     pub sizesim: f32,
     pub seqsim: f32,
     pub coverage: Option<u64>,
@@ -16,25 +17,21 @@ impl Eq for PathScore {}
 
 impl PartialEq for PathScore {
     fn eq(&self, other: &Self) -> bool {
-        self.full_target == other.full_target
-            && self.sizesim == other.sizesim
-            && self.seqsim == other.seqsim
+        self.full_target == other.full_target && self.score == other.score
     }
 }
 
 impl Ord for PathScore {
-    // Sort by mean of size and sequence
     fn cmp(&self, other: &Self) -> Ordering {
         match self
             .full_target
             .partial_cmp(&other.full_target)
             .unwrap_or(Ordering::Equal)
         {
-            Ordering::Equal => {
-                let m_score = (self.sizesim + self.seqsim) / 2.0;
-                let o_score = (other.sizesim + other.seqsim) / 2.0;
-                m_score.partial_cmp(&o_score).unwrap_or(Ordering::Equal)
-            }
+            Ordering::Equal => self
+                .score
+                .partial_cmp(&other.score)
+                .unwrap_or(Ordering::Equal),
             other_ordering => other_ordering,
         }
     }
@@ -49,6 +46,7 @@ impl PartialOrd for PathScore {
 impl Default for PathScore {
     fn default() -> PathScore {
         PathScore {
+            score: 0.0,
             path: vec![],
             sizesim: 0.0,
             seqsim: 0.0,
@@ -105,9 +103,11 @@ impl PathScore {
             if seqsim < params.seqsim {
                 continue;
             }
-            // Stop on the first one that matches
-            // This has weird tying implications, I think
+
+            let score = ((seqsim + sizesim) / 2.0)
+                - (params.factor * hap_parts.parts.len().abs_diff(path.len()) as f32);
             return PathScore {
+                score,
                 path,
                 sizesim,
                 seqsim,
