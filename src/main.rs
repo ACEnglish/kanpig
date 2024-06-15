@@ -189,9 +189,9 @@ fn main() {
     {
         let mut value_guard = num_variants.lock().unwrap();
         *value_guard = m_input.call_count + m_input.skip_count;
+        info!("genotyping {} variants", value_guard);
     }
 
-    info!("genotyping");
     for handle in task_handles {
         handle.join().unwrap();
     }
