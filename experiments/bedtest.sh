@@ -31,7 +31,7 @@ create_zero() {
         --maxpaths 1000 --mapq 20 --hapsim 0.98 \
         --chunksize 100 --maxhom 0 \
         --sample doesthiswork \
-        --factor 0 \
+        --factor 0.03 \
         --bed $bed -o test_rs/hc_zero.vcf
             #| bcftools sort -O z -o test_rs/hc.vcf.gz
     # --bed /Users/english/code/kanpig/test/GRCh38_HG002-T2TQ100-V1.0_stvar.benchmark.bed \

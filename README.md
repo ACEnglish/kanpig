@@ -65,6 +65,17 @@ scored with the formula `Score(P) = ((SS + SZ) / 2) − (λ ⋅ ∣L(P)−E∣)`
 `L(P)` is the number of nodes in the path, and `E` is the number of pileups in the haplotype. The penalty factor `λ` is
 set by `--factor` and helps reduce paths with split variant representations.
 
+### `--factor`
+In the path score formula, the penalty factor helps reduce genotyping split variant representations. For example,
+imagine a window with three variants in its graph of +100bp, -49bp, and -55bp. These variants are pure tandem repeats
+and so +100bp and -49bp makes the same net-change in the haplotype relative to the reference as a single -51bp variant.
+If the haplotype has a single -52bp pileup, the +100bp & -49bp path will have a similarity of 96.0% while the path 
+scores will be 94.2% for just the -49bp and 94.5% for just the -55bp. However, with a penalty factor of 0.01 the score 
+becomes 95% and with 0.02 it becomes 94% since the path has one more node than the number of pileups. The default 
+`--factor` of 0.01 can be interpreted as a 1 percentage point penalty for every non 1-to-1 matched graph node or 
+haplotype pileup. For vcfs with a dozen or so samples, a `--factor` 0.02 may be beneficial, and for vcfs with large
+sample sets, 0.03 is recommended.
+
 ### `--maxpaths`
 When performing path-finding, this threshold limits the number of paths which are checked. A lower `maxpaths` will
 speed up runtime but may come at a cost of recall. A higher `maxpaths` is slower and may come at a cost to
