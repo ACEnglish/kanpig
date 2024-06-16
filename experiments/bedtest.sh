@@ -65,10 +65,10 @@ create
 bcftools sort -O z -o test_rs/hc.vcf.gz test_rs/hc.vcf
 tabix test_rs/hc.vcf.gz
 bench_medium test_rs/hc.vcf.gz
-bench_full test_rs/hc.vcf.gz
+#bench_full test_rs/hc.vcf.gz
 
-create_zero
-bcftools sort -O z -o test_rs/hc_zero.vcf.gz test_rs/hc_zero.vcf
-tabix test_rs/hc_zero.vcf.gz
-bench_medium  test_rs/hc_zero.vcf.gz
-bench_full test_rs/hc_zero.vcf.gz
+#create_zero
+#bcftools sort -O z -o test_rs/hc_zero.vcf.gz test_rs/hc_zero.vcf
+#tabix test_rs/hc_zero.vcf.gz
+#bench_medium  test_rs/hc_zero.vcf.gz
+#bench_full test_rs/hc_zero.vcf.gz

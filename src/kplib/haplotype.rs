@@ -10,6 +10,7 @@ pub struct Haplotype {
     pub coverage: u64,
     pub kfeat: Vec<f32>,
     pub parts: Vec<(i64, Vec<f32>)>,
+    pub partial: usize,
 }
 
 impl Haplotype {
@@ -20,6 +21,7 @@ impl Haplotype {
             coverage,
             kfeat: kfeat.clone(),
             parts: vec![(size, kfeat)],
+            partial: 0,
         }
     }
 
@@ -32,6 +34,7 @@ impl Haplotype {
             coverage,
             kfeat: mk.clone(),
             parts: vec![],
+            partial: 0,
         }
     }
 
@@ -73,6 +76,7 @@ impl Haplotype {
                         .zip(k.1.iter())
                         .for_each(|(x, y)| *x += y);
                 }
+                cur_hap.partial = m_len - i;
                 ret.push(cur_hap);
             }
         }
