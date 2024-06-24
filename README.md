@@ -61,11 +61,11 @@ Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of v
 When applying a haplotype to a variant graph, only paths above these two thresholds are allowed. If there are multiple
 paths above the threshold, the one with the highest score is kept. Generally, `0.90` is well balanced
 whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds. Paths are
-scored with the formula `Score(P) = ((SS + SZ) / 2) − (λ ⋅ ∣L(P)−E∣)` where `SS` and `SZ` are sequence and size similarity,
+scored with the formula `Score(P) = ((SS + SZ) / 2) − (G ⋅ ∣L(P)−E∣) - (G ⋅ N)` where `SS` and `SZ` are sequence and size similarity,
 `L(P)` is the number of nodes in the path, and `E` is the number of pileups in the haplotype. The penalty factor `λ` is
 set by `--factor` and helps reduce paths with split variant representations.
 
-### `--factor`
+### `--gpenalty` and `--fpenalty`
 In the path score formula, the penalty factor helps reduce genotyping split variant representations. For example,
 imagine a window with three variants in its graph of +100bp, -49bp, and -55bp. These variants are pure tandem repeats
 and so +100bp and -49bp makes the same net-change in the haplotype relative to the reference as a single -51bp variant.
