@@ -74,7 +74,7 @@ pub struct KDParams {
     pub sizemax: u64,
 
     /// Maximum number of paths in a graph to traverse
-    #[arg(long, default_value_t = 10000)]
+    #[arg(long, default_value_t = 5000)]
     pub maxpaths: u64,
 
     /// Minimum sequence similarity for paths
@@ -98,7 +98,7 @@ pub struct KDParams {
     pub gpenalty: f32,
 
     /// Scoring penalty for 'fns'
-    #[arg(long, default_value_t = 0.05)]
+    #[arg(long, default_value_t = 0.10)]
     pub fpenalty: f32,
 
     /// Search for a 1-to-1 match before graph traversal

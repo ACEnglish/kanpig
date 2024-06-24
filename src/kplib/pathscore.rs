@@ -58,7 +58,10 @@ impl PathScore {
         params: &KDParams,
     ) -> Self {
         let mut path_k: Option<Vec<f32>> = None;
-
+        let mut best_path = PathScore {
+            is_ref: false,
+            ..Default::default()
+        };
         // Return the partials in order from all to least
         for hap_parts in targets {
             if path_size.signum() != hap_parts.size.signum() {
@@ -100,20 +103,19 @@ impl PathScore {
                 - (params.gpenalty * hap_parts.parts.len().abs_diff(path.len()) as f32)
                 - (params.fpenalty * hap_parts.partial as f32);
 
-            return PathScore {
-                score,
-                path,
-                sizesim,
-                seqsim,
-                coverage: None,
-                full_target: hap_parts.partial == 0,
-                is_ref: false,
-            };
+            if score > best_path.score {
+                    best_path = PathScore {
+                        score,
+                        path: path.clone(),
+                        sizesim,
+                        seqsim,
+                        coverage: None,
+                        full_target: hap_parts.partial == 0,
+                        is_ref: false,
+                    };
+            }
         }
-        PathScore {
-            is_ref: false,
-            ..Default::default()
-        }
-        //PathScore::default()
+
+        best_path
     }
 }
