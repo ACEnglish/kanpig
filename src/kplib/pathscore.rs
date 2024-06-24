@@ -97,8 +97,8 @@ impl PathScore {
             }
 
             let score = ((seqsim + sizesim) / 2.0)
-                - (params.factor * hap_parts.parts.len().abs_diff(path.len()) as f32)
-                - (hap_parts.partial as f32) * 0.005;
+                - (params.gpenalty * hap_parts.parts.len().abs_diff(path.len()) as f32)
+                - (params.fpenalty * hap_parts.partial as f32);
 
             return PathScore {
                 score,
