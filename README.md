@@ -60,21 +60,20 @@ Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of v
 ### `--sizesim` and `--seqsim`
 When applying a haplotype to a variant graph, only paths above these two thresholds are allowed. If there are multiple
 paths above the threshold, the one with the highest score is kept. Generally, `0.90` is well balanced
-whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds. Paths are
-scored with the formula `Score(P) = ((SS + SZ) / 2) − (G ⋅ ∣L(P)−E∣) - (G ⋅ N)` where `SS` and `SZ` are sequence and size similarity,
-`L(P)` is the number of nodes in the path, and `E` is the number of pileups in the haplotype. The penalty factor `λ` is
-set by `--factor` and helps reduce paths with split variant representations.
+whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds. 
 
 ### `--gpenalty` and `--fpenalty`
-In the path score formula, the penalty factor helps reduce genotyping split variant representations. For example,
-imagine a window with three variants in its graph of +100bp, -49bp, and -55bp. These variants are pure tandem repeats
-and so +100bp and -49bp makes the same net-change in the haplotype relative to the reference as a single -51bp variant.
-If the haplotype has a single -52bp pileup, the +100bp & -49bp path will have a similarity of 96.0% while the path 
-scores will be 94.2% for just the -49bp and 94.5% for just the -55bp. However, with a penalty factor of 0.01 the score 
-becomes 95% and with 0.02 it becomes 94% since the path has one more node than the number of pileups. The default 
-`--factor` of 0.01 can be interpreted as a 1 percentage point penalty for every non 1-to-1 matched graph node or 
-haplotype pileup. For vcfs with a dozen or so samples, a `--factor` 0.02 may be beneficial, and for vcfs with large
-sample sets, 0.03 is recommended.
+The similarity of a path to the graph is used to to compute a score and the highest score kept. The scoring formula is
+
+```
+Score(P) = ((SS + SZ) / 2) − (λg ⋅ ∣L(P)−E∣) - (λf ⋅ N)
+``` 
+
+where `SS` and `SZ` are sequence and size similarity,  `L(P)` is the number of nodes in the path, and `E` is the number of 
+pileups in the haplotype, and `N` is the number of putative false-negatives in the variant graph. 
+
+The penalty factor `λg` helps reduce paths with split variant representations. The penalty factor `λf` helps penalizes
+false-negatives in the variant graph. Details on how the impact of the scoring penalties are in [the wiki](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function).
 
 ### `--maxpaths`
 When performing path-finding, this threshold limits the number of paths which are checked. A lower `maxpaths` will
