@@ -10,7 +10,6 @@ pub struct PathScore {
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
     pub full_target: bool, // Does this path use partial
-    pub is_ref: bool,      // This path tried to use a reference allele
 }
 
 impl Eq for PathScore {}
@@ -44,7 +43,6 @@ impl Default for PathScore {
             seqsim: 0.0,
             coverage: None,
             full_target: false,
-            is_ref: true,
         }
     }
 }
@@ -58,10 +56,7 @@ impl PathScore {
         params: &KDParams,
     ) -> Self {
         let mut path_k: Option<Vec<f32>> = None;
-        let mut best_path = PathScore {
-            is_ref: false,
-            ..Default::default()
-        };
+        let mut best_path = PathScore::default();
         // Return the partials in order from all to least
         for hap_parts in targets {
             if path_size.signum() != hap_parts.size.signum() {
@@ -104,15 +99,14 @@ impl PathScore {
                 - (params.fpenalty * hap_parts.partial as f32);
 
             if score > best_path.score {
-                    best_path = PathScore {
-                        score,
-                        path: path.clone(),
-                        sizesim,
-                        seqsim,
-                        coverage: None,
-                        full_target: hap_parts.partial == 0,
-                        is_ref: false,
-                    };
+                best_path = PathScore {
+                    score,
+                    path: path.clone(),
+                    sizesim,
+                    seqsim,
+                    coverage: None,
+                    full_target: hap_parts.partial == 0,
+                };
             }
         }
 
