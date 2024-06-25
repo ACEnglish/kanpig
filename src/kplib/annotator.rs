@@ -219,7 +219,7 @@ fn haploid(
     coverage: u64,
 ) -> GenotypeAnno {
     if paths.is_empty() {
-        let (gq, gt_str, gt_state) = match coverage == 0 {
+        let (gt_str, gq, gt_state) = match coverage == 0 {
             true => (".", 0, metrics::GTstate::Non),
             false => ("0", 100, metrics::GTstate::Ref),
         };
@@ -231,13 +231,13 @@ fn haploid(
 
         return GenotypeAnno {
             entry,
-            gt: gt_str,
+            gt: gt_str.to_string(),
             filt,
             sq: 0,
             gq,
             dp: coverage as i32,
-            ad: vec![coverage as i32, 0],
-            ks: 0,
+            ad: vec![Some(coverage as i32), Some(0)],
+            ks: vec![],
             gt_state,
         };
     }
