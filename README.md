@@ -100,8 +100,7 @@ The `SAMPLE` column fields populated by kanpig are:
 | **PS**  | Each chunk of variants is assigned a phase set |
 | **DP**  | Read coverage over the region |
 | **AD**  | Read coverage supporting the reference and alternate alleles. |
-| **SZ**  | Size similarity of the two haplotypes to this variant |
-| **SS**  | Sequence similarity of the two haplotypes to this variant |
+| **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
 
 Details of `FT`
 | Flag   | Description |

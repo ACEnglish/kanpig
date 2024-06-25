@@ -9,8 +9,8 @@ create() {
         --bam /Users/english/code/kanpig/experiments/test_rs/NA24385.chr20.bam \
         --reference /Users/english/code/references/grch38/GRCh38_1kg_mainchrs.fa \
         --sizemin 50 \
-        --sizesim 0.95 --seqsim 0.90 --threads 5 \
-        --maxpaths 1000 --mapq 20 --hapsim 0.98 \
+        --sizesim 0.95 --seqsim 0.90 --threads 4 \
+        --maxpaths 1000 --mapq 5 --hapsim 0.98 \
         --chunksize 100 --maxhom 0 \
         --sample doesthiswork \
         --bed $bed -o test_rs/hc.vcf 

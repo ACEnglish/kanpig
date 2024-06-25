@@ -30,8 +30,7 @@ pub struct GenotypeAnno {
     pub gq: i32,
     pub dp: i32,
     pub ad: IntG,
-    pub zs: IntG,
-    pub ss: IntG,
+    pub ks: IntG,
     pub gt_state: metrics::GTstate,
 }
 
@@ -80,8 +79,7 @@ impl GenotypeAnno {
             Some(Value::Integer(phase_group)),
             Some(Value::Integer(self.dp)),
             Some(Value::Array(Array::Integer(self.ad.clone()))),
-            Some(Value::Array(Array::Integer(self.zs.clone()))),
-            Some(Value::Array(Array::Integer(self.ss.clone()))),
+            Some(Value::Array(Array::Integer(self.ks.clone()))),
         ]
     }
 }
@@ -157,9 +155,10 @@ fn diploid(
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 
-    let zs = vec![Some((0.0 * 100.0) as i32), Some((0.0 * 100.0) as i32)];
-
-    let ss = vec![Some((0.0 * 100.0) as i32), Some((0.0 * 100.0) as i32)];
+    let ks: Vec<Option<i32>> = paths
+        .iter()
+        .map(|p| Some((p.score * 100.0) as i32))
+        .collect();
 
     let mut filt = FiltFlags::PASS;
     // The genotype from AD doesn't match path genotype
@@ -192,8 +191,7 @@ fn diploid(
         gq: gq.round() as i32,
         dp: coverage as i32,
         ad,
-        zs,
-        ss,
+        ks,
         gt_state: gt_path,
     }
 }
@@ -208,8 +206,7 @@ fn zero(entry: RecordBuf, coverage: u64) -> GenotypeAnno {
         gq: 0,
         dp: coverage as i32,
         ad: vec![None],
-        zs: vec![None],
-        ss: vec![None],
+        ks: vec![None],
         gt_state: metrics::GTstate::Non,
     }
 }
@@ -235,9 +232,7 @@ fn haploid(
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 
-    let zs = vec![Some((path1.sizesim * 100.0) as i32)];
-
-    let ss = vec![Some((path1.seqsim * 100.0) as i32)];
+    let ks = vec![Some((path1.score * 100.0) as i32)];
 
     let mut filt = FiltFlags::PASS;
     if gq < 5.0 {
@@ -266,8 +261,7 @@ fn haploid(
         gq: gq.round() as i32,
         dp: coverage as i32,
         ad,
-        zs,
-        ss,
+        ks,
         gt_state: gt_path,
     }
 }
