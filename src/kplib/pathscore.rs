@@ -4,39 +4,27 @@ use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
 pub struct PathScore {
+    pub score: f32, // Score(P) = S((SS + SZ) / 2) − λ ⋅ ∣L(P)−E∣
     pub sizesim: f32,
     pub seqsim: f32,
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
-    pub full_target: bool, // is this path against the full target
-    pub is_ref: bool,      // This path tried to use a reference allele
+    pub full_target: bool, // Does this path use partial
 }
 
 impl Eq for PathScore {}
 
 impl PartialEq for PathScore {
     fn eq(&self, other: &Self) -> bool {
-        self.full_target == other.full_target
-            && self.sizesim == other.sizesim
-            && self.seqsim == other.seqsim
+        self.score == other.score
     }
 }
 
 impl Ord for PathScore {
-    // Sort by mean of size and sequence
     fn cmp(&self, other: &Self) -> Ordering {
-        match self
-            .full_target
-            .partial_cmp(&other.full_target)
+        self.score
+            .partial_cmp(&other.score)
             .unwrap_or(Ordering::Equal)
-        {
-            Ordering::Equal => {
-                let m_score = (self.sizesim + self.seqsim) / 2.0;
-                let o_score = (other.sizesim + other.seqsim) / 2.0;
-                m_score.partial_cmp(&o_score).unwrap_or(Ordering::Equal)
-            }
-            other_ordering => other_ordering,
-        }
     }
 }
 
@@ -49,12 +37,12 @@ impl PartialOrd for PathScore {
 impl Default for PathScore {
     fn default() -> PathScore {
         PathScore {
+            score: 0.0,
             path: vec![],
             sizesim: 0.0,
             seqsim: 0.0,
             coverage: None,
             full_target: false,
-            is_ref: true,
         }
     }
 }
@@ -68,9 +56,9 @@ impl PathScore {
         params: &KDParams,
     ) -> Self {
         let mut path_k: Option<Vec<f32>> = None;
-
+        let mut best_path = PathScore::default();
         // Return the partials in order from all to least
-        for (i, hap_parts) in targets.iter().enumerate() {
+        for hap_parts in targets {
             if path_size.signum() != hap_parts.size.signum() {
                 continue;
             }
@@ -101,25 +89,27 @@ impl PathScore {
                 &hap_parts.kfeat,
                 params.minkfreq as f32,
             );
-            //debug!("sqsim: {}", seqsim);
+
             if seqsim < params.seqsim {
                 continue;
             }
-            // Stop on the first one that matches
-            // This has weird tying implications, I think
-            return PathScore {
-                path,
-                sizesim,
-                seqsim,
-                coverage: None,
-                full_target: i == 0,
-                is_ref: false,
-            };
+
+            let score = ((seqsim + sizesim) / 2.0)
+                - (params.gpenalty * hap_parts.parts.len().abs_diff(path.len()) as f32)
+                - (params.fpenalty * hap_parts.partial as f32);
+
+            if score > best_path.score {
+                best_path = PathScore {
+                    score,
+                    path: path.clone(),
+                    sizesim,
+                    seqsim,
+                    coverage: None,
+                    full_target: hap_parts.partial == 0,
+                };
+            }
         }
-        PathScore {
-            is_ref: false,
-            ..Default::default()
-        }
-        //PathScore::default()
+
+        best_path
     }
 }

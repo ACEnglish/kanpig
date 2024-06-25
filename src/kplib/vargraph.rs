@@ -127,15 +127,6 @@ impl Variants {
     // the haplotype push coverage onto the VarNodes
     pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
         // if there are no variants in the hap, we don't want to apply the coverage.
-        debug!("applying coverage");
-        if hap.n == 0 {
-            return PathScore {
-                coverage: Some(hap.coverage),
-                is_ref: true,
-                ..Default::default()
-            };
-        }
-
         let partial_matches = if params.prune || params.try_exact {
             get_one_to_one(&self.graph, hap, params)
         } else {

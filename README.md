@@ -36,7 +36,7 @@ are still being determined and will likely be dependent on things such as number
 of the variants, and sequencing technology.
 
 ### `--bed`
-Sorted bed file restricts kanpig to only analyzing variants with starts and ends within a single bed entry.
+A sorted bed file (`bedtools sort`) that restricts kanpig to only analyzing variants with starts and ends within a single bed entry.
 
 ### `--ploidy-bed`
 This bed file informs kanpig of special regions within chromosomes that should have non-diploid genotypes. For example, a female
@@ -49,18 +49,31 @@ Kanpig will build local variant graphs from windows of the genome. These windows
 of an upstream window's variants at least `chunksize` base-pairs away from the next window's variants' minimum start position.
 
 This chunksize also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
-passing the `mapflag` filter, and which fully span the minimum variant start and maximum variant end are considered. 
+passing the `mapflag` filter, and which fully span the window are considered.
 
 This is an important parameter because too small of a `chunksize` may not recruit distant read pileups which support variants. Similarly, 
-too large of a value may create windows with many SVs which are also too large for reads to fully-span. 
+too large of a value may create windows with many SVs which are also too large for reads to fully-span.
 
 ### `--sizemin` and `--sizemax`
 Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of variants not within the size boundaries are set to missing (`./.`).
 
 ### `--sizesim` and `--seqsim`
 When applying a haplotype to a variant graph, only paths above these two thresholds are allowed. If there are multiple
-paths above the threshold, the one with the highest `(sizesim + seqsim) / 2` is kept. Generally, `0.90` is well balanced
-whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds.
+paths above the threshold, the one with the highest score is kept. Generally, `0.90` is well balanced
+whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds. 
+
+### `--gpenalty` and `--fpenalty`
+The similarity of a path to the graph is used to to compute a score and the highest score kept. The scoring formula is
+
+```
+Score(P) = ((SS + SZ) / 2) − (λg ⋅ ∣L(P)−E∣) - (λf ⋅ N)
+``` 
+
+where `SS` and `SZ` are sequence and size similarity,  `L(P)` is the number of nodes in the path, and `E` is the number of 
+pileups in the haplotype, and `N` is the number of putative false-negatives in the variant graph. 
+
+The penalty factor `λg` helps reduce paths with split variant representations. The penalty factor `λf` helps penalizes
+false-negatives in the variant graph. Details on how the impact of the scoring penalties are in [the wiki](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function).
 
 ### `--maxpaths`
 When performing path-finding, this threshold limits the number of paths which are checked. A lower `maxpaths` will
@@ -87,8 +100,7 @@ The `SAMPLE` column fields populated by kanpig are:
 | **PS**  | Each chunk of variants is assigned a phase set |
 | **DP**  | Read coverage over the region |
 | **AD**  | Read coverage supporting the reference and alternate alleles. |
-| **SZ**  | Size similarity of the two haplotypes to this variant |
-| **SS**  | Sequence similarity of the two haplotypes to this variant |
+| **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
 
 Details of `FT`
 | Flag   | Description |

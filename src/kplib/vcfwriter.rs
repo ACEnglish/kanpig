@@ -54,7 +54,7 @@ impl VcfWriter {
         // Setup FORMAT header definitions
         // Overwrites existing definitions
         let all_formats = header.formats_mut();
-        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:PS:DP:AD:ZS:SS"
+        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:PS:DP:AD:KS"
             .split(':')
             .map(String::from)
             .collect();
@@ -117,21 +117,13 @@ impl VcfWriter {
         *adfmt.description_mut() = "Coverage for reference and alternate alleles".to_string();
         all_formats.insert(adid.to_string(), adfmt);
 
-        // ZS
-        let zsid = "ZS";
-        let mut zsfmt = Map::<format::Format>::from(zsid);
-        *zsfmt.number_mut() = format::Number::ReferenceAlternateBases;
-        *zsfmt.type_mut() = format::Type::Integer;
-        *zsfmt.description_mut() = "Size similarity of path to entry".to_string();
-        all_formats.insert(zsid.to_string(), zsfmt);
-
-        // SS
-        let ssid = "SS";
-        let mut ssfmt = Map::<format::Format>::from(ssid);
-        *ssfmt.number_mut() = format::Number::ReferenceAlternateBases;
-        *ssfmt.type_mut() = format::Type::Integer;
-        *ssfmt.description_mut() = "Sequence similarity of path to entry".to_string();
-        all_formats.insert(ssid.to_string(), ssfmt);
+        // KS
+        let ksid = "KS";
+        let mut ksfmt = Map::<format::Format>::from(ksid);
+        *ksfmt.number_mut() = format::Number::Unknown;
+        *ksfmt.type_mut() = format::Type::Integer;
+        *ksfmt.description_mut() = "Kanpig score".to_string();
+        all_formats.insert(ksid.to_string(), ksfmt);
 
         // Ready to make files
         let out_buf: Box<dyn Write> = match out_path {

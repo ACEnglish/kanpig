@@ -92,6 +92,7 @@ fn main() {
                             let paths: Vec<PathScore> = haps
                                 .iter()
                                 .map(|h| m_graph.apply_coverage(h, &m_args.kd))
+                                .filter(|p| *p != PathScore::default())
                                 .collect();
 
                             m_result_sender
@@ -189,9 +190,9 @@ fn main() {
     {
         let mut value_guard = num_variants.lock().unwrap();
         *value_guard = m_input.call_count + m_input.skip_count;
+        info!("genotyping {} variants", value_guard);
     }
 
-    info!("genotyping");
     for handle in task_handles {
         handle.join().unwrap();
     }
