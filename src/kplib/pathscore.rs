@@ -104,15 +104,15 @@ impl PathScore {
                 - (params.fpenalty * hap_parts.partial as f32);
 
             if score > best_path.score {
-                    best_path = PathScore {
-                        score,
-                        path: path.clone(),
-                        sizesim,
-                        seqsim,
-                        coverage: None,
-                        full_target: hap_parts.partial == 0,
-                        is_ref: false,
-                    };
+                best_path = PathScore {
+                    score,
+                    path: path.clone(),
+                    sizesim,
+                    seqsim,
+                    coverage: None,
+                    full_target: hap_parts.partial == 0,
+                    is_ref: false,
+                };
             }
         }
 

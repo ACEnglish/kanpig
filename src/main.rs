@@ -92,6 +92,7 @@ fn main() {
                             let paths: Vec<PathScore> = haps
                                 .iter()
                                 .map(|h| m_graph.apply_coverage(h, &m_args.kd))
+                                .filter(|p| *p != PathScore::default())
                                 .collect();
 
                             m_result_sender

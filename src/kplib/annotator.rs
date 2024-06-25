@@ -93,71 +93,73 @@ fn diploid(
     paths: &[PathScore],
     coverage: u64,
 ) -> GenotypeAnno {
-    let path1 = &paths[0];
-    let path2 = &paths[1];
+    let (gt_str, gt_path, alt_cov, full_target) = match paths.len() {
+        // hom ref
+        0 => {
+            if coverage != 0 {
+                ("0|0", metrics::GTstate::Ref, 0.0, true)
+            } else {
+                ("./.", metrics::GTstate::Non, 0.0, true)
+            }
+        }
+        // het or hom
+        1 => {
+            let m_path = &paths[0];
+            if !m_path.path.contains(var_idx) {
+                ("0|0", metrics::GTstate::Ref, 0.0, true)
+            } else {
+                let alt_cov = m_path.coverage.unwrap() as f64;
+                let ref_cov = (coverage as f64) - alt_cov;
+                let (genotype, state) = match metrics::genotyper(ref_cov, alt_cov) {
+                    metrics::GTstate::Ref | metrics::GTstate::Het => ("0|1", metrics::GTstate::Het),
+                    metrics::GTstate::Hom => ("1|1", metrics::GTstate::Hom),
+                    _ => panic!("Cannot happen here"),
+                };
+                (genotype, state, alt_cov, m_path.full_target)
+            }
+        }
+        // compound het or the other one
+        2 => {
+            let path1 = &paths[0];
+            let path2 = &paths[1];
 
-    let (mut gt_str, mut gt_path, mut alt_cov, full_target) =
-        match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
-            (true, true) if path1 != path2 => (
-                "1|1",
-                metrics::GTstate::Hom,
-                (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
-                path1.full_target && path2.full_target,
-            ),
-            // sometimes I used the same path twice
-            (true, true) => (
-                "1|1",
-                metrics::GTstate::Hom,
-                path1.coverage.unwrap() as f64,
-                path1.full_target,
-            ),
-            (true, false) => (
-                "1|0",
-                metrics::GTstate::Het,
-                path1.coverage.unwrap() as f64,
-                path1.full_target,
-            ),
-            (false, true) => (
-                "0|1",
-                metrics::GTstate::Het,
-                path2.coverage.unwrap() as f64,
-                path2.full_target,
-            ),
-            (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0, true),
-            (false, false) => ("./.", metrics::GTstate::Non, 0.0, true),
-        };
-    let mut ref_cov = (coverage as f64) - alt_cov;
+            match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
+                (true, true) => (
+                    "1|1",
+                    metrics::GTstate::Hom,
+                    (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+                    path1.full_target || path2.full_target,
+                ),
+                (true, false) => (
+                    "1|0",
+                    metrics::GTstate::Het,
+                    path1.coverage.unwrap() as f64,
+                    path1.full_target,
+                ),
+                (false, true) => (
+                    "0|1",
+                    metrics::GTstate::Het,
+                    path2.coverage.unwrap() as f64,
+                    path2.full_target,
+                ),
+                (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0, true),
+                (false, false) => ("./.", metrics::GTstate::Non, 0.0, true),
+            }
+        }
+        _ => panic!("Cannot happen in diploid"),
+    };
+
+    let ref_cov = coverage as f64 - alt_cov;
     let gt_obs = metrics::genotyper(ref_cov, alt_cov);
-
-    // Alt haplotypes without a path can be filtered if we think it is
-    // more likely to be an error
-    if !path1.is_ref && *path1 == PathScore::default() && gt_path != gt_obs {
-        let bcov = path1.coverage.unwrap() as f64;
-        ref_cov += bcov;
-        alt_cov -= bcov;
-        gt_str = match gt_obs {
-            metrics::GTstate::Ref => "0|0",
-            metrics::GTstate::Het => "0|1",
-            metrics::GTstate::Hom => "1|1",
-            _ => "./.",
-        };
-        gt_path = gt_obs;
-    }
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 
-    let zs = vec![
-        Some((path1.sizesim * 100.0) as i32),
-        Some((path2.sizesim * 100.0) as i32),
-    ];
+    let zs = vec![Some((0.0 * 100.0) as i32), Some((0.0 * 100.0) as i32)];
 
-    let ss = vec![
-        Some((path1.seqsim * 100.0) as i32),
-        Some((path2.seqsim * 100.0) as i32),
-    ];
+    let ss = vec![Some((0.0 * 100.0) as i32), Some((0.0 * 100.0) as i32)];
 
     let mut filt = FiltFlags::PASS;
     // The genotype from AD doesn't match path genotype
