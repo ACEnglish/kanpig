@@ -218,6 +218,30 @@ fn haploid(
     paths: &[PathScore],
     coverage: u64,
 ) -> GenotypeAnno {
+    if paths.is_empty() {
+        let (gq, gt_str, gt_state) = match coverage == 0 {
+            true => (".", 0, metrics::GTstate::Non),
+            false => ("0", 100, metrics::GTstate::Ref),
+        };
+
+        let mut filt = FiltFlags::PASS;
+        if coverage < 5 {
+            filt |= FiltFlags::LOWCOV;
+        }
+
+        return GenotypeAnno {
+            entry,
+            gt: gt_str,
+            filt,
+            sq: 0,
+            gq,
+            dp: coverage as i32,
+            ad: vec![coverage as i32, 0],
+            ks: 0,
+            gt_state,
+        };
+    }
+
     let path1 = &paths[0];
     let (gt_str, gt_path, alt_cov) = match path1.path.contains(var_idx) {
         true => ("1", metrics::GTstate::Hom, path1.coverage.unwrap() as f64),
