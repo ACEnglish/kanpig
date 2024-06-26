@@ -212,7 +212,7 @@ fn log_choose(n: f64, k: f64) -> f64 {
     if k * 2.0 > n {
         k = n - k;
     }
-    for d in 1..=(k as i32) {
+    for d in 1..((k + 1.0) as i32) {
         r += n.log10();
         r -= d as f64;
         n -= 1.0;
