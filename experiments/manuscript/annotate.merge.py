@@ -16,13 +16,15 @@ header.add_line(('##INFO=<ID=ALState,Number=.,Type=String,'
                  'Description="Each Allele State">'))
 o = pysam.VariantFile("/dev/stdout", 'w', header=header)
 for entry in v:
+    if truvari.entry_size(entry) > 10000:
+        continue
     entry.translate(header)
     if None in entry.samples[0]["GT"]:
-        entry.info["GTState"] = "Filtered"
+        entry.info["GTState"] = "Missing"
         o.write(entry)
         continue
     if None in entry.samples[1]["GT"]:
-        entry.info["GTState"] = "Missing"
+        entry.info["GTState"] = "Filtered"
         o.write(entry)
         continue
     c = sorted(list(entry.samples[0]['GT']))
