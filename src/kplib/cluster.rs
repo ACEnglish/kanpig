@@ -1,5 +1,84 @@
 use crate::kplib::{kmeans, metrics, Haplotype, KDParams};
 use itertools::{Either, Itertools};
+use crate::kplib::kmeans::Cluster;
+
+fn euclidean_distance(a: &Vec<f32>, b: &Vec<f32>) -> f32 {
+    a.iter()
+        .zip(b.iter())
+        .map(|(x1, x2)| (x1 - x2).powi(2))
+        .sum::<f32>()
+        .sqrt()
+}
+
+pub fn calculate_wcss(clusters: &Vec<Cluster>) -> f32 {
+    clusters.iter().map(|cluster| {
+        cluster.points.iter().map(|point| {
+            let distance = euclidean_distance(&cluster.centroid, point);
+            distance.powi(2)
+        }).sum::<f32>()
+    }).sum()
+}
+
+fn calinski_harabasz_index(clusters: &[Cluster]) -> f32 {
+    let n_clusters = clusters.len();
+    let n_points = clusters
+        .iter()
+        .map(|cluster| cluster.points.len())
+        .sum::<usize>();
+    let n_features = clusters[0].centroid.len();
+    if n_points <= n_clusters {
+        return f32::NAN;
+    }
+    // Calculate centroids of centroids
+    let centroid_of_centroids: Vec<f32> = clusters
+        .iter()
+        .flat_map(|cluster| cluster.centroid.iter())
+        .fold(vec![0.0; n_features], |mut acc, &x| {
+            acc.iter_mut().for_each(|a| *a += x);
+            acc
+        })
+        .iter()
+        .map(|&sum| sum / n_features as f32)
+        .collect();
+
+    // Calculate between-cluster dispersion
+    let between_cluster_dispersion: f32 =
+        clusters
+            .iter()
+            .filter(|v| !v.points.is_empty())
+            .fold(0.0, |acc, cluster| {
+                let cluster_size = cluster.points.len() as f32;
+                acc + cluster_size * squared_distance(&cluster.centroid, &centroid_of_centroids)
+            });
+
+    // Calculate within-cluster dispersion
+    let within_cluster_dispersion: f32 =
+        clusters
+            .iter()
+            .filter(|v| !v.points.is_empty())
+            .fold(0.0, |acc, cluster| {
+                acc + cluster.points.iter().fold(0.0, |acc, point| {
+                    acc + squared_distance(point, &cluster.centroid)
+                })
+            });
+
+    // Within is perfect, so just return between dispersion?
+    if within_cluster_dispersion == 0.0 {
+        between_cluster_dispersion / (n_clusters - 1) as f32
+    } else {
+        // Calculate Calinski-Harabasz index
+        (between_cluster_dispersion / (n_clusters - 1) as f32)
+            / (within_cluster_dispersion / (n_points - n_clusters) as f32)
+    }
+}
+
+fn squared_distance(point1: &[f32], point2: &[f32]) -> f32 {
+    point1
+        .iter()
+        .zip(point2.iter())
+        .map(|(&x, &y)| (x - y).powi(2))
+        .sum()
+}
 
 /// Simply takes the best-covered haplotype as the representative
 pub fn haploid_haplotypes(
@@ -42,7 +121,16 @@ pub fn diploid_haplotypes(
     }
 
     let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
-    let clusts = kmeans(&allk, 2);
+    let clusts1 = kmeans(&allk, 1);
+    let idx1 = calculate_wcss(&clusts1);
+    let clusts2 = kmeans(&allk, 2);
+    let idx2 = calculate_wcss(&clusts2);
+    
+    let clusts = if idx1 <= idx2 {
+        clusts1
+    } else {
+        clusts2
+    };
 
     // Separate the two haplotypes and sort
     let (mut hap_a, mut hap_b): (Vec<Haplotype>, Vec<Haplotype>) =
