@@ -101,6 +101,14 @@ pub struct KDParams {
     #[arg(long, default_value_t = 0.10)]
     pub fpenalty: f32,
 
+    /// Maximum number of FNs allowed in a chunk
+    #[arg(long, default_value_t = 3)]
+    pub fnmax: usize,
+
+    /// Maximum number of pileups in a chunk to attempt partials
+    #[arg(long, default_value_t = 100)]
+    pub pileupmax: usize,
+
     /// Search for a 1-to-1 match before graph traversal
     #[arg(long, default_value_t = false)]
     pub try_exact: bool,
