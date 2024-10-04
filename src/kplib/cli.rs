@@ -86,7 +86,7 @@ pub struct KDParams {
     pub sizesim: f32,
 
     /// Minimum frequency of kmer
-    #[arg(long, default_value_t = 1)]
+    #[arg(long, default_value_t = 2)]
     pub minkfreq: u64,
 
     /// Haplotype size similarity collapse threshold (off=1)

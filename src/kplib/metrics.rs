@@ -19,7 +19,7 @@ pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
 
     for (&x, &y) in a.iter().zip(b.iter()) {
         total_d = x.abs() + y.abs();
-        if total_d > mink {
+        if total_d >= mink {
             deno += total_d;
             neum += (x - y).abs();
         }
