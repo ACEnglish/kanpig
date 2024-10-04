@@ -162,6 +162,16 @@ impl ArgParser {
             error!("--reference is not a file");
             is_ok = false;
         }
+        
+        let mut fai_path = self.io.reference.clone();
+        fai_path.set_file_name(format!("{}.fai", fai_path.file_name().unwrap().to_string_lossy()));
+        if !fai_path.exists() {
+            error!("--reference index (.fai) does not exist");
+            is_ok = false;
+        } else if !fai_path.is_file() {
+            error!("--reference index is not a file");
+            is_ok = false;
+        }
 
         if let Some(bed_file) = &self.io.bed {
             if !bed_file.exists() {
