@@ -46,12 +46,8 @@ impl BamParser {
         let mut reads = IndexMap::<Vec<u8>, Vec<usize>>::new();
         // consolidate common variants
         let mut p_variants = IndexSet::<PileupVariant>::new();
-        for pileup in self.bam.pileup() {
-            if pileup.is_err() {
-                continue;
-            }
 
-            let pileup = pileup.unwrap();
+        for pileup in self.bam.pileup().filter_map(Result::ok) {
             let m_pos: u64 = pileup.pos().into();
 
             // We got to truncate the pileup
