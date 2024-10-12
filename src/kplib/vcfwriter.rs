@@ -156,12 +156,10 @@ impl VcfWriter {
         let mut tmp = vcf::io::Writer::new(&mut self.buf);
         // Let noodles check it, first
         match tmp.write_variant_record(&self.header, &annot.entry) {
-            Ok(_) => {
-                match self.writer.get_mut().write_all(&self.buf) {
-                    Ok(_) => {}
-                    Err(error) => panic!("Couldn't write record {:?}", error),
-                }
-            }
+            Ok(_) => match self.writer.get_mut().write_all(&self.buf) {
+                Ok(_) => {}
+                Err(error) => panic!("Couldn't write record {:?}", error),
+            },
             Err(_) => {
                 let changed = replace_iupac_inplace(annot.entry.reference_bases_mut());
                 self.iupac_fixed |= changed;

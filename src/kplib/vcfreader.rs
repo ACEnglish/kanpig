@@ -110,6 +110,8 @@ impl<R: BufRead> VcfChunker<R> {
                 }
                 Ok(_) => {
                     if self.filter_entry(&entry) {
+                        // Clear samples early
+                        *entry.samples_mut() = vcf::variant::record_buf::Samples::default();
                         return Some(entry);
                     } else {
                         self.skip_count += 1;
