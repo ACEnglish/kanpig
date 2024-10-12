@@ -23,7 +23,9 @@ type OutputType = Option<Vec<GenotypeAnno>>;
 
 fn main() {
     let args = ArgParser::parse();
-    let level = if args.io.debug {
+    let level = if args.io.trace {
+        log::LevelFilter::Trace
+    } else if args.io.debug {
         log::LevelFilter::Debug
     } else {
         log::LevelFilter::Info

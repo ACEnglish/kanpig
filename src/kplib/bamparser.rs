@@ -91,7 +91,7 @@ impl BamParser {
                     }
                     _ => continue,
                 };
-                debug!("{:?}", m_var);
+                trace!("{:?}", m_var);
 
                 let (p_idx, _) = p_variants.insert_full(m_var);
                 let qname = alignment.record().qname().to_owned();
@@ -150,12 +150,11 @@ impl BamParser {
                 //cur_hap.add(&hap_parts[*p]);
             }
             cur_hap.coverage = coverage;
-            //debug!("{:?}", cur_hap);
             ret.push(cur_hap);
         }
 
         ret.sort_by(|a, b| b.cmp(a));
-        debug!("{:?}", ret);
+        trace!("{:?}", ret);
         (ret, coverage)
     }
 }

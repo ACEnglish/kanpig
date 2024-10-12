@@ -81,8 +81,8 @@ pub fn diploid_haplotypes(
         std::mem::swap(&mut hap1, &mut hap2);
     }
 
-    debug!("Hap1 in {:?}", hap1);
-    debug!("Hap2 in {:?}", hap2);
+    trace!("Hap1 in {:?}", hap1);
+    trace!("Hap2 in {:?}", hap2);
 
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar

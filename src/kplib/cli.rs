@@ -49,6 +49,10 @@ pub struct IOParams {
     /// Verbose logging
     #[arg(long, default_value_t = false)]
     pub debug: bool,
+
+    /// Very Verbose logging
+    #[arg(long, default_value_t = false)]
+    pub trace: bool,
 }
 
 #[derive(clap::Args, Clone, Debug)]
@@ -220,7 +224,7 @@ impl ArgParser {
             error!("--threads must be at least 1");
             is_ok = false;
         }
-
+        
         is_ok
     }
 }
