@@ -6,6 +6,9 @@ A fast tool for genotyping structural variants with long-reads.
 *Kanpig is currently under active research and development. We make no guarantees about its accuracy or the stability of features 
 before version 1.0.*
 
+*Embargo: Do not publish manuscripts utilizing kanpig results until we've completed our manuscript describing its methods.
+We're aiming to have a preprint available early Q1 2025.*
+
 # 📥 Install
 ```
 git clone https://github.com/ACEnglish/kanpig
@@ -25,8 +28,6 @@ See `kanpig -h` for all available parameters, most of which are detailed below.
 * Kanpig expects sequence resolved SVs. Variants with symbolic alts (e.g. `<DEL>`) and BNDs are not parsed.
 * Kanpig only looks at read pileups and does not consider split or soft-clipped alignment information. This means
   variants above ~10kbp should be skipped with the `--sizemax` parameter.
-* Please do not publish manuscripts benchmarking kanpig results until we've completed our manuscript. We're aiming to have a preprint 
-available early Q3 2024.
 
 # 🔧 Core Parameter Details
 
