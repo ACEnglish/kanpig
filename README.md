@@ -40,14 +40,14 @@ non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEng
 has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
 ### `--chunksize`
-Kanpig will build local variant graphs from windows of the genome. These windows are determined by making the maximum end position
-of an upstream window's variants at least `chunksize` base-pairs away from the next window's variants' minimum start position.
+Kanpig will build local variant graphs from groups of variants in a 'neighborhood'. These neighborhoods are determined by making the maximum end position
+of an upstream neighborhood's variants at least `chunksize` base-pairs away from the next neighborhood's variants' minimum start position.
 
 This chunksize also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
-passing the `mapflag` filter, and which fully span the window are considered.
+passing the `mapflag` filter, and which fully span the neighborhood are considered.
 
 This is an important parameter because too small of a `chunksize` may not recruit distant read pileups which support variants. Similarly, 
-too large of a value may create windows with many SVs which are also too large for reads to fully-span.
+too large of a value may create long neighborhoods with many SVs which are also too large for reads to fully-span.
 
 ### `--sizemin` and `--sizemax`
 Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of variants not within the size boundaries are set to missing (`./.`).
