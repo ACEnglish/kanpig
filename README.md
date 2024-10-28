@@ -4,13 +4,15 @@ kanpig - Kmer ANalysis of PIleups for Genotyping
 A fast tool for genotyping structural variants with long-reads.
 
 # 📥 Install
+Binaries are available in [releases](https://github.com/ACEnglish/kanpig/releases).
+
+Alternatively, build from source with:
 ```
 git clone https://github.com/ACEnglish/kanpig
 cd kanpig
 cargo build --release
 # executable in ./target/release/kanpig
 ```
-Alternatively, binaries are available in [releases](https://github.com/ACEnglish/kanpig/releases).
 
 # 🚀 Quick Start
 ```
@@ -68,7 +70,7 @@ where `SS` and `SZ` are sequence and size similarity,  `L(P)` is the number of n
 pileups in the haplotype, and `N` is the number of putative false-negatives in the variant graph. 
 
 The penalty factor `λg` helps reduce paths with split variant representations. The penalty factor `λf` helps penalizes
-false-negatives in the variant graph. Details on how the impact of the scoring penalties are in [the wiki](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function).
+false-negatives in the variant graph. Details on the scoring penalties are in [the wiki](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function).
 
 ### `--maxpaths`
 When performing path-finding, this threshold limits the number of paths which are checked. A lower `maxpaths` will
