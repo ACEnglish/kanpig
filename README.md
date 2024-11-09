@@ -3,20 +3,16 @@ kanpig - Kmer ANalysis of PIleups for Genotyping
 ------
 A fast tool for genotyping structural variants with long-reads.
 
-*Kanpig is currently under active research and development. We make no guarantees about its accuracy or the stability of features 
-before version 1.0.*
-
-*Embargo: Do not publish manuscripts utilizing kanpig results until we've completed our manuscript describing its methods.
-We're aiming to have a preprint available early Q1 2025.*
-
 # 📥 Install
+Binaries are available in [releases](https://github.com/ACEnglish/kanpig/releases).
+
+Alternatively, build from source with:
 ```
 git clone https://github.com/ACEnglish/kanpig
 cd kanpig
 cargo build --release
 # executable in ./target/release/kanpig
 ```
-Alternatively, binaries are available in [releases](https://github.com/ACEnglish/kanpig/releases).
 
 # 🚀 Quick Start
 ```
@@ -46,14 +42,14 @@ non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEng
 has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
 ### `--chunksize`
-Kanpig will build local variant graphs from windows of the genome. These windows are determined by making the maximum end position
-of an upstream window's variants at least `chunksize` base-pairs away from the next window's variants' minimum start position.
+Kanpig will build local variant graphs from groups of variants in a 'neighborhood'. These neighborhoods are determined by making the maximum end position
+of an upstream neighborhood's variants at least `chunksize` base-pairs away from the next neighborhood's variants' minimum start position.
 
 This chunksize also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
-passing the `mapflag` filter, and which fully span the window are considered.
+passing the `mapflag` filter, and which fully span the neighborhood are considered.
 
 This is an important parameter because too small of a `chunksize` may not recruit distant read pileups which support variants. Similarly, 
-too large of a value may create windows with many SVs which are also too large for reads to fully-span.
+too large of a value may create long neighborhoods with many SVs which are also too large for reads to fully-span.
 
 ### `--sizemin` and `--sizemax`
 Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of variants not within the size boundaries are set to missing (`./.`).
@@ -74,7 +70,7 @@ where `SS` and `SZ` are sequence and size similarity,  `L(P)` is the number of n
 pileups in the haplotype, and `N` is the number of putative false-negatives in the variant graph. 
 
 The penalty factor `λg` helps reduce paths with split variant representations. The penalty factor `λf` helps penalizes
-false-negatives in the variant graph. Details on how the impact of the scoring penalties are in [the wiki](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function).
+false-negatives in the variant graph. Details on the scoring penalties are in [the wiki](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function).
 
 ### `--maxpaths`
 When performing path-finding, this threshold limits the number of paths which are checked. A lower `maxpaths` will
