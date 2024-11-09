@@ -29,3 +29,9 @@ Check `results.vcf` to see the kanpig output.
 
 The `summary.sh` will merge the original input vcf with the kanpig results and will report how many variants 
 were correctly genotyped. Alternatively, open `answer.vcf.gz` to read the genotypes side-by-side.
+
+Extra Information
+-----------------
+- Typical time on a "normal" desktop computer - 3 seconds.
+- Expected output - 4 correctly genotyped SVs in a vcf.
+
