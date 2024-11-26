@@ -16,9 +16,17 @@ cargo build --release
 
 # 🚀 Quick Start
 ```
-kanpig --input variant.vcf.gz --reads alignments.bam --reference ref.fa --out output.vcf
+kanpig gt --input variant.vcf.gz --reads alignments.bam --reference ref.fa --out output.vcf
 ```
 See `kanpig -h` for all available parameters, most of which are detailed below.
+
+Kanpig can also create a pileup index from a bam that is smaller and faster for the genotyper to parse. This is useful
+for long-term or multiple reanalysis operations like N+1 for a cohort.
+
+```
+kanpig plup --bam alignments.bam | bedtools sort | bgzip > alignments.plup.gz
+tabix -p bed alignments.plup.gz
+```
 
 # ⚠️ Current Limitations
 * Kanpig expects sequence resolved SVs. Variants with symbolic alts (e.g. `<DEL>`) and BNDs are not parsed.

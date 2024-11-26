@@ -80,16 +80,14 @@ impl KanpigParams for PlupArgs {
             is_ok = false;
         }
 
-        if self.reference.as_ref().map_or(true, |path| !path.exists()) {
-            error!("--reference does not exist");
-            is_ok = false;
-        } else if self
-            .reference
-            .as_ref()
-            .map_or(false, |path| !path.is_file())
-        {
-            error!("--reference is not a file");
-            is_ok = false;
+        if let Some(path) = &self.reference {
+            if !path.exists() {
+                error!("--reference does not exist");
+                is_ok = false;
+            } else if !path.is_file() {
+                error!("--reference is not a file");
+                is_ok = false;
+            }
         }
 
         if self.sizemin < 20 {
