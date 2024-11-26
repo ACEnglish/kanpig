@@ -8,7 +8,7 @@ mod bedparser;
 pub use crate::kplib::bedparser::BedParser;
 
 mod cli;
-pub use crate::kplib::cli::{Cli, Commands, GTArgs, KDParams, PlupArgs};
+pub use crate::kplib::cli::{Cli, Commands, GTArgs, KDParams, KanpigParams, PlupArgs};
 
 mod cluster;
 pub use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};

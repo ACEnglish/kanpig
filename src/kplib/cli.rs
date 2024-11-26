@@ -10,10 +10,18 @@ pub struct Cli {
     pub command: Commands,
 }
 
+pub trait KanpigParams {
+    fn validate(&self) -> bool;
+    fn trace(&self) -> bool;
+    fn debug(&self) -> bool;
+}
+
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
+    #[command(about = "Genotype SVs")]
     Gt(GTArgs),
 
+    #[command(about = "BAM/CRAM to Pileup Index")]
     Plup(PlupArgs),
 }
 
@@ -46,6 +54,20 @@ pub struct PlupArgs {
     /// Batchsize (25k ~1Gb Mem)
     #[arg(short, long, default_value_t = 250000)]
     pub batch_size: usize,
+}
+
+impl KanpigParams for PlupArgs {
+    fn trace(&self) -> bool {
+        false
+    }
+
+    fn debug(&self) -> bool {
+        false
+    }
+
+    fn validate(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -183,9 +205,16 @@ pub struct KDParams {
     pub maxhom: usize,
 }
 
-impl GTArgs {
+impl KanpigParams for GTArgs {
+    fn trace(&self) -> bool {
+        self.io.trace
+    }
+
+    fn debug(&self) -> bool {
+        self.io.debug
+    }
     /// Validate command line arguments
-    pub fn validate(&self) -> bool {
+    fn validate(&self) -> bool {
         let mut is_ok = true;
 
         if !self.io.input.exists() {

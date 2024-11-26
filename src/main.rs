@@ -5,12 +5,39 @@ extern crate log;
 
 mod kplib;
 use clap::Parser;
-use kplib::{genotyper_main, plup_main, Cli, Commands};
+use kplib::{genotyper_main, plup_main, Cli, Commands, KanpigParams};
+
+fn setup_logging(args: &(impl KanpigParams + std::fmt::Debug)) {
+    let level = if args.trace() {
+        log::LevelFilter::Trace
+    } else if args.debug() {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
+
+    pretty_env_logger::formatted_timed_builder()
+        .filter_level(level)
+        .init();
+
+    info!("params: {:#?}", args);
+    if !args.validate() {
+        error!("please fix arguments");
+        std::process::exit(1);
+    }
+}
 
 fn main() {
     let cli = Cli::parse();
+
     match cli.command {
-        Commands::Gt(args) => genotyper_main(args),
-        Commands::Plup(args) => plup_main(args),
-    }
+        Commands::Gt(args) => {
+            setup_logging(&args);
+            genotyper_main(args);
+        }
+        Commands::Plup(args) => {
+            setup_logging(&args);
+            plup_main(args)
+        }
+    };
 }

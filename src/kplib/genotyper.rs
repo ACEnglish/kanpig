@@ -14,23 +14,6 @@ type InputType = Option<Vec<vcf::variant::RecordBuf>>;
 type OutputType = Option<Vec<GenotypeAnno>>;
 
 pub fn genotyper_main(args: GTArgs) {
-    let level = if args.io.trace {
-        log::LevelFilter::Trace
-    } else if args.io.debug {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Info
-    };
-    pretty_env_logger::formatted_timed_builder()
-        .filter_level(level)
-        .init();
-
-    info!("starting");
-    info!("params: {:#?}", args);
-    if !args.validate() {
-        error!("please fix arguments");
-        std::process::exit(1);
-    }
     let mut input_vcf = vcf::io::reader::Builder::default()
         .build_from_path(args.io.input.clone())
         .expect("Unable to parse vcf");
