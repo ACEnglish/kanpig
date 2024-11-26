@@ -1,17 +1,14 @@
-use crate::kplib::{seq_to_kmer, Haplotype, KDParams, PileupVariant, Svtype};
-use indexmap::{IndexMap, IndexSet};
+use crate::kplib::{KDParams, PileupSet, PileupVariant, ReadsMap, Svtype};
 
 use rust_htslib::{
     bam::ext::BamRecordExtensions,
     bam::pileup::Indel,
     bam::{IndexedReader, Read},
-    faidx,
 };
 use std::path::PathBuf;
 
 pub struct BamParser {
     bam: IndexedReader,
-    reference: faidx::Reader,
     params: KDParams,
 }
 
@@ -19,16 +16,16 @@ impl BamParser {
     pub fn new(bam_name: PathBuf, ref_name: PathBuf, params: KDParams) -> Self {
         let mut bam = IndexedReader::from_path(bam_name).unwrap();
         let _ = bam.set_reference(ref_name.clone());
-        let reference = faidx::Reader::from_path(ref_name).unwrap();
-        BamParser {
-            bam,
-            reference,
-            params,
-        }
+        BamParser { bam, params }
     }
 
     /// Returns all unique haplotypes over a region
-    pub fn find_haps(&mut self, chrom: &String, start: u64, end: u64) -> (Vec<Haplotype>, u64) {
+    pub fn find_pileups(
+        &mut self,
+        chrom: &String,
+        start: u64,
+        end: u64,
+    ) -> (ReadsMap, PileupSet, u64) {
         // We pileup a little outside the region for variants
         let window_start = if start < self.params.chunksize {
             0
@@ -43,9 +40,9 @@ impl BamParser {
         };
 
         // track the changes made by each read
-        let mut reads = IndexMap::<Vec<u8>, Vec<usize>>::new();
+        let mut reads = ReadsMap::new();
         // consolidate common variants
-        let mut p_variants = IndexSet::<PileupVariant>::new();
+        let mut p_variants = PileupSet::new();
 
         for pileup in self.bam.pileup().filter_map(Result::ok) {
             let m_pos: u64 = pileup.pos().into();
@@ -85,12 +82,19 @@ impl BamParser {
                     continue;
                 }
 
-                let m_var = match alignment.indel() {
-                    Indel::Ins(size) | Indel::Del(size) if size as u64 >= self.params.sizemin => {
-                        PileupVariant::new(&alignment, m_pos)
+                let (size, svtype, seq) = match alignment.indel() {
+                    Indel::Del(size) if size as u64 >= self.params.sizemin => {
+                        (-(size as i64), Svtype::Del, None)
+                    }
+                    Indel::Ins(size) if size as u64 >= self.params.sizemin => {
+                        let qpos = alignment.qpos().unwrap();
+                        let seq = alignment.record().seq().as_bytes()[qpos..(qpos + size as usize)]
+                            .to_vec();
+                        (size as i64, Svtype::Ins, Some(seq))
                     }
                     _ => continue,
                 };
+                let m_var = PileupVariant::new(m_pos, svtype, size, seq);
                 trace!("{:?}", m_var);
 
                 let (p_idx, _) = p_variants.insert_full(m_var);
@@ -98,63 +102,9 @@ impl BamParser {
                 reads.entry(qname).or_default().push(p_idx);
             }
         }
-
         // Either all the reads used or the mean coverage over the window
         let coverage = (tot_cov / (window_end - window_start)).max(reads.len() as u64);
 
-        let mut hap_parts = Vec::<Haplotype>::with_capacity(p_variants.len());
-
-        //p_variants.reverse();
-        while let Some(mut p) = p_variants.pop() {
-            // Need to fill in deleted sequence
-            let sequence = if p.indel == Svtype::Del {
-                let d_start = p.position;
-                let d_end = d_start + p.size.unsigned_abs();
-                self.reference
-                    .fetch_seq(chrom, d_start as usize, d_end as usize)
-                    .unwrap()
-                    .to_vec()
-            } else {
-                p.sequence
-                    .take()
-                    .expect("Insertions should already have a sequence")
-            };
-
-            let n_hap = Haplotype::new(
-                seq_to_kmer(
-                    &sequence,
-                    self.params.kmer,
-                    p.indel == Svtype::Del,
-                    self.params.maxhom,
-                ),
-                p.size,
-                1,
-                1,
-            );
-            hap_parts.push(n_hap);
-        }
-
-        // Deduplicate reads by pileup combination
-        let mut unique_reads: IndexMap<&Vec<usize>, u64> = IndexMap::new();
-        for m_plups in reads.values() {
-            *unique_reads.entry(m_plups).or_insert(0) += 1;
-        }
-
-        // Turn variants into haplotypes
-        let mut ret = Vec::<Haplotype>::new();
-        for (read_pileups, coverage) in unique_reads {
-            let mut cur_hap = Haplotype::blank(self.params.kmer, 1);
-            for p in read_pileups {
-                cur_hap.add(&hap_parts[hap_parts.len() - *p - 1]);
-                // When using p_variants.reverse above reversed in the while pop
-                //cur_hap.add(&hap_parts[*p]);
-            }
-            cur_hap.coverage = coverage;
-            ret.push(cur_hap);
-        }
-
-        ret.sort_by(|a, b| b.cmp(a));
-        trace!("{:?}", ret);
-        (ret, coverage)
+        (reads, p_variants, coverage)
     }
 }

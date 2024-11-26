@@ -1,13 +1,14 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
+use rust_htslib::faidx;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 
 use crate::kplib::{
-    build_region_tree, diploid_haplotypes, haploid_haplotypes, BamParser, GTArgs, GenotypeAnno,
-    PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
+    build_region_tree, diploid_haplotypes, haploid_haplotypes, pileups_to_haps, BamParser, GTArgs,
+    GenotypeAnno, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
@@ -37,6 +38,10 @@ pub fn genotyper_main(args: GTArgs) {
             let m_ploidy = ploidy.clone();
 
             thread::spawn(move || {
+                let reference = faidx::Reader::from_path(&m_args.io.reference).unwrap();
+                // Here I need to have a AlignedReads trait
+                // Put it in BamParser. And make a PlupParser
+                // Only thing it needs is find_haps
                 let mut m_bam =
                     BamParser::new(m_args.io.reads, m_args.io.reference, m_args.kd.clone());
                 loop {
@@ -55,8 +60,16 @@ pub fn genotyper_main(args: GTArgs) {
                                 continue;
                             }
 
-                            let (haps, coverage) =
-                                m_bam.find_haps(&m_graph.chrom, m_graph.start, m_graph.end);
+                            let (reads, plups, coverage) =
+                                m_bam.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+                            let (haps, coverage) = pileups_to_haps(
+                                &m_graph.chrom,
+                                reads,
+                                plups,
+                                coverage,
+                                &reference,
+                                &m_args.kd,
+                            );
 
                             let haps = match ploidy {
                                 Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),

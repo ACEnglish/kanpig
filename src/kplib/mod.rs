@@ -31,7 +31,7 @@ mod pathscore;
 pub use crate::kplib::pathscore::PathScore;
 
 mod pileup;
-pub use crate::kplib::pileup::PileupVariant;
+pub use crate::kplib::pileup::{pileups_to_haps, PileupSet, PileupVariant, ReadsMap};
 
 mod pileup_index;
 pub use crate::kplib::pileup_index::plup_main;

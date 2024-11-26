@@ -1,6 +1,8 @@
 /// A pileup variant that's hashable / comparable
 use crate::kplib::Svtype;
-use rust_htslib::bam::pileup::{Alignment, Indel};
+use crate::kplib::{seq_to_kmer, Haplotype, KDParams};
+use indexmap::{IndexMap, IndexSet};
+use rust_htslib::faidx;
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone)]
@@ -12,18 +14,7 @@ pub struct PileupVariant {
 }
 
 impl PileupVariant {
-    pub fn new(alignment: &Alignment, position: u64) -> Self {
-        let (indel, size, sequence) = match alignment.indel() {
-            Indel::Del(size) => (Svtype::Del, -(size as i64), None),
-            Indel::Ins(size) => {
-                let qpos = alignment.qpos().unwrap();
-                let seq =
-                    alignment.record().seq().as_bytes()[qpos..(qpos + size as usize)].to_vec();
-                (Svtype::Ins, size as i64, Some(seq))
-            }
-            _ => panic!("Unexpected Indel type"),
-        };
-
+    pub fn new(position: u64, indel: Svtype, size: i64, sequence: Option<Vec<u8>>) -> Self {
         PileupVariant {
             position,
             indel,
@@ -79,4 +70,68 @@ impl std::fmt::Debug for PileupVariant {
             // Exclude kfeat from the debug output
             .finish()
     }
+}
+
+pub type ReadsMap = IndexMap<Vec<u8>, Vec<usize>>;
+pub type PileupSet = IndexSet<PileupVariant>;
+
+pub fn pileups_to_haps(
+    chrom: &String,
+    reads: ReadsMap,
+    mut plups: PileupSet,
+    coverage: u64,
+    reference: &faidx::Reader,
+    params: &KDParams,
+) -> (Vec<Haplotype>, u64) {
+    let mut hap_parts = Vec::<Haplotype>::with_capacity(plups.len());
+
+    while let Some(mut p) = plups.pop() {
+        // Need to fill in deleted sequence
+        let sequence = if p.indel == Svtype::Del {
+            let d_start = p.position;
+            let d_end = d_start + p.size.unsigned_abs();
+            reference
+                .fetch_seq(chrom, d_start as usize, d_end as usize)
+                .unwrap()
+                .to_vec()
+        } else {
+            p.sequence
+                .take()
+                .expect("Insertions should already have a sequence")
+        };
+
+        let n_hap = Haplotype::new(
+            seq_to_kmer(
+                &sequence,
+                params.kmer,
+                p.indel == Svtype::Del,
+                params.maxhom,
+            ),
+            p.size,
+            1,
+            1,
+        );
+        hap_parts.push(n_hap);
+    }
+
+    // Deduplicate reads by pileup combination
+    let mut unique_reads: IndexMap<&Vec<usize>, u64> = IndexMap::new();
+    for m_plups in reads.values() {
+        *unique_reads.entry(m_plups).or_insert(0) += 1;
+    }
+
+    // Turn variants into haplotypes
+    let mut ret = Vec::<Haplotype>::new();
+    for (read_pileups, coverage) in unique_reads {
+        let mut cur_hap = Haplotype::blank(params.kmer, 1);
+        for p in read_pileups {
+            cur_hap.add(&hap_parts[hap_parts.len() - *p - 1]);
+        }
+        cur_hap.coverage = coverage;
+        ret.push(cur_hap);
+    }
+
+    ret.sort_by(|a, b| b.cmp(a));
+    trace!("{:?}", ret);
+    (ret, coverage)
 }
