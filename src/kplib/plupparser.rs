@@ -23,8 +23,10 @@ impl PlupParser {
         let start: u64 = fields.next()?.parse().ok()?;
         let end: u64 = fields.next()?.parse().ok()?;
         let pileups_str = fields.next()?;
-
-        let pileups = pileups_str
+        let pileups = if pileups_str == "." {
+            Vec::new()
+        } else {
+            pileups_str
             .split(',')
             .filter_map(|entry| {
                 let mut parts = entry.split(':');
@@ -45,7 +47,8 @@ impl PlupParser {
 
                 Some(PileupVariant::new(m_pos - 1, end, svtype, size, seq))
             })
-            .collect();
+            .collect()
+        };
 
         Some((chrom, start, end, pileups))
     }
