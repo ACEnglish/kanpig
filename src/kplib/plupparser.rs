@@ -65,7 +65,6 @@ impl ReadParser for PlupParser {
             Ok(tid) => tid,
             Err(_) => panic!("Could not resolve '{}' to contig ID", chrom),
         };
-        trace!("{}:{}-{}", chrom, start, end);
         // Set region to fetch.
         self.tbx
             .fetch(tid, window_start, window_end)
@@ -91,7 +90,6 @@ impl ReadParser for PlupParser {
                         && lsize >= self.params.sizemin
                         && lsize <= self.params.sizemax
                     {
-                        trace!("{:?}", m_var);
                         let (p_idx, _) = p_variants.insert_full(m_var);
                         reads
                             .entry(qname.to_string().into_bytes())

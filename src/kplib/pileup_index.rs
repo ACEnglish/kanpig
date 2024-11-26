@@ -110,7 +110,7 @@ pub fn plup_main(args: PlupArgs) {
             match result {
                 Ok(record) => {
                     // Filter out records that are empty or have the unwanted flags
-                    if !record.seq().is_empty() && (record.flags() & args.mapflag) == 0 {
+                    if !record.seq().is_empty() && (record.flags() & args.mapflag) == 0 && record.mapq() >= args.mapq {
                         Some(record) // Only keep the valid records
                     } else {
                         None // Filter out invalid records
