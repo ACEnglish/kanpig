@@ -5,7 +5,7 @@ extern crate log;
 
 mod kplib;
 use clap::Parser;
-use kplib::{plup_main, genotyper_main, Cli, Commands, GTArgs, PlupArgs};
+use kplib::{genotyper_main, plup_main, Cli, Commands};
 
 fn main() {
     let cli = Cli::parse();

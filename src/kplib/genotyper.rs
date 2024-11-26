@@ -1,4 +1,3 @@
-use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
@@ -7,8 +6,8 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use crate::kplib::{
-    build_region_tree, diploid_haplotypes, haploid_haplotypes, plup_main, BamParser, GTArgs,
-    GenotypeAnno, PathScore, Ploidy, PloidyRegions, PlupArgs, Variants, VcfChunker, VcfWriter,
+    build_region_tree, diploid_haplotypes, haploid_haplotypes, BamParser, GTArgs, GenotypeAnno,
+    PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
@@ -56,7 +55,7 @@ pub fn genotyper_main(args: GTArgs) {
 
             thread::spawn(move || {
                 let mut m_bam =
-                    BamParser::new(m_args.io.bam, m_args.io.reference, m_args.kd.clone());
+                    BamParser::new(m_args.io.reads, m_args.io.reference, m_args.kd.clone());
                 loop {
                     match m_receiver.recv() {
                         Ok(None) | Err(_) => break,

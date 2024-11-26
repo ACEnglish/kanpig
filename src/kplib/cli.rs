@@ -21,15 +21,31 @@ pub enum Commands {
 pub struct PlupArgs {
     /// Input BAM file
     #[arg(short, long)]
-    pub input: String,
+    pub bam: String,
 
     /// Output file
     #[arg(short, long)]
     pub output: String,
 
+    /// Minimum size of variant to index
+    #[arg(long, default_value_t = 50)]
+    pub sizemin: u32,
+
+    /// Maximum size of variant to index
+    #[arg(long, default_value_t = 10000)]
+    pub sizemax: u32,
+
+    /// Alignments with flag matching this value are ignored
+    #[arg(long, default_value_t = 3840)]
+    pub mapflag: u16,
+
     /// Number of threads
     #[arg(short, long, default_value_t = 1)]
     pub threads: usize,
+
+    /// Batchsize (25k ~1Gb Mem)
+    #[arg(short, long, default_value_t = 250000)]
+    pub batch_size: usize,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -49,9 +65,9 @@ pub struct IOParams {
 
     /// Reads to genotype
     #[arg(short, long)]
-    pub bam: std::path::PathBuf,
+    pub reads: std::path::PathBuf,
 
-    /// Reference bam is aligned to
+    /// Reference reads are aligned to
     #[arg(short = 'f', long)]
     pub reference: std::path::PathBuf,
 
@@ -180,11 +196,11 @@ impl GTArgs {
             is_ok = false;
         }
 
-        if !self.io.bam.exists() {
-            error!("--bam does not exist");
+        if !self.io.reads.exists() {
+            error!("--reads does not exist");
             is_ok = false;
-        } else if !self.io.bam.is_file() {
-            error!("--bam is not a file");
+        } else if !self.io.reads.is_file() {
+            error!("--reads is not a file");
             is_ok = false;
         }
 

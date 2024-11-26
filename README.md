@@ -16,7 +16,7 @@ cargo build --release
 
 # 🚀 Quick Start
 ```
-kanpig --input variant.vcf.gz --bam alignments.bam --reference ref.fa --out output.vcf
+kanpig --input variant.vcf.gz --reads alignments.bam --reference ref.fa --out output.vcf
 ```
 See `kanpig -h` for all available parameters, most of which are detailed below.
 
