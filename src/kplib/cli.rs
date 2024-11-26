@@ -56,17 +56,25 @@ pub struct PlupArgs {
     pub threads: usize,
 
     /// Batchsize (25k ~1Gb Mem)
-    #[arg(short, long, default_value_t = 250000)]
+    #[arg(long, default_value_t = 250000)]
     pub batch_size: usize,
+
+    /// Verbose logging
+    #[arg(long, default_value_t = false)]
+    pub debug: bool,
+
+    /// Very Verbose logging
+    #[arg(long, default_value_t = false)]
+    pub trace: bool,
 }
 
 impl KanpigParams for PlupArgs {
     fn trace(&self) -> bool {
-        false
+        self.trace
     }
 
     fn debug(&self) -> bool {
-        false
+        self.debug
     }
 
     fn validate(&self) -> bool {

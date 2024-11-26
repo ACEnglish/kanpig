@@ -8,7 +8,8 @@ use std::thread::JoinHandle;
 
 use crate::kplib::{
     build_region_tree, diploid_haplotypes, haploid_haplotypes, pileups_to_haps, BamParser, GTArgs,
-    GenotypeAnno, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
+    GenotypeAnno, PathScore, Ploidy, PloidyRegions, PlupParser, ReadParser, Variants, VcfChunker,
+    VcfWriter,
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
@@ -39,11 +40,18 @@ pub fn genotyper_main(args: GTArgs) {
 
             thread::spawn(move || {
                 let reference = faidx::Reader::from_path(&m_args.io.reference).unwrap();
-                // Here I need to have a AlignedReads trait
-                // Put it in BamParser. And make a PlupParser
-                // Only thing it needs is find_haps
-                let mut m_bam =
-                    BamParser::new(m_args.io.reads, m_args.io.reference, m_args.kd.clone());
+                let mut m_bam: Box<dyn ReadParser> =
+                    match m_args.io.reads.file_name().and_then(|name| name.to_str()) {
+                        Some(name) if name.ends_with(".plup.gz") => {
+                            Box::new(PlupParser::new(m_args.io.reads, m_args.kd.clone()))
+                        }
+                        _ => Box::new(BamParser::new(
+                            m_args.io.reads,
+                            m_args.io.reference,
+                            m_args.kd.clone(),
+                        )),
+                    };
+
                 loop {
                     match m_receiver.recv() {
                         Ok(None) | Err(_) => break,

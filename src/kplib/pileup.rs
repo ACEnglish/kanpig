@@ -8,15 +8,23 @@ use std::hash::{Hash, Hasher};
 #[derive(Clone)]
 pub struct PileupVariant {
     pub position: u64,
+    pub end: u64,
     pub indel: Svtype,
     pub size: i64,
     pub sequence: Option<Vec<u8>>,
 }
 
 impl PileupVariant {
-    pub fn new(position: u64, indel: Svtype, size: i64, sequence: Option<Vec<u8>>) -> Self {
+    pub fn new(
+        position: u64,
+        end: u64,
+        indel: Svtype,
+        size: i64,
+        sequence: Option<Vec<u8>>,
+    ) -> Self {
         PileupVariant {
             position,
+            end,
             indel,
             size,
             sequence,

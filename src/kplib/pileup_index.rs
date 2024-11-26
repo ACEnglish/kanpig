@@ -10,12 +10,13 @@ type ProcessedRead = (i32, i64, i64, String);
 
 fn process_read(record: Record, sizemin: u32, sizemax: u32) -> ProcessedRead {
     let chrom = record.tid();
-    let start = record.pos();
+    let start = record.reference_start();
     let end = record.reference_end();
 
     // Build the CIGAR operations string
     let mut cigar_ops = Vec::new();
-    let mut offset = 0;
+    let mut read_offset = 0;
+    let mut align_offset = 0;
 
     for cigar in record.cigar().iter() {
         match cigar.char() {
@@ -23,22 +24,32 @@ fn process_read(record: Record, sizemin: u32, sizemax: u32) -> ProcessedRead {
             'I' if sizemin <= cigar.len() && cigar.len() <= sizemax => {
                 // Get the inserted sequence
                 let sequence = String::from_utf8_lossy(
-                    &record.seq().as_bytes()[offset..offset + cigar.len() as usize],
+                    &record.seq().as_bytes()[read_offset..read_offset + cigar.len() as usize],
                 )
                 .to_string();
-                cigar_ops.push(format!("{}:{}", offset, sequence));
-                offset += cigar.len() as usize;
+                cigar_ops.push(format!("{}:{}", align_offset, sequence));
+                read_offset += cigar.len() as usize;
             }
             'D' if sizemin <= cigar.len() && cigar.len() <= sizemax => {
                 // Record deletion without adjusting the offset
-                cigar_ops.push(format!("{}:{}", offset, cigar.len()));
+                cigar_ops.push(format!("{}:{}", align_offset, cigar.len()));
+                align_offset += cigar.len() as usize;
             }
-            'M' | 'X' | '=' | 'S' | 'I' => {
-                offset += cigar.len() as usize;
+            'M' | 'X' | '=' => {
+                read_offset += cigar.len() as usize;
+                align_offset += cigar.len() as usize;
+            }
+            'I' | 'S' => {
+                read_offset += cigar.len() as usize;
+            }
+            'D' => {
+                align_offset += cigar.len() as usize;
             }
             // Handle 'H' and 'P' explicitly to ignore them
             'H' | 'P' => {}
-            _ => {}
+            _ => {
+                error!("What is this code?: {}", cigar.char());
+            }
         }
     }
 

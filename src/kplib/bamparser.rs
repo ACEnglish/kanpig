@@ -1,4 +1,4 @@
-use crate::kplib::{KDParams, PileupSet, PileupVariant, ReadsMap, Svtype};
+use crate::kplib::{KDParams, PileupSet, PileupVariant, ReadParser, ReadsMap, Svtype};
 
 use rust_htslib::{
     bam::ext::BamRecordExtensions,
@@ -18,14 +18,11 @@ impl BamParser {
         let _ = bam.set_reference(ref_name.clone());
         BamParser { bam, params }
     }
+}
 
+impl ReadParser for BamParser {
     /// Returns all unique haplotypes over a region
-    pub fn find_pileups(
-        &mut self,
-        chrom: &String,
-        start: u64,
-        end: u64,
-    ) -> (ReadsMap, PileupSet, u64) {
+    fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (ReadsMap, PileupSet, u64) {
         // We pileup a little outside the region for variants
         let window_start = if start < self.params.chunksize {
             0
@@ -82,19 +79,19 @@ impl BamParser {
                     continue;
                 }
 
-                let (size, svtype, seq) = match alignment.indel() {
+                let (end, size, svtype, seq) = match alignment.indel() {
                     Indel::Del(size) if size as u64 >= self.params.sizemin => {
-                        (-(size as i64), Svtype::Del, None)
+                        (m_pos + size as u64, -(size as i64), Svtype::Del, None)
                     }
                     Indel::Ins(size) if size as u64 >= self.params.sizemin => {
-                        let qpos = alignment.qpos().unwrap();
+                        let qpos = alignment.qpos().unwrap() + 1;
                         let seq = alignment.record().seq().as_bytes()[qpos..(qpos + size as usize)]
                             .to_vec();
-                        (size as i64, Svtype::Ins, Some(seq))
+                        (m_pos + 1_u64, size as i64, Svtype::Ins, Some(seq))
                     }
                     _ => continue,
                 };
-                let m_var = PileupVariant::new(m_pos, svtype, size, seq);
+                let m_var = PileupVariant::new(m_pos, end, svtype, size, seq);
                 trace!("{:?}", m_var);
 
                 let (p_idx, _) = p_variants.insert_full(m_var);
