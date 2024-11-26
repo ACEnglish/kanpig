@@ -13,6 +13,9 @@ pub use crate::kplib::cli::{Cli, Commands, GTArgs, KDParams, PlupArgs};
 mod cluster;
 pub use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};
 
+mod genotyper;
+pub use crate::kplib::genotyper::genotyper_main;
+
 mod haplotype;
 pub use crate::kplib::haplotype::Haplotype;
 
