@@ -1,10 +1,39 @@
 extern crate pretty_env_logger;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Clone, Debug)]
+#[command(name = "kanpig")]
 #[command(author = "ACEnglish", version)]
-pub struct ArgParser {
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum Commands {
+    Gt(GTArgs),
+
+    Plup(PlupArgs),
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct PlupArgs {
+    /// Input BAM file
+    #[arg(short, long)]
+    pub input: String,
+
+    /// Output file
+    #[arg(short, long)]
+    pub output: String,
+
+    /// Number of threads
+    #[arg(short, long, default_value_t = 1)]
+    pub threads: usize,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct GTArgs {
     #[command(flatten)]
     pub io: IOParams,
 
@@ -138,7 +167,7 @@ pub struct KDParams {
     pub maxhom: usize,
 }
 
-impl ArgParser {
+impl GTArgs {
     /// Validate command line arguments
     pub fn validate(&self) -> bool {
         let mut is_ok = true;

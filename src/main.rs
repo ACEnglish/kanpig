@@ -14,15 +14,15 @@ use std::thread::JoinHandle;
 mod kplib;
 
 use kplib::{
-    build_region_tree, diploid_haplotypes, haploid_haplotypes, ArgParser, BamParser, GenotypeAnno,
-    PathScore, Ploidy, PloidyRegions, Variants, VcfChunker, VcfWriter,
+    build_region_tree, diploid_haplotypes, haploid_haplotypes, plup_main, BamParser, Cli, Commands,
+    GTArgs, GenotypeAnno, PathScore, Ploidy, PloidyRegions, PlupArgs, Variants, VcfChunker,
+    VcfWriter,
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
 type OutputType = Option<Vec<GenotypeAnno>>;
 
-fn main() {
-    let args = ArgParser::parse();
+fn gt_main(args: GTArgs) {
     let level = if args.io.trace {
         log::LevelFilter::Trace
     } else if args.io.debug {
@@ -205,4 +205,12 @@ fn main() {
     // Wait on the writer
     write_handler.join().unwrap();
     info!("finished");
+}
+
+fn main() {
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::Gt(args) => gt_main(args),
+        Commands::Plup(args) => plup_main(args),
+    }
 }
