@@ -51,13 +51,25 @@ fn process_read(record: Record, sizemin: u32, sizemax: u32) -> ProcessedRead {
 
 pub fn plup_main(args: PlupArgs) {
     let mut bam = bam::Reader::from_path(&args.bam).expect("Error opening BAM file");
+
+    if let Some(ref_name) = args.reference {
+        let _ = bam.set_reference(ref_name);
+    }
+
     let (tx, rx): (mpsc::Sender<ProcessedRead>, mpsc::Receiver<ProcessedRead>) = mpsc::channel();
 
     // Spawn a thread for writing to ensure reads are written in order
     let writer_thread = {
         thread::spawn(move || {
-            let output_file = File::create(args.output).expect("Error creating output file");
-            let mut writer = BufWriter::new(output_file);
+            let mut writer: Box<dyn Write> = match args.output {
+                Some(ref path) => {
+                    let m_page = page_size::get() * 1000;
+                    let file = File::create(path).expect("Error Creating Output File");
+                    Box::new(BufWriter::with_capacity(m_page, file))
+                }
+                None => Box::new(BufWriter::new(std::io::stdout())),
+            };
+
             let lbam = bam::Reader::from_path(args.bam).expect("Error opening BAM file");
             let header_main = bam::Header::from_template(lbam.header());
             let header = bam::HeaderView::from_header(&header_main);

@@ -27,13 +27,17 @@ pub enum Commands {
 
 #[derive(Parser, Debug, Clone)]
 pub struct PlupArgs {
-    /// Input BAM file
+    /// Input BAM/CRAM file
     #[arg(short, long)]
-    pub bam: String,
+    pub bam: std::path::PathBuf,
+
+    /// CRAM file reference
+    #[arg(short, long)]
+    pub reference: Option<std::path::PathBuf>,
 
     /// Output file
     #[arg(short, long)]
-    pub output: String,
+    pub output: Option<std::path::PathBuf>,
 
     /// Minimum size of variant to index
     #[arg(long, default_value_t = 50)]
@@ -66,7 +70,33 @@ impl KanpigParams for PlupArgs {
     }
 
     fn validate(&self) -> bool {
-        true
+        let mut is_ok = true;
+
+        if !self.bam.exists() {
+            error!("--bam does not exist");
+            is_ok = false;
+        } else if !self.bam.is_file() {
+            error!("--bam is not a file");
+            is_ok = false;
+        }
+
+        if self.reference.as_ref().map_or(true, |path| !path.exists()) {
+            error!("--reference does not exist");
+            is_ok = false;
+        } else if self
+            .reference
+            .as_ref()
+            .map_or(false, |path| !path.is_file())
+        {
+            error!("--reference is not a file");
+            is_ok = false;
+        }
+
+        if self.sizemin < 20 {
+            warn!("--sizemin is recommended to be at least 20");
+        }
+
+        is_ok
     }
 }
 
