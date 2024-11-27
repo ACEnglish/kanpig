@@ -76,6 +76,31 @@ impl ReadPileup {
         }
     }
 
+    pub fn decode(line: &[u8]) -> Option<Self> {
+        let line_str = std::str::from_utf8(line).ok()?;
+        let mut fields = line_str.split('\t');
+
+        let _chrom = fields.next()?.to_string();
+        let start = fields.next()?.parse().ok()?;
+        let end = fields.next()?.parse().ok()?;
+        let pileups_str = fields.next()?;
+
+        let pileups = match pileups_str {
+            "." => Vec::new(),
+            _ => pileups_str
+                .split(',')
+                .filter_map(|entry| PileupVariant::decode(entry, start))
+                .collect(),
+        };
+        // I use chrom 0 for the decode because new puts in tid
+        Some(ReadPileup {
+            chrom: 0,
+            start,
+            end,
+            pileups,
+        })
+    }
+
     pub fn to_string(&self, chrom: &str) -> String {
         let pstr: String = if self.pileups.is_empty() {
             ".".to_string()

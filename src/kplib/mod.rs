@@ -1,9 +1,6 @@
 mod annotator;
 pub use crate::kplib::annotator::GenotypeAnno;
 
-mod bamparser;
-pub use crate::kplib::bamparser::BamParser;
-
 mod bedparser;
 pub use crate::kplib::bedparser::BedParser;
 
@@ -31,19 +28,16 @@ mod pathscore;
 pub use crate::kplib::pathscore::PathScore;
 
 mod pileup;
-pub use crate::kplib::pileup::{pileups_to_haps, PileupSet, PileupVariant, ReadPileup, ReadsMap};
+pub use crate::kplib::pileup::{pileups_to_haps, PileupSet, ReadPileup, ReadsMap};
 
 mod pileup_index;
 pub use crate::kplib::pileup_index::plup_main;
-
-mod plupparser;
-pub use crate::kplib::plupparser::PlupParser;
 
 mod ploidy;
 pub use crate::kplib::ploidy::{Ploidy, PloidyRegions};
 
 mod readparser;
-pub use crate::kplib::readparser::ReadParser;
+pub use crate::kplib::readparser::{BamParser, PlupParser, ReadParser};
 
 mod regions;
 pub use crate::kplib::regions::{build_region_tree, Regions};
