@@ -73,7 +73,7 @@ impl ReadPileup {
         }
     }
 
-    pub fn decode(line: &[u8]) -> Option<Self> {
+    pub fn decode(line: &[u8], sizemin: u64, sizemax: u64) -> Option<Self> {
         let line_str = std::str::from_utf8(line).ok()?;
         let mut fields = line_str.split('\t');
 
@@ -87,6 +87,7 @@ impl ReadPileup {
             _ => pileups_str
                 .split(',')
                 .filter_map(|entry| PileupVariant::decode(entry, start))
+                .filter(|variant| variant.size.unsigned_abs() >= sizemin && variant.size.unsigned_abs() <= sizemax)
                 .collect(),
         };
         // I use chrom 0 for the decode because new puts in tid

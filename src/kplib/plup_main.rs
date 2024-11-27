@@ -40,7 +40,6 @@ pub fn plup_main(args: PlupArgs) {
         })
     };
 
-    // Configure a custom thread pool
     let pool = ThreadPoolBuilder::new()
         .num_threads(args.threads)
         .build()
@@ -48,7 +47,7 @@ pub fn plup_main(args: PlupArgs) {
 
     pool.install(|| {
         let mut buffer = Vec::with_capacity(args.batch_size);
-        let tx = Arc::new(tx.clone()); // Cloneable sender for parallel tasks
+        let tx = Arc::new(tx.clone());
 
         for record in bam.records().filter_map(|result| match result {
             Ok(record) => {
@@ -65,9 +64,8 @@ pub fn plup_main(args: PlupArgs) {
         }) {
             buffer.push(record);
 
-            // When the buffer is full, process it in parallel
             if buffer.len() == args.batch_size {
-                let chunk = std::mem::take(&mut buffer); // Take the batch
+                let chunk = std::mem::take(&mut buffer);
                 let tx = Arc::clone(&tx);
                 rayon::spawn(move || {
                     for record in chunk {

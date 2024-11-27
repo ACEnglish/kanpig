@@ -7,7 +7,6 @@ use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
 use petgraph::graph::{DiGraph, NodeIndex};
 
-/// Every --input variant is placed inside a node is turned into a graph.
 #[derive(Debug)]
 pub struct VarNode {
     pub start: u64,

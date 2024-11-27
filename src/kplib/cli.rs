@@ -173,7 +173,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 1000)]
     pub neighdist: u64,
 
-    /// Only analyze reads with PASS FILTER
+    /// Only analyze variants with PASS FILTER
     #[arg(long, default_value_t = false)]
     pub passonly: bool,
 
