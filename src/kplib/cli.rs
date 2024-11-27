@@ -126,7 +126,7 @@ pub struct IOParams {
     #[arg(short, long)]
     pub input: std::path::PathBuf,
 
-    /// Reads to genotype
+    /// Reads to genotype (.bam, .cram, or .plup.gz)
     #[arg(short, long)]
     pub reads: std::path::PathBuf,
 
