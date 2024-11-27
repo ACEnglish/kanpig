@@ -42,8 +42,8 @@ impl ReadParser for BamParser {
     /// Returns all unique haplotypes over a region
     fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64) {
         // We pileup a little outside the region for variants
-        let window_start = start.saturating_sub(self.params.chunksize);
-        let window_end = end + self.params.chunksize;
+        let window_start = start.saturating_sub(self.params.neighdist);
+        let window_end = end + self.params.neighdist;
 
         if let Err(e) = self.bam.fetch((&chrom, window_start, window_end)) {
             panic!("Unable to fetch bam {}:{}-{}\n{:?}", chrom, start, end, e)
@@ -117,8 +117,8 @@ impl ReadParser for PlupParser {
     /// Fetch and parse pileups within a specified genomic interval.
     /// Returns the set of haplotypes
     fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64) {
-        let window_start = start.saturating_sub(self.params.chunksize);
-        let window_end = end + self.params.chunksize;
+        let window_start = start.saturating_sub(self.params.neighdist);
+        let window_end = end + self.params.neighdist;
 
         let tid = self
             .tbx

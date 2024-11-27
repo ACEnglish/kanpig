@@ -170,7 +170,7 @@ pub struct KDParams {
 
     /// Minimum distance between variants to create independent graphs
     #[arg(long, default_value_t = 1000)]
-    pub chunksize: u64,
+    pub neighdist: u64,
 
     /// Only analyze reads with PASS FILTER
     #[arg(long, default_value_t = false)]

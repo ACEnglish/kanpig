@@ -138,7 +138,7 @@ impl<R: BufRead> VcfChunker<R> {
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;
 
         let (start, end) = entry.boundaries();
-        let new_chunk = self.cur_end != 0 && self.cur_end + self.params.chunksize < start;
+        let new_chunk = self.cur_end != 0 && self.cur_end + self.params.neighdist < start;
 
         self.cur_chrom = check_chrom;
         self.cur_end = if new_chrom {
