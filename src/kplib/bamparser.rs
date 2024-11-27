@@ -60,7 +60,7 @@ impl ReadParser for BamParser {
                 if m_var.position >= window_start && m_var.position <= window_end {
                     trace!("{:?}", m_var);
                     let (p_idx, _) = p_variants.insert_full(m_var);
-                    reads.entry(qname.clone()).or_default().push(p_idx);
+                    reads.entry(qname).or_default().push(p_idx);
                 }
             }
         }

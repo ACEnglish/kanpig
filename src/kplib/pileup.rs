@@ -215,17 +215,16 @@ pub fn pileups_to_haps(
 
     while let Some(mut p) = plups.pop() {
         // Need to fill in deleted sequence
-        let sequence = if p.indel == Svtype::Del {
-            let d_start = p.position;
-            let d_end = d_start + p.size.unsigned_abs();
-            reference
-                .fetch_seq(chrom, d_start as usize, d_end as usize)
+        let sequence = match p.indel {
+            Svtype::Del => reference
+                .fetch_seq(chrom, p.position as usize, p.end as usize)
                 .unwrap()
-                .to_vec()
-        } else {
-            p.sequence
+                .to_vec(),
+            Svtype::Ins => p
+                .sequence
                 .take()
-                .expect("Insertions should already have a sequence")
+                .expect("Insertions should already have a sequence"),
+            _ => panic!("Unknown Svtype"),
         };
 
         let n_hap = Haplotype::new(
