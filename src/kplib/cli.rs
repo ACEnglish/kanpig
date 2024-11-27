@@ -236,10 +236,6 @@ pub struct KDParams {
     #[arg(long, default_value_t = 3840)]
     pub mapflag: u16,
 
-    /// Don't require alignments to span vargraph region
-    #[arg(long, default_value_t = true)]
-    pub spanoff: bool,
-
     /// Maximum homopolymer length to kmerize (off=0)
     #[arg(long, default_value_t = 0)]
     pub maxhom: usize,

@@ -8,6 +8,7 @@ pub use self::{
     kplib::plup_main, kplib::seq_to_kmer, kplib::BamParser, kplib::BedParser, kplib::Cli,
     kplib::Commands, kplib::GTArgs, kplib::Haplotype, kplib::KDParams, kplib::KanpigParams,
     kplib::KdpVcf, kplib::PathScore, kplib::PileupSet, kplib::Ploidy, kplib::PloidyRegions,
-    kplib::PlupArgs, kplib::PlupParser, kplib::ReadParser, kplib::ReadsMap, kplib::Regions,
-    kplib::Svtype, kplib::VarNode, kplib::Variants, kplib::VcfChunker, kplib::VcfWriter,
+    kplib::PlupArgs, kplib::PlupParser, kplib::ReadParser, kplib::ReadPileup, kplib::ReadsMap,
+    kplib::Regions, kplib::Svtype, kplib::VarNode, kplib::Variants, kplib::VcfChunker,
+    kplib::VcfWriter,
 };

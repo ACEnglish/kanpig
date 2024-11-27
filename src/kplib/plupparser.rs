@@ -27,27 +27,27 @@ impl PlupParser {
             Vec::new()
         } else {
             pileups_str
-            .split(',')
-            .filter_map(|entry| {
-                let mut parts = entry.split(':');
-                let offset: u64 = parts.next()?.parse().ok()?;
-                let m_pos = start + offset;
-                let value = parts.next()?;
-                let (end, svtype, size, seq) = if let Ok(size) = value.parse::<u64>() {
-                    // It's an integer, so should be Del
-                    (m_pos + size, Svtype::Del, -(size as i64), None)
-                } else {
-                    (
-                        m_pos + 1,
-                        Svtype::Ins,
-                        value.len() as i64,
-                        Some(value.as_bytes().to_vec()),
-                    )
-                };
+                .split(',')
+                .filter_map(|entry| {
+                    let mut parts = entry.split(':');
+                    let offset: u64 = parts.next()?.parse().ok()?;
+                    let m_pos = start + offset;
+                    let value = parts.next()?;
+                    let (end, svtype, size, seq) = if let Ok(size) = value.parse::<u64>() {
+                        // It's an integer, so should be Del
+                        (m_pos + size, Svtype::Del, -(size as i64), None)
+                    } else {
+                        (
+                            m_pos + 1,
+                            Svtype::Ins,
+                            value.len() as i64,
+                            Some(value.as_bytes().to_vec()),
+                        )
+                    };
 
-                Some(PileupVariant::new(m_pos - 1, end, svtype, size, seq))
-            })
-            .collect()
+                    Some(PileupVariant::new(m_pos - 1, end, svtype, size, seq))
+                })
+                .collect()
         };
 
         Some((chrom, start, end, pileups))
@@ -93,6 +93,7 @@ impl ReadParser for PlupParser {
                         && lsize >= self.params.sizemin
                         && lsize <= self.params.sizemax
                     {
+                        trace!("{:?}", m_var);
                         let (p_idx, _) = p_variants.insert_full(m_var);
                         reads
                             .entry(qname.to_string().into_bytes())

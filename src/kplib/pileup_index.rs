@@ -1,64 +1,10 @@
-use crate::kplib::PlupArgs;
+use crate::kplib::{PlupArgs, ReadPileup};
 use rayon::ThreadPoolBuilder;
-use rust_htslib::bam::{self, ext::BamRecordExtensions, Read, Record};
+use rust_htslib::bam::{self, Read};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::sync::{mpsc, Arc};
 use std::thread;
-
-type ProcessedRead = (i32, i64, i64, String);
-
-fn process_read(record: Record, sizemin: u32, sizemax: u32) -> ProcessedRead {
-    let chrom = record.tid();
-    let start = record.reference_start();
-    let end = record.reference_end();
-
-    // Build the CIGAR operations string
-    let mut cigar_ops = Vec::new();
-    let mut read_offset = 0;
-    let mut align_offset = 0;
-
-    for cigar in record.cigar().iter() {
-        match cigar.char() {
-            // Operations that consume read sequence and affect the offset
-            'I' if sizemin <= cigar.len() && cigar.len() <= sizemax => {
-                // Get the inserted sequence
-                let sequence = String::from_utf8_lossy(
-                    &record.seq().as_bytes()[read_offset..read_offset + cigar.len() as usize],
-                )
-                .to_string();
-                cigar_ops.push(format!("{}:{}", align_offset, sequence));
-                read_offset += cigar.len() as usize;
-            }
-            'D' if sizemin <= cigar.len() && cigar.len() <= sizemax => {
-                // Record deletion without adjusting the offset
-                cigar_ops.push(format!("{}:{}", align_offset, cigar.len()));
-                align_offset += cigar.len() as usize;
-            }
-            'M' | 'X' | '=' => {
-                read_offset += cigar.len() as usize;
-                align_offset += cigar.len() as usize;
-            }
-            'I' | 'S' => {
-                read_offset += cigar.len() as usize;
-            }
-            'D' => {
-                align_offset += cigar.len() as usize;
-            }
-            // Handle 'H' and 'P' explicitly to ignore them
-            'H' | 'P' => {}
-            _ => {
-                error!("What is this code?: {}", cigar.char());
-            }
-        }
-    }
-
-    if cigar_ops.is_empty() {
-        (chrom, start, end, ".".to_string())
-    } else {
-        (chrom, start, end, cigar_ops.join(","))
-    }
-}
 
 pub fn plup_main(args: PlupArgs) {
     let mut bam = bam::Reader::from_path(&args.bam).expect("Error opening BAM file");
@@ -67,7 +13,7 @@ pub fn plup_main(args: PlupArgs) {
         let _ = bam.set_reference(ref_name);
     }
 
-    let (tx, rx): (mpsc::Sender<ProcessedRead>, mpsc::Receiver<ProcessedRead>) = mpsc::channel();
+    let (tx, rx): (mpsc::Sender<ReadPileup>, mpsc::Receiver<ReadPileup>) = mpsc::channel();
 
     // Spawn a thread for writing to ensure reads are written in order
     let writer_thread = {
@@ -85,13 +31,11 @@ pub fn plup_main(args: PlupArgs) {
             let header_main = bam::Header::from_template(lbam.header());
             let header = bam::HeaderView::from_header(&header_main);
             for result in rx {
-                let chrom = std::str::from_utf8(header.tid2name(result.0 as u32)).expect("is okay");
-                writeln!(
-                    writer,
-                    "{}\t{}\t{}\t{}",
-                    chrom, result.1, result.2, result.3
-                )
-                .expect("Error writing to output file");
+                // Need to pass the chrom in
+                let chrom =
+                    std::str::from_utf8(header.tid2name(result.chrom as u32)).expect("is okay");
+                writeln!(writer, "{}", result.to_string(chrom))
+                    .expect("Error writing to output file");
             }
         })
     };
@@ -106,17 +50,18 @@ pub fn plup_main(args: PlupArgs) {
         let mut buffer = Vec::with_capacity(args.batch_size);
         let tx = Arc::new(tx.clone()); // Cloneable sender for parallel tasks
 
-        for record in bam.records().filter_map(|result| {
-            match result {
-                Ok(record) => {
-                    if record.seq().is_empty() || record.mapq() < args.mapq || (record.flags() & args.mapflag) != 0 {
-                        None
-                    } else {
-                        Some(record)
-                    }
+        for record in bam.records().filter_map(|result| match result {
+            Ok(record) => {
+                if record.seq().is_empty()
+                    || record.mapq() < args.mapq
+                    || (record.flags() & args.mapflag) != 0
+                {
+                    None
+                } else {
+                    Some(record)
                 }
-                Err(_) => None,
             }
+            Err(_) => None,
         }) {
             buffer.push(record);
 
@@ -126,7 +71,7 @@ pub fn plup_main(args: PlupArgs) {
                 let tx = Arc::clone(&tx);
                 rayon::spawn(move || {
                     for record in chunk {
-                        let _ = tx.send(process_read(record, args.sizemin, args.sizemax));
+                        let _ = tx.send(ReadPileup::new(record, args.sizemin, args.sizemax));
                     }
                 });
             }
@@ -137,7 +82,7 @@ pub fn plup_main(args: PlupArgs) {
             let tx = Arc::clone(&tx);
             rayon::spawn(move || {
                 for record in buffer {
-                    let _ = tx.send(process_read(record, args.sizemin, args.sizemax));
+                    let _ = tx.send(ReadPileup::new(record, args.sizemin, args.sizemax));
                 }
             });
         }

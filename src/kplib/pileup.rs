@@ -3,7 +3,92 @@ use crate::kplib::Svtype;
 use crate::kplib::{seq_to_kmer, Haplotype, KDParams};
 use indexmap::{IndexMap, IndexSet};
 use rust_htslib::faidx;
+use rust_htslib::{bam::ext::BamRecordExtensions, bam::Record};
 use std::hash::{Hash, Hasher};
+
+pub struct ReadPileup {
+    pub chrom: i32,
+    pub start: u64,
+    pub end: u64,
+    pub pileups: Vec<PileupVariant>,
+}
+
+impl ReadPileup {
+    pub fn new(record: Record, sizemin: u32, sizemax: u32) -> Self {
+        let chrom = record.tid();
+        let start = record.reference_start();
+        let end = record.reference_end();
+
+        let mut pileups = Vec::<PileupVariant>::new();
+        let mut read_offset = 0;
+        let mut align_offset = start as usize - 1;
+
+        for cigar in record.cigar().iter() {
+            match cigar.char() {
+                'I' if sizemin <= cigar.len() && cigar.len() <= sizemax => {
+                    let sequence = record.seq().as_bytes()
+                        [read_offset..read_offset + cigar.len() as usize]
+                        .to_vec();
+
+                    pileups.push(PileupVariant::new(
+                        align_offset as u64,
+                        (align_offset + 1) as u64,
+                        Svtype::Ins,
+                        cigar.len() as i64,
+                        Some(sequence),
+                    ));
+
+                    read_offset += cigar.len() as usize;
+                }
+                'D' if sizemin <= cigar.len() && cigar.len() <= sizemax => {
+                    pileups.push(PileupVariant::new(
+                        align_offset as u64,
+                        (align_offset + (cigar.len() as usize)) as u64,
+                        Svtype::Del,
+                        -(cigar.len() as i64),
+                        None,
+                    ));
+                    align_offset += cigar.len() as usize;
+                }
+                'M' | 'X' | '=' => {
+                    read_offset += cigar.len() as usize;
+                    align_offset += cigar.len() as usize;
+                }
+                'I' | 'S' => {
+                    read_offset += cigar.len() as usize;
+                }
+                'D' => {
+                    align_offset += cigar.len() as usize;
+                }
+                // Handle 'H' and 'P' explicitly to ignore them
+                'H' | 'P' => {}
+                _ => {
+                    error!("What is this code?: {}", cigar.char());
+                }
+            }
+        }
+
+        ReadPileup {
+            chrom,
+            start: start as u64,
+            end: end as u64,
+            pileups,
+        }
+    }
+
+    pub fn to_string(&self, chrom: &str) -> String {
+        let pstr: String = if self.pileups.is_empty() {
+            ".".to_string()
+        } else {
+            self.pileups
+                .iter()
+                .map(|x| x.encode(self.start))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        format!("{}\t{}\t{}\t{}", chrom, self.start, self.end, pstr)
+    }
+}
 
 #[derive(Clone)]
 pub struct PileupVariant {
@@ -28,6 +113,21 @@ impl PileupVariant {
             indel,
             size,
             sequence,
+        }
+    }
+
+    pub fn encode(&self, offset: u64) -> String {
+        match self.indel {
+            Svtype::Del => format!("{}:{}", self.position - offset, self.size.abs()),
+            Svtype::Ins => format!(
+                "{}:{}",
+                self.position - offset,
+                self.sequence
+                    .clone()
+                    .and_then(|seq| String::from_utf8(seq).ok())
+                    .unwrap()
+            ),
+            _ => panic!("Unencodeable PileupVariant"),
         }
     }
 }
