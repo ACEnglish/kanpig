@@ -104,7 +104,6 @@ impl ReadParser for PlupParser {
             }
             qname += 1;
         }
-        let coverage = (tot_cov / (window_end - window_start)).max(reads.len() as u64);
-        (reads, p_variants, coverage)
+        (reads, p_variants, tot_cov)
     }
 }
