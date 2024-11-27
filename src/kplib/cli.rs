@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser, Clone, Debug)]
 #[command(name = "kanpig")]
+#[command(about = "Kmer ANalysis of PIleups for Genotyping")]
 #[command(author = "ACEnglish", version)]
 pub struct Cli {
     #[command(subcommand)]
