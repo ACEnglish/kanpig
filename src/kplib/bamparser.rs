@@ -23,11 +23,7 @@ impl ReadParser for BamParser {
     /// Returns all unique haplotypes over a region
     fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (ReadsMap, PileupSet, u64) {
         // We pileup a little outside the region for variants
-        let window_start = if start < self.params.chunksize {
-            0
-        } else {
-            start - self.params.chunksize
-        };
+        let window_start = start.saturating_sub(self.params.chunksize);
         let window_end = end + self.params.chunksize;
 
         if let Err(e) = self.bam.fetch((&chrom, window_start, window_end)) {
@@ -40,24 +36,27 @@ impl ReadParser for BamParser {
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
 
-        for record in self.bam.records().filter_map(|r| {
-            r.ok().filter(|rec| {
-                !rec.seq().is_empty()
-                    && rec.mapq() >= self.params.mapq
-                    && (rec.flags() & self.params.mapflag) == 0
-                    && (rec.reference_start() as u64) < window_start
-                    && (rec.reference_end() as u64) > window_end
+        for (qname, record) in self
+            .bam
+            .records()
+            .filter_map(|r| {
+                r.ok().filter(|rec| {
+                    !rec.seq().is_empty()
+                        && rec.mapq() >= self.params.mapq
+                        && (rec.flags() & self.params.mapflag) == 0
+                        && (rec.reference_start() as u64) < window_start
+                        && (rec.reference_end() as u64) > window_end
+                })
             })
-        }) {
-            let qname = record.qname().to_owned();
+            .enumerate()
+        {
             coverage += 1;
-            let m_plups = ReadPileup::new(
+            let mut m_plups = ReadPileup::new(
                 record,
                 self.params.sizemin as u32,
                 self.params.sizemax as u32,
             );
-            // There's a way to take here
-            for m_var in m_plups.pileups {
+            for m_var in m_plups.pileups.drain(..) {
                 if m_var.position >= window_start && m_var.position <= window_end {
                     trace!("{:?}", m_var);
                     let (p_idx, _) = p_variants.insert_full(m_var);

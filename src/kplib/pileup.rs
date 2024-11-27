@@ -116,6 +116,26 @@ impl PileupVariant {
         }
     }
 
+    /// Parses a single entry into a `PileupVariant`.
+    pub fn decode(entry: &str, start: u64) -> Option<Self> {
+        let mut parts = entry.split(':');
+        let offset = parts.next()?.parse::<u64>().ok()?;
+        let m_pos = start + offset;
+        let value = parts.next()?;
+
+        let (end, svtype, size, seq) = match value.parse::<u64>() {
+            Ok(size) => (m_pos + size, Svtype::Del, -(size as i64), None),
+            Err(_) => (
+                m_pos + 1,
+                Svtype::Ins,
+                value.len() as i64,
+                Some(value.as_bytes().to_vec()),
+            ),
+        };
+
+        Some(PileupVariant::new(m_pos, end, svtype, size, seq))
+    }
+
     pub fn encode(&self, offset: u64) -> String {
         match self.indel {
             Svtype::Del => format!("{}:{}", self.position - offset, self.size.abs()),
@@ -180,7 +200,7 @@ impl std::fmt::Debug for PileupVariant {
     }
 }
 
-pub type ReadsMap = IndexMap<Vec<u8>, Vec<usize>>;
+pub type ReadsMap = IndexMap<usize, Vec<usize>>;
 pub type PileupSet = IndexSet<PileupVariant>;
 
 pub fn pileups_to_haps(

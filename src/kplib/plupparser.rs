@@ -1,4 +1,4 @@
-use crate::kplib::{KDParams, PileupSet, PileupVariant, ReadParser, ReadsMap, Svtype};
+use crate::kplib::{KDParams, PileupSet, PileupVariant, ReadParser, ReadsMap};
 use rust_htslib::tbx::{self, Read};
 use std::path::PathBuf;
 
@@ -10,7 +10,7 @@ pub struct PlupParser {
 impl PlupParser {
     /// Creates a new `PlupReader` for a given file path.
     pub fn new(file_path: PathBuf, params: KDParams) -> Self {
-        let tbx = tbx::Reader::from_path(&file_path).unwrap();
+        let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
         Self { tbx, params }
     }
 
@@ -20,36 +20,16 @@ impl PlupParser {
         let mut fields = line_str.split('\t');
 
         let chrom = fields.next()?.to_string();
-        let start: u64 = fields.next()?.parse().ok()?;
-        let end: u64 = fields.next()?.parse().ok()?;
+        let start = fields.next()?.parse().ok()?;
+        let end = fields.next()?.parse().ok()?;
         let pileups_str = fields.next()?;
-        let pileups = if pileups_str == "." {
-            Vec::new()
-        } else {
-            pileups_str
-                .split(',')
-                .filter_map(|entry| {
-                    // This should probably be in PileupVariant, but ?, so have to implement error
-                    // parsing throughout
-                    let mut parts = entry.split(':');
-                    let offset: u64 = parts.next()?.parse().ok()?;
-                    let m_pos = start + offset;
-                    let value = parts.next()?;
-                    let (end, svtype, size, seq) = if let Ok(size) = value.parse::<u64>() {
-                        // It's an integer, so should be Del
-                        (m_pos + size, Svtype::Del, -(size as i64), None)
-                    } else {
-                        (
-                            m_pos + 1,
-                            Svtype::Ins,
-                            value.len() as i64,
-                            Some(value.as_bytes().to_vec()),
-                        )
-                    };
 
-                    Some(PileupVariant::new(m_pos - 1, end, svtype, size, seq))
-                })
-                .collect()
+        let pileups = match pileups_str {
+            "." => Vec::new(),
+            _ => pileups_str
+                .split(',')
+                .filter_map(|entry| PileupVariant::decode(entry, start))
+                .collect(),
         };
 
         Some((chrom, start, end, pileups))
@@ -59,53 +39,41 @@ impl PlupParser {
 impl ReadParser for PlupParser {
     /// Fetch and parse pileups within a specified genomic interval.
     fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (ReadsMap, PileupSet, u64) {
-        let window_start = if start < self.params.chunksize {
-            0
-        } else {
-            start - self.params.chunksize
-        };
+        let window_start = start.saturating_sub(self.params.chunksize);
         let window_end = end + self.params.chunksize;
 
-        let tid = match self.tbx.tid(chrom) {
-            Ok(tid) => tid,
-            Err(_) => panic!("Could not resolve '{}' to contig ID", chrom),
-        };
-        // Set region to fetch.
+        let tid = self
+            .tbx
+            .tid(chrom)
+            .unwrap_or_else(|_| panic!("Could not resolve '{}' to contig ID", chrom));
         self.tbx
             .fetch(tid, window_start, window_end)
-            .expect("Could not seek to {}:{}-{}");
+            .expect("Could not fetch region from TBX");
 
-        // track the changes made by each read
         let mut reads = ReadsMap::new();
-        // consolidate common variants
         let mut p_variants = PileupSet::new();
-        let mut tot_cov: u64 = 0;
+        let mut total_coverage = 0;
 
-        let mut qname = 0;
-        for line in self.tbx.records().filter_map(Result::ok) {
-            if let Some(parsed) = Self::parse_line(&line) {
-                if !(parsed.1 < window_start && parsed.2 > window_end) {
-                    continue;
-                }
-                tot_cov += 1;
-                for m_var in parsed.3 {
-                    let lsize = m_var.size.unsigned_abs();
-                    if m_var.position > window_start
-                        && m_var.position < window_end
-                        && lsize >= self.params.sizemin
-                        && lsize <= self.params.sizemax
-                    {
-                        trace!("{:?}", m_var);
-                        let (p_idx, _) = p_variants.insert_full(m_var);
-                        reads
-                            .entry(qname.to_string().into_bytes())
-                            .or_default()
-                            .push(p_idx);
+        for (qname, line) in self.tbx.records().filter_map(Result::ok).enumerate() {
+            if let Some((_, start, end, variants)) = Self::parse_line(&line) {
+                if start <= window_start && end >= window_end {
+                    total_coverage += 1;
+                    for m_var in variants {
+                        let size = m_var.size.unsigned_abs();
+                        if m_var.position > window_start
+                            && m_var.position < window_end
+                            && size >= self.params.sizemin
+                            && size <= self.params.sizemax
+                        {
+                            trace!("{:?}", m_var);
+                            let (p_idx, _) = p_variants.insert_full(m_var);
+                            reads.entry(qname).or_default().push(p_idx);
+                        }
                     }
                 }
             }
-            qname += 1;
         }
-        (reads, p_variants, tot_cov)
+
+        (reads, p_variants, total_coverage)
     }
 }
