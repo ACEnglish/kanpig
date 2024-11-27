@@ -29,6 +29,8 @@ impl PlupParser {
             pileups_str
                 .split(',')
                 .filter_map(|entry| {
+                    // This should probably be in PileupVariant, but ?, so have to implement error
+                    // parsing throughout
                     let mut parts = entry.split(':');
                     let offset: u64 = parts.next()?.parse().ok()?;
                     let m_pos = start + offset;

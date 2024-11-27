@@ -148,7 +148,3 @@ This parameter will boost the specificity and speed of kanpig at the cost of rec
 
 When performing kmer-featurization of sequences (from reads or variants), homopolymer runs above `maxhom` are trimmed
 to `maxhom`. For example, `--maxhom 5` will only count two four-mers in homopolymer runs above 5bp.
-
-### `--spanoff`
-
-Don't use this.
