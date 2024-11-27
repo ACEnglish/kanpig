@@ -60,9 +60,9 @@ pub struct PlupArgs {
     #[arg(short, long, default_value_t = 1)]
     pub threads: usize,
 
-    /// Batchsize (25k ~1Gb Mem)
-    #[arg(long, default_value_t = 250000)]
-    pub batch_size: usize,
+    /// Chunksize in Mbp
+    #[arg(long, default_value_t = 25)]
+    pub chunk_size: u64,
 
     /// Verbose logging
     #[arg(long, default_value_t = false)]

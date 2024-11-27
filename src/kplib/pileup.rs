@@ -87,7 +87,9 @@ impl ReadPileup {
             _ => pileups_str
                 .split(',')
                 .filter_map(|entry| PileupVariant::decode(entry, start))
-                .filter(|variant| variant.size.unsigned_abs() >= sizemin && variant.size.unsigned_abs() <= sizemax)
+                .filter(|variant| {
+                    variant.size.unsigned_abs() >= sizemin && variant.size.unsigned_abs() <= sizemax
+                })
                 .collect(),
         };
         // I use chrom 0 for the decode because new puts in tid
