@@ -1,10 +1,118 @@
 extern crate pretty_env_logger;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Clone, Debug)]
+#[command(name = "kanpig")]
+#[command(about = "Kmer ANalysis of PIleups for Genotyping")]
 #[command(author = "ACEnglish", version)]
-pub struct ArgParser {
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+pub trait KanpigParams {
+    fn validate(&self) -> bool;
+    fn trace(&self) -> bool;
+    fn debug(&self) -> bool;
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum Commands {
+    #[command(about = "Genotype SVs")]
+    Gt(GTArgs),
+
+    #[command(about = "BAM/CRAM to Pileup Index")]
+    Plup(PlupArgs),
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct PlupArgs {
+    /// Input BAM/CRAM file
+    #[arg(short, long)]
+    pub bam: std::path::PathBuf,
+
+    /// CRAM file reference
+    #[arg(short, long)]
+    pub reference: Option<std::path::PathBuf>,
+
+    /// Output file
+    #[arg(short, long)]
+    pub output: Option<std::path::PathBuf>,
+
+    /// Minimum size of variant to index
+    #[arg(long, default_value_t = 50)]
+    pub sizemin: u32,
+
+    /// Maximum size of variant to index
+    #[arg(long, default_value_t = 10000)]
+    pub sizemax: u32,
+
+    /// Minimum mapq of reads to consider
+    #[arg(long, default_value_t = 5)]
+    pub mapq: u8,
+
+    /// Alignments with flag matching this value are ignored
+    #[arg(long, default_value_t = 3840)]
+    pub mapflag: u16,
+
+    /// Number of threads
+    #[arg(short, long, default_value_t = 1)]
+    pub threads: usize,
+
+    /// Chunksize in Mbp
+    #[arg(long, default_value_t = 25)]
+    pub chunk_size: u64,
+
+    /// Verbose logging
+    #[arg(long, default_value_t = false)]
+    pub debug: bool,
+
+    /// Very Verbose logging
+    #[arg(long, default_value_t = false)]
+    pub trace: bool,
+}
+
+impl KanpigParams for PlupArgs {
+    fn trace(&self) -> bool {
+        self.trace
+    }
+
+    fn debug(&self) -> bool {
+        self.debug
+    }
+
+    fn validate(&self) -> bool {
+        let mut is_ok = true;
+
+        if !self.bam.exists() {
+            error!("--bam does not exist");
+            is_ok = false;
+        } else if !self.bam.is_file() {
+            error!("--bam is not a file");
+            is_ok = false;
+        }
+
+        if let Some(path) = &self.reference {
+            if !path.exists() {
+                error!("--reference does not exist");
+                is_ok = false;
+            } else if !path.is_file() {
+                error!("--reference is not a file");
+                is_ok = false;
+            }
+        }
+
+        if self.sizemin < 20 {
+            warn!("--sizemin is recommended to be at least 20");
+        }
+
+        is_ok
+    }
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct GTArgs {
     #[command(flatten)]
     pub io: IOParams,
 
@@ -18,11 +126,11 @@ pub struct IOParams {
     #[arg(short, long)]
     pub input: std::path::PathBuf,
 
-    /// Reads to genotype
+    /// Reads to genotype (.bam, .cram, or .plup.gz)
     #[arg(short, long)]
-    pub bam: std::path::PathBuf,
+    pub reads: std::path::PathBuf,
 
-    /// Reference bam is aligned to
+    /// Reference reads are aligned to
     #[arg(short = 'f', long)]
     pub reference: std::path::PathBuf,
 
@@ -63,9 +171,9 @@ pub struct KDParams {
 
     /// Minimum distance between variants to create independent graphs
     #[arg(long, default_value_t = 1000)]
-    pub chunksize: u64,
+    pub neighdist: u64,
 
-    /// Only analyze reads with PASS FILTER
+    /// Only analyze variants with PASS FILTER
     #[arg(long, default_value_t = false)]
     pub passonly: bool,
 
@@ -98,7 +206,7 @@ pub struct KDParams {
     pub hapsim: f32,
 
     /// Scoring penalty for 'gaps'
-    #[arg(long, default_value_t = 0.01)]
+    #[arg(long, default_value_t = 0.02)]
     pub gpenalty: f32,
 
     /// Scoring penalty for 'fns'
@@ -129,18 +237,21 @@ pub struct KDParams {
     #[arg(long, default_value_t = 3840)]
     pub mapflag: u16,
 
-    /// Don't require alignments to span vargraph region
-    #[arg(long, default_value_t = true)]
-    pub spanoff: bool,
-
     /// Maximum homopolymer length to kmerize (off=0)
     #[arg(long, default_value_t = 0)]
     pub maxhom: usize,
 }
 
-impl ArgParser {
+impl KanpigParams for GTArgs {
+    fn trace(&self) -> bool {
+        self.io.trace
+    }
+
+    fn debug(&self) -> bool {
+        self.io.debug
+    }
     /// Validate command line arguments
-    pub fn validate(&self) -> bool {
+    fn validate(&self) -> bool {
         let mut is_ok = true;
 
         if !self.io.input.exists() {
@@ -151,11 +262,11 @@ impl ArgParser {
             is_ok = false;
         }
 
-        if !self.io.bam.exists() {
-            error!("--bam does not exist");
+        if !self.io.reads.exists() {
+            error!("--reads does not exist");
             is_ok = false;
-        } else if !self.io.bam.is_file() {
-            error!("--bam is not a file");
+        } else if !self.io.reads.is_file() {
+            error!("--reads is not a file");
             is_ok = false;
         }
 

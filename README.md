@@ -16,9 +16,17 @@ cargo build --release
 
 # 🚀 Quick Start
 ```
-kanpig --input variant.vcf.gz --bam alignments.bam --reference ref.fa --out output.vcf
+kanpig gt --input variant.vcf.gz --reads alignments.bam --reference ref.fa --out output.vcf
 ```
 See `kanpig -h` for all available parameters, most of which are detailed below.
+
+Kanpig can also create a pileup index from a bam that is smaller and faster for the genotyper to parse. This is useful
+for long-term projects or multiple reanalysis operations like N+1 for a cohort.
+
+```
+kanpig plup --bam alignments.bam | bedtools sort | bgzip > alignments.plup.gz
+tabix -p bed alignments.plup.gz
+```
 
 # ⚠️ Current Limitations
 * Kanpig expects sequence resolved SVs. Variants with symbolic alts (e.g. `<DEL>`) and BNDs are not parsed.
@@ -41,14 +49,14 @@ human sample shouldn't have any genotypes on chrY. A male human sample should ha
 non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEnglish/kanpig/tree/develop/ploidy_beds) directory 
 has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
-### `--chunksize`
+### `--neighdist`
 Kanpig will build local variant graphs from groups of variants in a 'neighborhood'. These neighborhoods are determined by making the maximum end position
-of an upstream neighborhood's variants at least `chunksize` base-pairs away from the next neighborhood's variants' minimum start position.
+of an upstream neighborhood's variants at least `neighdist` base-pairs away from the next neighborhood's variants' minimum start position.
 
-This chunksize also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
+This distance also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
 passing the `mapflag` filter, and which fully span the neighborhood are considered.
 
-This is an important parameter because too small of a `chunksize` may not recruit distant read pileups which support variants. Similarly, 
+This is an important parameter because too small of a `neighdist` may not recruit distant read pileups which support variants. Similarly, 
 too large of a value may create long neighborhoods with many SVs which are also too large for reads to fully-span.
 
 ### `--sizemin` and `--sizemax`
@@ -140,7 +148,3 @@ This parameter will boost the specificity and speed of kanpig at the cost of rec
 
 When performing kmer-featurization of sequences (from reads or variants), homopolymer runs above `maxhom` are trimmed
 to `maxhom`. For example, `--maxhom 5` will only count two four-mers in homopolymer runs above 5bp.
-
-### `--spanoff`
-
-Don't use this.
