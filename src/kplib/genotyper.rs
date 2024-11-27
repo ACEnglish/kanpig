@@ -7,9 +7,8 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use crate::kplib::{
-    build_region_tree, diploid_haplotypes, haploid_haplotypes, pileups_to_haps, BamParser, GTArgs,
-    GenotypeAnno, PathScore, Ploidy, PloidyRegions, PlupParser, ReadParser, Variants, VcfChunker,
-    VcfWriter,
+    build_region_tree, diploid_haplotypes, haploid_haplotypes, BamParser, GTArgs, GenotypeAnno,
+    PathScore, Ploidy, PloidyRegions, PlupParser, ReadParser, Variants, VcfChunker, VcfWriter,
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
@@ -40,14 +39,17 @@ pub fn genotyper_main(args: GTArgs) {
 
             thread::spawn(move || {
                 let reference = faidx::Reader::from_path(&m_args.io.reference).unwrap();
-                let mut m_bam: Box<dyn ReadParser> =
+                let mut m_reads: Box<dyn ReadParser> =
                     match m_args.io.reads.file_name().and_then(|name| name.to_str()) {
-                        Some(name) if name.ends_with(".plup.gz") => {
-                            Box::new(PlupParser::new(m_args.io.reads, m_args.kd.clone()))
-                        }
+                        Some(name) if name.ends_with(".plup.gz") => Box::new(PlupParser::new(
+                            m_args.io.reads,
+                            reference,
+                            m_args.kd.clone(),
+                        )),
                         _ => Box::new(BamParser::new(
                             m_args.io.reads,
                             m_args.io.reference,
+                            reference,
                             m_args.kd.clone(),
                         )),
                     };
@@ -68,16 +70,8 @@ pub fn genotyper_main(args: GTArgs) {
                                 continue;
                             }
 
-                            let (reads, plups, coverage) =
-                                m_bam.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                            let (haps, coverage) = pileups_to_haps(
-                                &m_graph.chrom,
-                                reads,
-                                plups,
-                                coverage,
-                                &reference,
-                                &m_args.kd,
-                            );
+                            let (haps, coverage) =
+                                m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
 
                             let haps = match ploidy {
                                 Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),
