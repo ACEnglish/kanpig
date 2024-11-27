@@ -206,7 +206,7 @@ pub struct KDParams {
     pub hapsim: f32,
 
     /// Scoring penalty for 'gaps'
-    #[arg(long, default_value_t = 0.01)]
+    #[arg(long, default_value_t = 0.02)]
     pub gpenalty: f32,
 
     /// Scoring penalty for 'fns'

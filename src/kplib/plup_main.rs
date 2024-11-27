@@ -24,40 +24,39 @@ fn process_bam_region(
         .fetch((chrom, start, end))
         .expect("Failed to fetch region");
 
-    let mut records = Vec::new();
-    for record in reader.records().filter_map(|r| {
-        r.ok().filter(|rec| {
-            !rec.seq().is_empty()
-                && rec.mapq() >= params.mapq
-                && (rec.flags() & params.mapflag) == 0
-                && (rec.reference_start().unsigned_abs() >= start)
-                && (rec.reference_start().unsigned_abs() < end)
-        })
-    }) {
-        // Perform your processing here
-        records.push(ReadPileup::new(record, params.sizemin, params.sizemax));
-    }
-    Some(records)
+    Some(
+        reader
+            .records()
+            .filter_map(|r| {
+                r.ok().filter(|rec| {
+                    !rec.seq().is_empty()
+                        && rec.mapq() >= params.mapq
+                        && (rec.flags() & params.mapflag) == 0
+                        && (rec.reference_start().unsigned_abs() >= start)
+                        && (rec.reference_start().unsigned_abs() < end)
+                })
+            })
+            .map(|record| ReadPileup::new(record, params.sizemin, params.sizemax))
+            .collect()
+    )
 }
 
 fn split_into_regions(bam_path: &PathBuf, chunk_size: usize) -> Vec<(String, u64, u64)> {
     let reader = IndexedReader::from_path(bam_path).expect("Failed to open BAM file");
     let header = reader.header().to_owned();
 
-    let mut regions = Vec::new();
-    for tid in 0..header.target_count() {
-        let target_name = String::from_utf8(header.tid2name(tid as u32).to_vec())
-            .expect("Invalid UTF-8 in target name");
-        let target_len = header.target_len(tid).expect("Failed to get target length") as usize;
+    (0..header.target_count())
+        .flat_map(|tid| {
+            let target_name = String::from_utf8(header.tid2name(tid as u32).to_vec())
+                .expect("Invalid UTF-8 in target name");
+            let target_len = header.target_len(tid).expect("Failed to get target length") as usize;
 
-        // Divide the target into chunks
-        for start in (0..target_len).step_by(chunk_size) {
-            let end = usize::min(start + chunk_size, target_len as usize);
-            regions.push((target_name.clone(), start as u64, end as u64));
-        }
-    }
-
-    regions
+            (0..target_len).step_by(chunk_size).map(move |start| {
+                let end = usize::min(start + chunk_size, target_len);
+                (target_name.clone(), start as u64, end as u64)
+            })
+        })
+        .collect()
 }
 
 pub fn plup_main(args: PlupArgs) {
@@ -79,8 +78,6 @@ pub fn plup_main(args: PlupArgs) {
                 }
                 None => Box::new(BufWriter::new(std::io::stdout())),
             };
-            // This can go inside of worker threads if I make the return type a big'ol string.
-            // Or a bunch of string. Bunch of strings is fine, I think
             let lbam = bam::Reader::from_path(m_args.bam).expect("Error opening BAM file");
             let header_main = bam::Header::from_template(lbam.header());
             let header = bam::HeaderView::from_header(&header_main);
@@ -99,7 +96,7 @@ pub fn plup_main(args: PlupArgs) {
                     }
                 }
             }
-            info!("Processed {} reads", n_reads);
+            info!("processed {} reads", n_reads);
         })
     };
 
