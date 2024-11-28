@@ -33,8 +33,8 @@ fn process_bam_region(
                     !rec.seq().is_empty()
                         && rec.mapq() >= params.mapq
                         && (rec.flags() & params.mapflag) == 0
-                        && (rec.reference_start().unsigned_abs() >= start)
-                        && (rec.reference_start().unsigned_abs() < end)
+                        && rec.reference_start().unsigned_abs() >= start
+                        && rec.reference_start().unsigned_abs() < end
                 })
             })
             .map(|record| ReadPileup::new(record, params.sizemin, params.sizemax))
