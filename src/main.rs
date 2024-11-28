@@ -3,8 +3,8 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
-mod kplib;
 mod genotype_main;
+mod kplib;
 mod plup_main;
 use crate::{genotype_main::genotype_main, plup_main::plup_main};
 use clap::Parser;

@@ -133,7 +133,8 @@ impl ReadParser for PlupParser {
         let mut coverage = 0;
 
         for (qname, line) in self.tbx.records().filter_map(Result::ok).enumerate() {
-            if let Some(mut read) = ReadPileup::decode(&line, self.params.sizemin, self.params.sizemax)
+            if let Some(mut read) =
+                ReadPileup::decode(&line, self.params.sizemin, self.params.sizemax)
             {
                 if read.start < window_start && read.end > window_end {
                     coverage += 1;

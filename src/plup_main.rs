@@ -1,5 +1,6 @@
 use crate::kplib::{PlupArgs, ReadPileup};
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use indicatif::{ProgressBar, ProgressStyle};
 use rust_htslib::{
     bam::ext::BamRecordExtensions,
     bam::{self, IndexedReader, Read},
@@ -62,7 +63,8 @@ fn split_into_regions(bam_path: &PathBuf, chunk_size: usize) -> Vec<(String, u64
 
 pub fn plup_main(args: PlupArgs) {
     let regions = split_into_regions(&args.bam, (args.chunk_size as usize) * 1000000);
-    info!("{} regions to process", regions.len());
+    let num_regions = regions.len() as u64;
+    info!("{} regions to process", num_regions);
 
     // Create channels for communication between threads
     let (task_sender, task_receiver): (Sender<InputType>, Receiver<InputType>) = unbounded();
@@ -70,6 +72,12 @@ pub fn plup_main(args: PlupArgs) {
 
     let write_handler = {
         let m_args = args.clone();
+        let sty = ProgressStyle::with_template(
+            " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
+        )
+        .unwrap()
+        .progress_chars("##-");
+        let pbar = ProgressBar::new(num_regions).with_style(sty);
         thread::spawn(move || {
             let mut writer: Box<dyn Write> = match m_args.output {
                 Some(ref path) => {
@@ -94,9 +102,11 @@ pub fn plup_main(args: PlupArgs) {
                                 .expect("Error writing to output file");
                             n_reads += 1;
                         }
+                        pbar.inc(1);
                     }
                 }
             }
+            pbar.finish();
             info!("processed {} reads", n_reads);
         })
     };

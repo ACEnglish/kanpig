@@ -5,6 +5,7 @@ use std::cmp::Ordering;
 #[derive(Clone, Debug)]
 pub struct PathScore {
     pub score: f32, // Score(P) = S((SS + SZ) / 2) − λ ⋅ ∣L(P)−E∣
+    #[allow(dead_code)]
     pub sizesim: f32,
     pub seqsim: f32,
     pub coverage: Option<u64>,
