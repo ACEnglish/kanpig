@@ -40,6 +40,10 @@ pub struct PlupArgs {
     #[arg(short, long)]
     pub output: Option<std::path::PathBuf>,
 
+    /// Number of threads
+    #[arg(short, long, default_value_t = 1)]
+    pub threads: usize,
+
     /// Minimum size of variant to index
     #[arg(long, default_value_t = 50)]
     pub sizemin: u32,
@@ -55,10 +59,6 @@ pub struct PlupArgs {
     /// Alignments with flag matching this value are ignored
     #[arg(long, default_value_t = 3840)]
     pub mapflag: u16,
-
-    /// Number of threads
-    #[arg(short, long, default_value_t = 1)]
-    pub threads: usize,
 
     /// Chunksize in Mbp
     #[arg(long, default_value_t = 25)]
