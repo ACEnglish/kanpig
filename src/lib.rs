@@ -4,7 +4,7 @@ extern crate log;
 mod kplib;
 pub use self::{
     kplib::brute_force_find_path, kplib::build_region_tree, kplib::diploid_haplotypes,
-    kplib::genotyper_main, kplib::haploid_haplotypes, kplib::kmeans, kplib::plup_main,
+    kplib::haploid_haplotypes, kplib::kmeans,
     kplib::seq_to_kmer, kplib::BamParser, kplib::BedParser, kplib::Cli, kplib::Commands,
     kplib::GTArgs, kplib::Haplotype, kplib::KDParams, kplib::KanpigParams, kplib::KdpVcf,
     kplib::PathScore, kplib::Ploidy, kplib::PloidyRegions, kplib::PlupArgs, kplib::PlupParser,

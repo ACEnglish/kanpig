@@ -10,9 +10,6 @@ pub use crate::kplib::cli::{Cli, Commands, GTArgs, KDParams, KanpigParams, PlupA
 mod cluster;
 pub use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};
 
-mod genotype_main;
-pub use crate::kplib::genotype_main::genotyper_main;
-
 mod haplotype;
 pub use crate::kplib::haplotype::Haplotype;
 
@@ -29,9 +26,6 @@ pub use crate::kplib::pathscore::PathScore;
 
 mod pileup;
 pub use crate::kplib::pileup::{PileupVariant, ReadPileup};
-
-mod plup_main;
-pub use crate::kplib::plup_main::plup_main;
 
 mod ploidy;
 pub use crate::kplib::ploidy::{Ploidy, PloidyRegions};

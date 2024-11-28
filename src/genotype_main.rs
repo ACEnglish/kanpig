@@ -15,7 +15,7 @@ use crate::kplib::{
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
 type OutputType = Option<Vec<GenotypeAnno>>;
 
-pub fn genotyper_main(args: GTArgs) {
+pub fn genotype_main(args: GTArgs) {
     let mut input_vcf = vcf::io::reader::Builder::default()
         .build_from_path(args.io.input.clone())
         .expect("Unable to parse vcf");
