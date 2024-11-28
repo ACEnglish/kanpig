@@ -1,8 +1,6 @@
 use crate::kplib::BedParser;
 use rust_lapper::{Interval, Lapper};
-use std::collections::HashMap;
-
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(PartialEq, Debug)]
 pub enum Ploidy {

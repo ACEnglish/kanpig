@@ -2,9 +2,11 @@
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeIndex;
 use petgraph::visit::{Dfs, EdgeRef};
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
-use std::iter::FromIterator;
+use std::{
+    cmp::Ordering,
+    collections::{BinaryHeap, HashSet},
+    iter::FromIterator,
+};
 
 use crate::kplib::{Haplotype, KDParams, PathScore, VarNode};
 

@@ -1,7 +1,6 @@
 use indexmap::IndexMap;
 use noodles_vcf::header::record::value::{map::contig::Contig, Map};
-use std::collections::HashMap;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use crate::kplib::BedParser;
 

@@ -1,7 +1,9 @@
 use crate::kplib::seq_to_kmer;
 use itertools::Itertools;
-use std::cmp::Ordering;
-use std::fmt::{Debug, Formatter, Result};
+use std::{
+    cmp::Ordering,
+    fmt::{Debug, Formatter, Result},
+};
 
 #[derive(Clone)]
 pub struct Haplotype {

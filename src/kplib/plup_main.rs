@@ -4,11 +4,12 @@ use rust_htslib::{
     bam::ext::BamRecordExtensions,
     bam::{self, IndexedReader, Read},
 };
-use std::fs::File;
-use std::io::{BufWriter, Write};
-use std::path::PathBuf;
-use std::thread;
-use std::thread::JoinHandle;
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+    path::PathBuf,
+    thread::{self, JoinHandle},
+};
 
 type InputType = Option<(String, u64, u64)>;
 type OutputType = Option<Vec<ReadPileup>>;
@@ -37,7 +38,7 @@ fn process_bam_region(
                 })
             })
             .map(|record| ReadPileup::new(record, params.sizemin, params.sizemax))
-            .collect()
+            .collect(),
     )
 }
 
@@ -88,7 +89,7 @@ pub fn plup_main(args: PlupArgs) {
                     Ok(Some(readplups)) => {
                         for read in readplups {
                             let chrom = std::str::from_utf8(header.tid2name(read.chrom as u32))
-                                .expect("is okay");
+                                .expect("Unable to lookup tid");
                             writeln!(writer, "{}", read.to_string(chrom))
                                 .expect("Error writing to output file");
                             n_reads += 1;

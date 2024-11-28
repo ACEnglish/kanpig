@@ -1,8 +1,10 @@
 use crate::kplib::{metrics::GTstate, GenotypeAnno};
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufWriter, Write},
+    path::PathBuf,
+};
 
 use noodles_vcf::{
     self as vcf,

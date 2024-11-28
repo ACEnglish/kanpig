@@ -2,9 +2,10 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
 use rust_htslib::faidx;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
+use std::{
+    sync::{Arc, Mutex},
+    thread::{self, JoinHandle},
+};
 
 use crate::kplib::{
     build_region_tree, diploid_haplotypes, haploid_haplotypes, BamParser, GTArgs, GenotypeAnno,

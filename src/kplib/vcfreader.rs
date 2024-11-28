@@ -2,8 +2,7 @@ use crate::kplib::{GenotypeAnno, KDParams, KdpVcf, Ploidy, Regions};
 use crossbeam_channel::Sender;
 use noodles_vcf::{self as vcf, variant::RecordBuf};
 use petgraph::graph::NodeIndex;
-use std::collections::VecDeque;
-use std::io::BufRead;
+use std::{collections::VecDeque, io::BufRead};
 
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
