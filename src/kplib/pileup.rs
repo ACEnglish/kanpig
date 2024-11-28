@@ -115,7 +115,6 @@ impl ReadPileup {
     }
 }
 
-#[derive(Clone)]
 pub struct PileupVariant {
     pub position: u64,
     pub end: u64,
