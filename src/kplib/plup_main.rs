@@ -48,7 +48,7 @@ fn split_into_regions(bam_path: &PathBuf, chunk_size: usize) -> Vec<(String, u64
 
     (0..header.target_count())
         .flat_map(|tid| {
-            let target_name = String::from_utf8(header.tid2name(tid as u32).to_vec())
+            let target_name = String::from_utf8(header.tid2name(tid).to_vec())
                 .expect("Invalid UTF-8 in target name");
             let target_len = header.target_len(tid).expect("Failed to get target length") as usize;
 

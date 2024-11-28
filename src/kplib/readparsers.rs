@@ -30,7 +30,7 @@ impl BamParser {
     ) -> Self {
         let mut bam = IndexedReader::from_path(bam_name).unwrap();
         let _ = bam.set_reference(ref_name.clone());
-        BamParser {
+        Self {
             bam,
             reference,
             params,

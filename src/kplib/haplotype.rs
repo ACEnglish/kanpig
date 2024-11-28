@@ -17,7 +17,7 @@ pub struct Haplotype {
 
 impl Haplotype {
     pub fn new(kfeat: Vec<f32>, size: i64, n: u64, coverage: u64) -> Self {
-        Haplotype {
+        Self {
             size,
             n,
             coverage,

@@ -65,7 +65,7 @@ impl ReadPileup {
             }
         }
 
-        ReadPileup {
+        Self {
             chrom,
             start: start as u64,
             end: end as u64,
@@ -132,7 +132,7 @@ impl PileupVariant {
         size: i64,
         sequence: Option<Vec<u8>>,
     ) -> Self {
-        PileupVariant {
+        Self {
             position,
             end,
             indel,

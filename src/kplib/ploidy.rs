@@ -80,7 +80,7 @@ impl PloidyRegions {
             })
             .collect();
 
-        PloidyRegions { intervals }
+        Self { intervals }
     }
 
     pub fn get_ploidy(&self, chrom: &String, start: u64) -> Ploidy {

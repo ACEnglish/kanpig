@@ -87,7 +87,7 @@ impl Variants {
             }
         }
 
-        Variants {
+        Self {
             chrom,
             start,
             end,
