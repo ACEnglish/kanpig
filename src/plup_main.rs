@@ -79,8 +79,8 @@ pub fn plup_main(args: PlupArgs) {
                 }
                 None => Box::new(BufWriter::new(std::io::stdout())),
             };
-            let lbam = bam::Reader::from_path(m_args.bam).expect("Error opening BAM file");
-            let header_main = bam::Header::from_template(lbam.header());
+            let bam = bam::Reader::from_path(m_args.bam).expect("Error opening BAM file");
+            let header_main = bam::Header::from_template(bam.header());
             let header = bam::HeaderView::from_header(&header_main);
             let mut n_reads = 0;
             loop {

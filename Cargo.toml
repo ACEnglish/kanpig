@@ -17,7 +17,6 @@ ordered-float = { version = "4.0", default-features = false }
 page_size = { version = "0.6.0" }
 petgraph = { version = "0.6.2" }
 pretty_env_logger = { version = "0.4.0" }
-rayon = { version = "1.10.0" }
 rust-htslib = { version = "0.46.0" }
 rust-lapper = { version = "1.1.0" }
 
