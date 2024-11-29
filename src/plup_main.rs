@@ -15,6 +15,41 @@ use std::{
 type InputType = Option<(String, u64, u64)>;
 type OutputType = Option<Vec<ReadPileup>>;
 
+/// Processes a specified region in a BAM file, filtering reads based on user-defined parameters and returning the results.
+///
+/// # Parameters
+/// - `reader`: A mutable reference to an `IndexedReader` for reading the BAM file. The reader must be initialized and have a valid index loaded.
+/// - `chrom`: A string representing the chromosome or reference sequence name to query.
+/// - `start`: The start position (inclusive) of the region to fetch, in 0-based coordinates.
+/// - `end`: The end position (exclusive) of the region to fetch, in 0-based coordinates.
+/// - `params`: A reference to a `PlupArgs` struct containing user-defined filtering criteria, including:
+///     - `mapq`: Minimum mapping quality required for reads to be included.
+///     - `mapflag`: Bitwise flags for filtering reads based on their SAM flag values.
+///     - `sizemin`: Minimum size threshold for reads to be included in the pileup.
+///     - `sizemax`: Maximum size threshold for reads to be included in the pileup.
+///
+/// # Returns
+/// - `OutputType`: A collection of processed reads from the specified region that meet the filtering criteria, organized as defined in `OutputType`.
+///
+/// # Panics
+/// This function panics if the `fetch` operation on the BAM reader fails, which can occur if the specified region is invalid or if there is an issue with the BAM file or its index.
+///
+/// # Example
+/// ```rust
+/// let mut reader = IndexedReader::from_path("example.bam").unwrap();
+/// let params = PlupArgs {
+///     mapq: 30,
+///     mapflag: 0,
+///     sizemin: 50,
+///     sizemax: 500,
+/// };
+/// let chrom = String::from("chr1");
+/// let start = 100_000;
+/// let end = 200_000;
+///
+/// let result = process_bam_region(&mut reader, &chrom, start, end, &params);
+/// // Process the result...
+/// ```
 fn process_bam_region(
     reader: &mut IndexedReader,
     chrom: &String,
@@ -43,6 +78,34 @@ fn process_bam_region(
     )
 }
 
+/// Splits the reference sequences in a BAM file into regions of a specified size.
+///
+/// # Parameters
+/// - `bam_path`: A reference to a `PathBuf` pointing to the BAM file. The BAM file must be indexed.
+/// - `chunk_size`: The size of each region, in base pairs. The last region for a reference sequence may be smaller if the reference length is not a multiple of `chunk_size`.
+///
+/// # Returns
+/// - `Vec<(String, u64, u64)>`: A vector of tuples where each tuple contains:
+///   - The name of the reference sequence (`String`).
+///   - The start position (inclusive) of the region (`u64`), in 0-based coordinates.
+///   - The end position (exclusive) of the region (`u64`), in 0-based coordinates.
+///
+/// # Panics
+/// - This function panics if the BAM file cannot be opened or if its header contains invalid UTF-8.
+/// - Panics if any reference sequence's length cannot be determined.
+///
+/// # Example
+/// ```rust
+/// use std::path::PathBuf;
+///
+/// let bam_path = PathBuf::from("example.bam");
+/// let chunk_size = 1_000_000; // Split regions into 1 Mb chunks
+///
+/// let regions = split_into_regions(&bam_path, chunk_size);
+/// for (chrom, start, end) in regions {
+///     println!("{}:{}-{}", chrom, start, end);
+/// }
+/// ```
 fn split_into_regions(bam_path: &PathBuf, chunk_size: usize) -> Vec<(String, u64, u64)> {
     let reader = IndexedReader::from_path(bam_path).expect("Failed to open BAM file");
     let header = reader.header().to_owned();

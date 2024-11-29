@@ -10,7 +10,7 @@ use crate::{genotype_main::genotype_main, plup_main::plup_main};
 use clap::Parser;
 use kplib::{Cli, Commands, KanpigParams};
 
-fn setup_logging(args: &(impl KanpigParams + std::fmt::Debug)) {
+fn setup_logging(args: &impl KanpigParams) {
     let level = if args.trace() {
         log::LevelFilter::Trace
     } else if args.debug() {

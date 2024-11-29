@@ -11,7 +11,7 @@ pub struct Cli {
     pub command: Commands,
 }
 
-pub trait KanpigParams {
+pub trait KanpigParams: std::fmt::Debug {
     fn validate(&self) -> bool;
     fn trace(&self) -> bool;
     fn debug(&self) -> bool;

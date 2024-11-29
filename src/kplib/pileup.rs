@@ -10,7 +10,32 @@ pub struct ReadPileup {
     pub pileups: Vec<PileupVariant>,
 }
 
+/// A struct representing a read and its pileups
 impl ReadPileup {
+    /// Creates a new `ReadPileup` from an alignment record, filtering variants based on size constraints.
+    ///
+    /// # Parameters
+    /// - `record`: The `Record` from which the pileup is constructed.
+    /// - `sizemin`: The minimum size of variants to include in the pileup.
+    /// - `sizemax`: The maximum size of variants to include in the pileup.
+    ///
+    /// # Returns
+    /// - A `ReadPileup` instance containing the extracted variants that satisfy the size constraints.
+    ///
+    /// # Function Details
+    /// - Iterates through the record's CIGAR operations and processes the following:
+    ///     - **Insertions (I)**: Captures the inserted sequence if its length is within `[sizemin, sizemax]`.
+    ///     - **Deletions (D)**: Captures the deletion if its length is within `[sizemin, sizemax]`.
+    ///     - **Matches (M, X, =) and Soft-clips (S)**: Advances offsets without creating variants.
+    ///     - **Hard-clips (H) and Pads (P)**: Ignores these operations.
+    /// - Logs an error for any unexpected CIGAR operation.
+    ///
+    /// # Example
+    /// ```rust
+    /// let record = ...; // A valid BAM record
+    /// let pileup = ReadPileup::new(record, 10, 100);
+    /// println!("{:?}", pileup);
+    /// ```
     pub fn new(record: Record, sizemin: u32, sizemax: u32) -> Self {
         let chrom = record.tid();
         let start = record.reference_start();
@@ -73,6 +98,32 @@ impl ReadPileup {
         }
     }
 
+    /// Decodes a `ReadPileup` from a tab-delimited string, applying size constraints to the included variants.
+    ///
+    /// # Parameters
+    /// - `line`: A byte slice containing the tab-delimited representation of a pileup.
+    /// - `sizemin`: The minimum size of variants to include in the pileup.
+    /// - `sizemax`: The maximum size of variants to include in the pileup.
+    ///
+    /// # Returns
+    /// - `Option<Self>`: Returns `Some(ReadPileup)` if decoding is successful, or `None` if the input is invalid or contains no valid variants.
+    ///
+    /// # Function Details
+    /// - Splits the input line into fields:
+    ///     - `chrom`: The chromosome name (ignored during decoding, set to 0).
+    ///     - `start` and `end`: The start and end positions of the pileup.
+    ///     - `pileups`: A comma-separated string of variants.
+    /// - Filters decoded variants based on size constraints.
+    ///
+    /// # TODO: Since parsing from an alignment record uses tid (i32) for chrom, the chromosome is
+    /// never parsed from a string.
+    ///
+    /// # Example
+    /// ```rust
+    /// let line = b"chr1\t1000\t1010\t.";
+    /// let pileup = ReadPileup::decode(line, 10, 100);
+    /// println!("{:?}", pileup);
+    /// ```
     pub fn decode(line: &[u8], sizemin: u64, sizemax: u64) -> Option<Self> {
         let line_str = std::str::from_utf8(line).ok()?;
         let mut fields = line_str.split('\t');
@@ -101,6 +152,24 @@ impl ReadPileup {
         })
     }
 
+    /// Encodes a `ReadPileup` into a tab-delimited string representation.
+    ///
+    /// # Parameters
+    /// - `chrom`: The chromosome name as a `&str`.
+    ///
+    /// # Returns
+    /// - `String`: A tab-delimited string containing:
+    ///     - Chromosome name
+    ///     - Start position
+    ///     - End position
+    ///     - A comma-separated list of encoded PileupVariants, or `.` if there are no variants.
+    ///
+    /// # Example
+    /// ```rust
+    /// let pileup = ReadPileup { chrom: 1, start: 1000, end: 1010, pileups: Vec::new() };
+    /// let pileup_str = pileup.to_string("chr1");
+    /// println!("{}", pileup_str); // Output: "chr1\t1000\t1010\t."
+    /// ```
     pub fn to_string(&self, chrom: &str) -> String {
         let pstr: String = if self.pileups.is_empty() {
             ".".to_string()
@@ -123,7 +192,25 @@ pub struct PileupVariant {
     pub sequence: Option<Vec<u8>>,
 }
 
+/// Provides information for an individual deletion or insertion with 
+/// methods to create, decode, and encode structural variant information.
 impl PileupVariant {
+    /// Creates a new `PileupVariant`.
+    ///
+    /// # Parameters
+    /// - `position`: The start position of the variant.
+    /// - `end`: The end position of the variant.
+    /// - `indel`: The type of the structural variant (`Svtype::Del` or `Svtype::Ins`).
+    /// - `size`: The size of the variant (positive for insertions, negative for deletions).
+    /// - `sequence`: The sequence of the variant (only applicable for insertions).
+    ///
+    /// # Returns
+    /// A new `PileupVariant` instance with the specified properties.
+    ///
+    /// # Example
+    /// ```rust
+    /// let variant = PileupVariant::new(1000, 1001, Svtype::Ins, 50, Some(vec![65, 67, 71, 84]));
+    /// ```
     pub fn new(
         position: u64,
         end: u64,
@@ -140,7 +227,31 @@ impl PileupVariant {
         }
     }
 
-    /// Parses a single entry into a `PileupVariant`.
+    /// Decodes a string entry into a `PileupVariant`.
+    ///
+    /// # Parameters
+    /// - `entry`: A string slice representing a variant entry (e.g., `offset:size` for deletions or `offset:sequence` for insertions).
+    /// - `start`: The start position of the reference region to calculate the absolute position.
+    ///
+    /// # Returns
+    /// - `Some(PileupVariant)` if the entry is valid.
+    /// - `None` if the entry cannot be parsed.
+    ///
+    /// # Parsing Logic
+    /// - For deletions (`offset:size`):
+    ///   - Parses `offset` and `size` to calculate the variant position and size.
+    ///   - Sets `sequence` to `None`.
+    /// - For insertions (`offset:sequence`):
+    ///   - Parses `offset` and derives the sequence from the remaining string.
+    ///   - Calculates the size based on the sequence length.
+    ///
+    /// # Example
+    /// ```rust
+    /// let variant = PileupVariant::decode("10:ACGT", 1000).unwrap();
+    /// assert_eq!(variant.position, 1010);
+    /// assert_eq!(variant.indel, Svtype::Ins);
+    /// assert_eq!(variant.size, 4);
+    /// ```
     pub fn decode(entry: &str, start: u64) -> Option<Self> {
         let mut parts = entry.split(':');
         let offset = parts.next()?.parse::<u64>().ok()?;
@@ -160,6 +271,24 @@ impl PileupVariant {
         Some(PileupVariant::new(m_pos, end, svtype, size, seq))
     }
 
+    /// Encodes a `PileupVariant` into a string representation.
+    ///
+    /// # Parameters
+    /// - `offset`: The reference start position to calculate relative positions.
+    ///
+    /// # Returns
+    /// A string representation of the variant:
+    /// - For deletions: `offset:size` (e.g., `10:50`).
+    /// - For insertions: `offset:sequence` (e.g., `10:ACGT`).
+    ///
+    /// # Panics
+    /// - If the variant type is neither `Svtype::Del` nor `Svtype::Ins`.
+    ///
+    /// # Example
+    /// ```rust
+    /// let variant = PileupVariant::new(1010, 1011, Svtype::Ins, 4, Some(vec![65, 67, 71, 84]));
+    /// assert_eq!(variant.encode(1000), "10:ACGT");
+    /// ```
     pub fn encode(&self, offset: u64) -> String {
         match self.indel {
             Svtype::Del => format!("{}:{}", self.position - offset, self.size.abs()),

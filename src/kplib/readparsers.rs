@@ -160,6 +160,54 @@ impl ReadParser for PlupParser {
     }
 }
 
+/// Converts a set of pileups into haplotypes by grouping and deduplicating reads based on pileup combinations.
+///
+/// # Parameters
+/// - `chrom`: The name of the reference chromosome or contig as a `&str`.
+/// - `reads`: A `ReadsMap` mapping read identifiers to a list of pileup indices.
+/// - `plups`: A `PileupSet` representing the pileups to process.
+/// - `coverage`: The total coverage for the region being analyzed.
+/// - `reference`: A reference to a `faidx::Reader` for querying the reference genome.
+/// - `params`: A reference to a `KDParams` struct containing user-defined parameters, including:
+///     - `kmer`: The k-mer size for generating haplotype sequences.
+///     - `maxhom`: The maximum homopolymer length for k-mer generation.
+///
+/// # Returns
+/// - `(Vec<Haplotype>, u64)`: A tuple containing:
+///   - A `Vec<Haplotype>`: The deduplicated and sorted list of haplotypes generated from the pileups.
+///   - A `u64`: The total coverage used for haplotype generation.
+///
+/// # Function Details
+/// - The function processes each pileup in `plups` to construct the corresponding sequence.
+///     - For deletions, it retrieves the missing sequence from the reference genome.
+///     - For insertions, it uses the pre-existing sequence associated with the pileup.
+/// - Converts the sequence into k-mers and creates a new `Haplotype` for each pileup.
+/// - Deduplicates reads by grouping them based on their associated pileup indices.
+/// - Combines pileup-based haplotypes into full haplotypes using deduplicated read groupings.
+/// - Sorts the resulting haplotypes in descending order of relevance for output.
+///
+/// # Panics
+/// - Panics if the indel type in a pileup is unknown.
+/// - Panics if an insertion pileup lacks an associated sequence.
+/// - Panics if the reference genome fetch fails for deletions.
+///
+/// # Example
+/// ```rust
+/// use faidx::Reader;
+/// use std::collections::HashMap;
+///
+/// let chrom = "chr1";
+/// let reads: ReadsMap = HashMap::new(); // Populate with actual read-pileup mappings
+/// let plups: PileupSet = Vec::new(); // Populate with pileups
+/// let coverage = 100;
+/// let reference = Reader::from_path("reference.fa").unwrap();
+/// let params = KDParams { kmer: 31, maxhom: 5 };
+///
+/// let (haplotypes, total_coverage) = pileups_to_haps(chrom, reads, plups, coverage, &reference, &params);
+/// for hap in haplotypes {
+///     println!("{:?}", hap);
+/// }
+/// ```
 pub fn pileups_to_haps(
     chrom: &str,
     reads: ReadsMap,
