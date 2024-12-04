@@ -1,6 +1,6 @@
 /// A pileup variant that's hashable / comparable
 use crate::kplib::Svtype;
-use rust_htslib::{bam::ext::BamRecordExtensions, bam::Record};
+use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::hash::{Hash, Hasher};
 
 pub struct ReadPileup {
@@ -8,6 +8,8 @@ pub struct ReadPileup {
     pub start: u64,
     pub end: u64,
     pub pileups: Vec<PileupVariant>,
+    pub ps: Option<u16>,
+    pub hp: Option<u8>,
 }
 
 /// A struct representing a read and its pileups
@@ -89,12 +91,24 @@ impl ReadPileup {
                 }
             }
         }
+ 
+        let ps = match record.aux(b"PS") {
+            Ok(Aux::U16(value)) => Some(value),
+            _ => None,
+        };
+
+        let hp = match record.aux(b"HP") {
+            Ok(Aux::U8(value)) => Some(value),
+            _ => None,
+        };
 
         Self {
             chrom,
             start: start as u64,
             end: end as u64,
             pileups,
+            ps,
+            hp,
         }
     }
 
@@ -143,12 +157,27 @@ impl ReadPileup {
                 })
                 .collect(),
         };
+
+        let ps = fields.next()?;
+        let ps = match ps {
+            "." => None,
+            _ => Some(ps.parse().ok()?),
+        };
+
+        let hp = fields.next()?;
+        let hp = match hp {
+            "." => None,
+            _ => Some(hp.parse().ok()?),
+        };
+
         // I use chrom 0 for the decode because new puts in tid
         Some(ReadPileup {
             chrom: 0,
             start,
             end,
             pileups,
+            ps,
+            hp,
         })
     }
 
@@ -180,7 +209,21 @@ impl ReadPileup {
                 .collect::<Vec<_>>()
                 .join(",")
         };
-        format!("{}\t{}\t{}\t{}", chrom, self.start, self.end, pstr)
+
+        let ps: String = match self.ps {
+            Some(p) => p.to_string(),
+            None => ".".to_string(),
+        };
+
+        let hp: String = match self.hp {
+            Some(h) => h.to_string(),
+            None => ".".to_string(),
+        };
+
+        format!(
+            "{}\t{}\t{}\t{}\t{}\t{}",
+            chrom, self.start, self.end, pstr, ps, hp
+        )
     }
 }
 
@@ -192,7 +235,7 @@ pub struct PileupVariant {
     pub sequence: Option<Vec<u8>>,
 }
 
-/// Provides information for an individual deletion or insertion with 
+/// Provides information for an individual deletion or insertion with
 /// methods to create, decode, and encode structural variant information.
 impl PileupVariant {
     /// Creates a new `PileupVariant`.
