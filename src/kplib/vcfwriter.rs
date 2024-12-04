@@ -56,7 +56,7 @@ impl VcfWriter {
         // Setup FORMAT header definitions
         // Overwrites existing definitions
         let all_formats = header.formats_mut();
-        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:PS:DP:AD:KS"
+        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:NE:DP:AD:KS"
             .split(':')
             .map(String::from)
             .collect();
@@ -95,13 +95,13 @@ impl VcfWriter {
         *gqfmt.description_mut() = "Phred scaled quality of genotype".to_string();
         all_formats.insert(gqid.to_string(), gqfmt);
 
-        // PS
-        let psid = "PS";
-        let mut psfmt = Map::<format::Format>::from(psid);
-        *psfmt.number_mut() = format::Number::Count(1);
-        *psfmt.type_mut() = format::Type::Integer;
-        *psfmt.description_mut() = "Local phase group of entries".to_string();
-        all_formats.insert(psid.to_string(), psfmt);
+        // NE
+        let neid = "NE";
+        let mut nefmt = Map::<format::Format>::from(neid);
+        *nefmt.number_mut() = format::Number::Count(1);
+        *nefmt.type_mut() = format::Type::Integer;
+        *nefmt.description_mut() = "Neighborhood phase set of entries".to_string();
+        all_formats.insert(neid.to_string(), nefmt);
 
         // DP
         let dpid = "DP";
@@ -149,10 +149,10 @@ impl VcfWriter {
         }
     }
 
-    pub fn anno_write(&mut self, mut annot: GenotypeAnno, phase_group: i32) {
+    pub fn anno_write(&mut self, mut annot: GenotypeAnno, neigh_id: i32) {
         *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
         *annot.entry.samples_mut() =
-            Samples::new(self.keys.clone(), vec![annot.make_fields(phase_group)]);
+            Samples::new(self.keys.clone(), vec![annot.make_fields(neigh_id)]);
 
         self.buf.clear();
         let mut tmp = vcf::io::Writer::new(&mut self.buf);
