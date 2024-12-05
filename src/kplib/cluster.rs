@@ -40,7 +40,7 @@ pub fn diploid_haplotypes(
         let hap = m_haps.pop().unwrap();
         return vec![hap];
     }
-
+    debug!("{:?}", m_haps);
     let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
     let clusts = kmeans(&allk, 2);
 

@@ -217,6 +217,7 @@ pub fn pileups_to_haps(
     params: &KDParams,
 ) -> (Vec<Haplotype>, u64) {
     let mut hap_parts = Vec::<Haplotype>::with_capacity(plups.len());
+    let mut ret = Vec::<Haplotype>::with_capacity(reads.len());
 
     while let Some(mut p) = plups.pop() {
         // Need to fill in deleted sequence
@@ -245,21 +246,12 @@ pub fn pileups_to_haps(
         );
         hap_parts.push(n_hap);
     }
-
-    // Deduplicate reads by pileup combination
-    let mut unique_reads: IndexMap<&Vec<usize>, u64> = IndexMap::new();
-    for m_plups in reads.values() {
-        *unique_reads.entry(m_plups).or_insert(0) += 1;
-    }
-
-    // Turn variants into haplotypes
-    let mut ret = Vec::<Haplotype>::new();
-    for (read_pileups, coverage) in unique_reads {
+    
+    for read in reads.values() {
         let mut cur_hap = Haplotype::blank(params.kmer, 1);
-        for p in read_pileups {
+        for p in read {
             cur_hap.add(&hap_parts[hap_parts.len() - *p - 1]);
         }
-        cur_hap.coverage = coverage;
         ret.push(cur_hap);
     }
 
