@@ -1,27 +1,36 @@
 use crate::kplib::{metrics, Haplotype, KDParams};
 use ndarray::Array2;
 use rand::SeedableRng;
+use std::collections::HashMap;
 
 /// Simply takes the best-covered haplotype as the representative
 pub fn haploid_haplotypes(
-    mut m_haps: Vec<Haplotype>,
+    mut haps: Vec<Haplotype>,
     coverage: u64,
-    params: &KDParams,
+    _params: &KDParams,
 ) -> Vec<Haplotype> {
-    if coverage == 0 || m_haps.is_empty() {
-        return vec![Haplotype::blank(params.kmer, coverage)];
+    if coverage == 0 || haps.is_empty() {
+        return vec![];
     }
 
-    if m_haps.len() == 1 {
-        return m_haps;
+    let cnt = haps.len();
+    if cnt == 1 {
+        return haps;
     }
 
-    m_haps.sort();
+    let hap_counts: HashMap<Haplotype, usize> =
+        haps.drain(..).fold(HashMap::new(), |mut acc, hap| {
+            *acc.entry(hap).or_insert(0) += 1;
+            acc
+        });
 
-    let mut hap = m_haps.pop().unwrap();
-    hap.coverage += m_haps.iter().map(|i| i.coverage).sum::<u64>();
+    let (mut most_common_hap, _) = hap_counts
+        .into_iter()
+        .max_by(|(hap1, count1), (hap2, count2)| count1.cmp(count2).then_with(|| hap1.cmp(&hap2)))
+        .expect("Must be >1 hap to get here");
+    most_common_hap.coverage = cnt;
 
-    vec![hap]
+    vec![most_common_hap]
 }
 
 /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
@@ -61,13 +70,13 @@ pub fn diploid_haplotypes(
 
     let mut hap1 = m_haps[medoids[0]].clone();
     let mut hap2 = m_haps[medoids[1]].clone();
-    for (idx, hap) in m_haps.iter().enumerate() {
+    for (idx, _hap) in m_haps.into_iter().enumerate() {
         if idx == medoids[0] || idx == medoids[1] {
             continue;
         }
         match assignments[idx] {
-            0 => hap1.coverage += hap.coverage,
-            _ => hap2.coverage += hap.coverage, // K=2
+            0 => hap1.coverage += 1,
+            _ => hap2.coverage += 1, // k=2
         }
     }
 

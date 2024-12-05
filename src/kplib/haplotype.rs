@@ -3,6 +3,7 @@ use itertools::Itertools;
 use std::{
     cmp::Ordering,
     fmt::{Debug, Formatter, Result},
+    hash::{Hash, Hasher},
 };
 
 #[derive(Clone)]
@@ -132,6 +133,14 @@ impl PartialEq for Haplotype {
 }
 
 impl Eq for Haplotype {}
+
+impl Hash for Haplotype {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for &val in &self.kfeat {
+            val.to_bits().hash(state);
+        }
+    }
+}
 
 impl Debug for Haplotype {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
