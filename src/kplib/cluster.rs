@@ -1,5 +1,6 @@
 use crate::kplib::{metrics, Haplotype, KDParams};
 use ndarray::Array2;
+use rand::SeedableRng;
 
 /// Simply takes the best-covered haplotype as the representative
 pub fn haploid_haplotypes(
@@ -47,7 +48,7 @@ pub fn diploid_haplotypes(
             // Convert similarity to distance
             1.0 - (metrics::seqsim(&m_haps[i].kfeat, &m_haps[j].kfeat, params.minkfreq as f32))
         });
-    let mut medoids = kmedoids::random_initialization(m_haps.len(), 2, &mut rand::thread_rng());
+    let mut medoids = kmedoids::random_initialization(m_haps.len(), 2, &mut rand::rngs::StdRng::seed_from_u64(21));
 
     let (loss, assignments, _, _): (f32, _, _, _) =
         kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
