@@ -84,13 +84,10 @@ impl ReadParser for BamParser {
             }
         }
 
-            (pileups_to_haps(
-            chrom,
-            reads,
-            p_variants,
-            &self.reference,
-            &self.params,
-        ), coverage)
+        (
+            pileups_to_haps(chrom, reads, p_variants, &self.reference, &self.params),
+            coverage,
+        )
     }
 }
 
@@ -148,13 +145,10 @@ impl ReadParser for PlupParser {
             }
         }
 
-        (pileups_to_haps(
-            chrom,
-            reads,
-            p_variants,
-            &self.reference,
-            &self.params,
-        ), coverage)
+        (
+            pileups_to_haps(chrom, reads, p_variants, &self.reference, &self.params),
+            coverage,
+        )
     }
 }
 

@@ -42,32 +42,39 @@ pub fn diploid_haplotypes(
         return vec![hap];
     }
 
-    // Create a distance matrix based on your similarity function
+    // Create a distance matrix
     let distance_matrix: Array2<f32> =
         Array2::from_shape_fn((m_haps.len(), m_haps.len()), |(i, j)| {
             // Convert similarity to distance
             1.0 - (metrics::seqsim(&m_haps[i].kfeat, &m_haps[j].kfeat, params.minkfreq as f32))
         });
-    let mut medoids = kmedoids::random_initialization(m_haps.len(), 2, &mut rand::rngs::StdRng::seed_from_u64(21));
+
+    let mut medoids = kmedoids::random_initialization(
+        m_haps.len(),
+        2, // K
+        &mut rand::rngs::StdRng::seed_from_u64(21),
+    );
 
     let (loss, assignments, _, _): (f32, _, _, _) =
         kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
     trace!("Loss: {}", loss);
+
     let mut hap1 = m_haps[medoids[0]].clone();
     let mut hap2 = m_haps[medoids[1]].clone();
-    for (idx, hap) in m_haps.into_iter().enumerate() {
-        if idx != medoids[0] && idx != medoids[1] {
-            if assignments[idx] == 0 {
-                hap1.coverage += hap.coverage;
-            } else {
-                hap2.coverage += hap.coverage;
-            }
+    for (idx, hap) in m_haps.iter().enumerate() {
+        if idx == medoids[0] || idx == medoids[1] {
+            continue;
+        }
+        match assignments[idx] {
+            0 => hap1.coverage += hap.coverage,
+            _ => hap2.coverage += hap.coverage, // K=2
         }
     }
 
     trace!("Hap1 in {:?}", hap1);
     trace!("Hap2 in {:?}", hap2);
 
+    // Hap2 is always the higher covered allele
     if hap2.coverage < hap1.coverage {
         std::mem::swap(&mut hap1, &mut hap2);
     }
@@ -93,23 +100,11 @@ pub fn diploid_haplotypes(
     let remaining_coverage = coverage as f64 - applied_coverage;
     match metrics::genotyper(remaining_coverage, applied_coverage) {
         // We need the one higher covered alt
-        // and probably should assign this GT as lowq if REF
         metrics::GTstate::Ref | metrics::GTstate::Het => {
             hap2.coverage += hap1.coverage;
             vec![hap2]
         }
-        metrics::GTstate::Hom => {
-            if hap1.n == 0 {
-                // HOMALT
-                vec![hap2]
-            } else if hap2.n == 0 {
-                // Doesn't happen?
-                vec![hap1]
-            } else {
-                // Compound Het
-                vec![hap1, hap2]
-            }
-        }
+        metrics::GTstate::Hom => vec![hap1, hap2],
         _ => panic!("The genotyper can't do this, yet"),
     }
 }
