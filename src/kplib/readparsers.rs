@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 pub type ReadsMap = IndexMap<usize, Vec<usize>>;
 pub type PileupSet = IndexSet<PileupVariant>;
-
+type HPMap = IndexMap<usize, Option<u8>>;
 pub trait ReadParser {
     fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64);
 }
@@ -51,13 +51,8 @@ impl ReadParser for BamParser {
 
         // track the changes made by each read
         let mut reads = ReadsMap::new();
-        // consolidate common variants
+        let mut hps = HPMap::new();
         let mut p_variants = PileupSet::new();
-        // What if we push a 'no variant' to the pileup
-        // And then we can add refhom reads to the ReadsMap
-        // How would pileups_to_hap work?
-        // Would it then have a bunch of reference homozygous variants?
-        // Or, could we just add read that's p_variants is None...
         let mut coverage = 0;
 
         for (qname, record) in self
@@ -80,9 +75,8 @@ impl ReadParser for BamParser {
                 self.params.sizemin as u32,
                 self.params.sizemax as u32,
             );
-            // No variant reads are now recorded
-            if read.pileups.is_empty() {
-                reads.entry(qname).or_default();
+            if !read.pileups.is_empty() {
+                hps.entry(qname).or_insert(read.hp);
             }
             for m_var in read.pileups.drain(..) {
                 if m_var.position >= window_start && m_var.position <= window_end {
@@ -94,7 +88,15 @@ impl ReadParser for BamParser {
         }
 
         (
-            pileups_to_haps(chrom, reads, p_variants, &self.reference, &self.params),
+            pileups_to_haps(
+                chrom,
+                reads,
+                p_variants,
+                &self.reference,
+                &self.params,
+                hps,
+                None,
+            ),
             coverage,
         )
     }
@@ -134,6 +136,7 @@ impl ReadParser for PlupParser {
             .expect("Could not fetch region from TBX");
 
         let mut reads = ReadsMap::new();
+        let mut hps = HPMap::new();
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
 
@@ -143,8 +146,8 @@ impl ReadParser for PlupParser {
             {
                 if read.start < window_start && read.end > window_end {
                     coverage += 1;
-                    if read.pileups.is_empty() {
-                        reads.entry(qname).or_default();
+                    if !read.pileups.is_empty() {
+                        hps.entry(qname).or_insert(read.hp);
                     }
                     for m_var in read.pileups.drain(..) {
                         if m_var.position >= window_start && m_var.position <= window_end {
@@ -158,7 +161,15 @@ impl ReadParser for PlupParser {
         }
 
         (
-            pileups_to_haps(chrom, reads, p_variants, &self.reference, &self.params),
+            pileups_to_haps(
+                chrom,
+                reads,
+                p_variants,
+                &self.reference,
+                &self.params,
+                hps,
+                None,
+            ),
             coverage,
         )
     }
@@ -215,6 +226,8 @@ pub fn pileups_to_haps(
     mut plups: PileupSet,
     reference: &faidx::Reader,
     params: &KDParams,
+    hps: HPMap,      // HP tags per-read
+    ps: Option<u16>, // The window's PS tag
 ) -> Vec<Haplotype> {
     let mut hap_parts = Vec::<Haplotype>::with_capacity(plups.len());
     let mut ret = Vec::<Haplotype>::with_capacity(reads.len());
@@ -243,14 +256,19 @@ pub fn pileups_to_haps(
             p.size,
             1,
             1,
+            None,
+            None,
         );
         hap_parts.push(n_hap);
     }
 
-    for read in reads.values() {
+    // qname: [plup_idx, ]
+    for (read_idx, read) in reads.into_iter() {
         let mut cur_hap = Haplotype::blank(params.kmer, 1);
+        cur_hap.ps = ps;
+        cur_hap.hp = *hps.get(&read_idx).expect("hp populated with reads");
         for p in read {
-            cur_hap.add(&hap_parts[hap_parts.len() - *p - 1]);
+            cur_hap.add(&hap_parts[hap_parts.len() - p - 1]);
         }
         ret.push(cur_hap);
     }

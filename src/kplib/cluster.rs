@@ -55,7 +55,13 @@ pub fn diploid_haplotypes(
     let distance_matrix: Array2<f32> =
         Array2::from_shape_fn((m_haps.len(), m_haps.len()), |(i, j)| {
             // Convert similarity to distance
-            1.0 - (metrics::seqsim(&m_haps[i].kfeat, &m_haps[j].kfeat, params.minkfreq as f32))
+            let dist =
+                1.0 - (metrics::seqsim(&m_haps[i].kfeat, &m_haps[j].kfeat, params.minkfreq as f32));
+            // Penalize only if both points have defined, different groups
+            match (m_haps[i].hp, m_haps[j].hp) {
+                (Some(group_i), Some(group_j)) if group_i != group_j => dist + params.hps_weight,
+                _ => dist,
+            }
         });
 
     let mut medoids = kmedoids::random_initialization(

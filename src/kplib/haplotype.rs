@@ -14,10 +14,19 @@ pub struct Haplotype {
     pub kfeat: Vec<f32>,
     pub parts: Vec<(i64, Vec<f32>)>,
     pub partial: usize,
+    pub ps: Option<u16>,
+    pub hp: Option<u8>,
 }
 
 impl Haplotype {
-    pub fn new(kfeat: Vec<f32>, size: i64, n: u64, coverage: u64) -> Self {
+    pub fn new(
+        kfeat: Vec<f32>,
+        size: i64,
+        n: u64,
+        coverage: u64,
+        ps: Option<u16>,
+        hp: Option<u8>,
+    ) -> Self {
         Self {
             size,
             n,
@@ -25,6 +34,8 @@ impl Haplotype {
             kfeat: kfeat.clone(),
             parts: vec![(size, kfeat)],
             partial: 0,
+            ps,
+            hp,
         }
     }
 
@@ -38,6 +49,8 @@ impl Haplotype {
             kfeat: mk.clone(),
             parts: vec![],
             partial: 0,
+            ps: None,
+            hp: None,
         }
     }
 

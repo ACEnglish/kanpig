@@ -221,6 +221,10 @@ pub struct KDParams {
     #[arg(long, default_value_t = 100)]
     pub pileupmax: usize,
 
+    /// Read clustering weight for haplotagged reads (off=0, full=1)
+    #[arg(long, default_value_t = 1.0)]
+    pub hps_weight: f32,
+
     /// Search for a 1-to-1 match before graph traversal
     #[arg(long, default_value_t = false)]
     pub try_exact: bool,
