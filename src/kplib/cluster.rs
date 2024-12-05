@@ -1,5 +1,5 @@
-use crate::kplib::{kmeans, metrics, Haplotype, KDParams};
-use itertools::{Either, Itertools};
+use crate::kplib::{metrics, Haplotype, KDParams};
+use ndarray::Array2;
 
 /// Simply takes the best-covered haplotype as the representative
 pub fn haploid_haplotypes(
@@ -40,49 +40,36 @@ pub fn diploid_haplotypes(
         let hap = m_haps.pop().unwrap();
         return vec![hap];
     }
-    debug!("{:?}", m_haps);
-    let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
-    let clusts = kmeans(&allk, 2);
 
-    // Separate the two haplotypes and sort
-    let (mut hap_a, mut hap_b): (Vec<Haplotype>, Vec<Haplotype>) =
-        m_haps.drain(..).enumerate().partition_map(|(idx, hap)| {
-            if clusts[0].points_idx.contains(&idx) {
-                Either::Left(hap)
-            } else {
-                Either::Right(hap)
-            }
+    // Create a distance matrix based on your similarity function
+    let distance_matrix: Array2<f32> =
+        Array2::from_shape_fn((m_haps.len(), m_haps.len()), |(i, j)| {
+            // Convert similarity to distance
+            1.0 - (metrics::seqsim(&m_haps[i].kfeat, &m_haps[j].kfeat, params.minkfreq as f32))
         });
+    let mut medoids = kmedoids::random_initialization(m_haps.len(), 2, &mut rand::thread_rng());
 
-    // Averaging Haplotypes could be done here?
-    // However, 'low-quality' long-reads are now ~97% (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10070092/)
-    // Which is reasonably within the thresholds of size/seqsim's search space
-    hap_a.sort();
-    hap_b.sort();
-    if hap_a.len() < hap_b.len() {
-        std::mem::swap(&mut hap_a, &mut hap_b);
-    }
-
-    // Guaranteed to have one cluster
-    let mut hap2 = hap_a.pop().unwrap();
-    hap2.coverage += hap_a.iter().map(|i| i.coverage).sum::<u64>();
-
-    let mut hap1 = if !hap_b.is_empty() {
-        let mut hap_t = hap_b.pop().unwrap();
-        hap_t.coverage += hap_b.iter().map(|i| i.coverage).sum::<u64>();
-        hap_t
-    } else {
-        // No deduping needed
-        return vec![hap2];
-    };
-
-    // hap2 should always be the more supported event
-    if hap1 > hap2 {
-        std::mem::swap(&mut hap1, &mut hap2);
+    let (loss, assignments, _, _): (f32, _, _, _) =
+        kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
+    trace!("Loss: {}", loss);
+    let mut hap1 = m_haps[medoids[0]].clone();
+    let mut hap2 = m_haps[medoids[1]].clone();
+    for (idx, hap) in m_haps.into_iter().enumerate() {
+        if idx != medoids[0] && idx != medoids[1] {
+            if assignments[idx] == 0 {
+                hap1.coverage += hap.coverage;
+            } else {
+                hap2.coverage += hap.coverage;
+            }
+        }
     }
 
     trace!("Hap1 in {:?}", hap1);
     trace!("Hap2 in {:?}", hap2);
+
+    if hap2.coverage < hap1.coverage {
+        std::mem::swap(&mut hap1, &mut hap2);
+    }
 
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar
@@ -92,6 +79,11 @@ pub fn diploid_haplotypes(
         hap2.coverage += hap1.coverage;
         return vec![hap2];
     };
+    // Need some way to challenge if an outlier is by itself..
+    /*if hap1.coverage < 3 {
+        hap2.coverage += hap1.coverage;
+        return vec![hap2];
+    }*/
 
     // Now we figure out if the we need two alt alleles or not
     // The reason this takes two steps is the above code is just trying to figure out if

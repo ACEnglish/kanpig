@@ -91,7 +91,7 @@ impl ReadPileup {
                 }
             }
         }
- 
+
         let ps = match record.aux(b"PS") {
             Ok(Aux::U16(value)) => Some(value),
             _ => None,

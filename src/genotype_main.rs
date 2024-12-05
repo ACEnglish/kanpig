@@ -80,6 +80,7 @@ pub fn genotype_main(args: GTArgs) {
                                 // and then eventually this could allow a --ploidy flag to branch to
                                 // polyploid_haplotypes
                             };
+                            debug!("{:?}", haps);
 
                             let paths: Vec<PathScore> = haps
                                 .iter()

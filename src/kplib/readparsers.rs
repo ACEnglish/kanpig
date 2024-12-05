@@ -246,7 +246,7 @@ pub fn pileups_to_haps(
         );
         hap_parts.push(n_hap);
     }
-    
+
     for read in reads.values() {
         let mut cur_hap = Haplotype::blank(params.kmer, 1);
         for p in read {
