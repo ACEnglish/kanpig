@@ -78,6 +78,7 @@ pub fn brute_force_find_path(
                     cur_path.size,
                     &partial_haps,
                     params,
+                    target,
                 ));
                 npaths += 1;
             } else {
@@ -117,6 +118,7 @@ pub fn get_one_to_one(
                 graph.node_weight(target_node).unwrap().size,
                 vec![target.clone()].as_ref(),
                 params,
+                target,
             );
             if candidate.seqsim > 0.0 {
                 Some(candidate)

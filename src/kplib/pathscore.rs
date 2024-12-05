@@ -11,6 +11,8 @@ pub struct PathScore {
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
     pub full_target: bool, // Does this path use partial
+    pub ps: Option<u16>,
+    pub hp: Option<u8>,
 }
 
 impl Eq for PathScore {}
@@ -44,6 +46,8 @@ impl Default for PathScore {
             seqsim: 0.0,
             coverage: None,
             full_target: false,
+            ps: None,
+            hp: None,
         }
     }
 }
@@ -55,6 +59,7 @@ impl PathScore {
         path_size: i64,
         targets: &[Haplotype],
         params: &KDParams,
+        target: &Haplotype,
     ) -> Self {
         let mut path_k: Option<Vec<f32>> = None;
         let mut best_path = PathScore::default();
@@ -107,6 +112,8 @@ impl PathScore {
                     seqsim,
                     coverage: None,
                     full_target: hap_parts.partial == 0,
+                    ps: target.ps,
+                    hp: target.hp,
                 };
             }
         }
