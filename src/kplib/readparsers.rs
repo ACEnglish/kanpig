@@ -53,6 +53,11 @@ impl ReadParser for BamParser {
         let mut reads = ReadsMap::new();
         // consolidate common variants
         let mut p_variants = PileupSet::new();
+        // What if we push a 'no variant' to the pileup
+        // And then we can add refhom reads to the ReadsMap
+        // How would pileups_to_hap work?
+        // Would it then have a bunch of reference homozygous variants?
+        // Or, could we just add read that's p_variants is None...
         let mut coverage = 0;
 
         for (qname, record) in self
@@ -70,12 +75,16 @@ impl ReadParser for BamParser {
             .enumerate()
         {
             coverage += 1;
-            let mut m_plups = ReadPileup::new(
+            let mut read = ReadPileup::new(
                 record,
                 self.params.sizemin as u32,
                 self.params.sizemax as u32,
             );
-            for m_var in m_plups.pileups.drain(..) {
+            // No variant reads are now recorded
+            if read.pileups.is_empty() {
+                reads.entry(qname).or_default();
+            }
+            for m_var in read.pileups.drain(..) {
                 if m_var.position >= window_start && m_var.position <= window_end {
                     trace!("{:?}", m_var);
                     let (p_idx, _) = p_variants.insert_full(m_var);
@@ -134,6 +143,9 @@ impl ReadParser for PlupParser {
             {
                 if read.start < window_start && read.end > window_end {
                     coverage += 1;
+                    if read.pileups.is_empty() {
+                        reads.entry(qname).or_default();
+                    }
                     for m_var in read.pileups.drain(..) {
                         if m_var.position >= window_start && m_var.position <= window_end {
                             trace!("{:?}", m_var);

@@ -13,7 +13,7 @@ pub fn haploid_haplotypes(
         return vec![];
     }
 
-    let cnt = haps.len();
+    let cnt = haps.len() as u64;
     if cnt == 1 {
         return haps;
     }
@@ -26,7 +26,7 @@ pub fn haploid_haplotypes(
 
     let (mut most_common_hap, _) = hap_counts
         .into_iter()
-        .max_by(|(hap1, count1), (hap2, count2)| count1.cmp(count2).then_with(|| hap1.cmp(&hap2)))
+        .max_by(|(hap1, count1), (hap2, count2)| count1.cmp(count2).then_with(|| hap1.cmp(hap2)))
         .expect("Must be >1 hap to get here");
     most_common_hap.coverage = cnt;
 
