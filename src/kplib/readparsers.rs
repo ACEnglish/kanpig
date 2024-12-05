@@ -80,7 +80,6 @@ impl ReadParser for BamParser {
             }
             for m_var in read.pileups.drain(..) {
                 if m_var.position >= window_start && m_var.position <= window_end {
-                    trace!("{:?}", m_var);
                     let (p_idx, _) = p_variants.insert_full(m_var);
                     reads.entry(qname).or_default().push(p_idx);
                 }
@@ -151,7 +150,6 @@ impl ReadParser for PlupParser {
                     }
                     for m_var in read.pileups.drain(..) {
                         if m_var.position >= window_start && m_var.position <= window_end {
-                            trace!("{:?}", m_var);
                             let (p_idx, _) = p_variants.insert_full(m_var);
                             reads.entry(qname).or_default().push(p_idx);
                         }
@@ -274,6 +272,5 @@ pub fn pileups_to_haps(
     }
 
     ret.sort_by(|a, b| b.cmp(a));
-    trace!("{:?}", ret);
     ret
 }

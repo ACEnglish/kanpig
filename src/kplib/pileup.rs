@@ -3,6 +3,7 @@ use crate::kplib::Svtype;
 use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::hash::{Hash, Hasher};
 
+#[derive(Debug)]
 pub struct ReadPileup {
     pub chrom: i32,
     pub start: u64,

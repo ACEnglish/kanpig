@@ -161,6 +161,8 @@ impl Debug for Haplotype {
             .field("size", &self.size)
             .field("n", &self.n)
             .field("coverage", &self.coverage)
+            .field("ps", &self.ps)
+            .field("hp", &self.hp)
             // Exclude kfeat from the debug output
             .finish()
     }

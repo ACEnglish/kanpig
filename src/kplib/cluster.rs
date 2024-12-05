@@ -74,16 +74,44 @@ pub fn diploid_haplotypes(
         kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
     trace!("Loss: {}", loss);
 
+    // grab ps from whoever
+    let mut g_ps = None;
     let mut hap1 = m_haps[medoids[0]].clone();
+    let mut hap1_hps = HashMap::<u8, u16>::new();
+
     let mut hap2 = m_haps[medoids[1]].clone();
-    for (idx, _hap) in m_haps.into_iter().enumerate() {
+    let mut hap2_hps = HashMap::<u8, u16>::new();
+    for (idx, _hap) in m_haps.iter().enumerate() {
         if idx == medoids[0] || idx == medoids[1] {
             continue;
         }
         match assignments[idx] {
-            0 => hap1.coverage += 1,
-            _ => hap2.coverage += 1, // k=2
+            0 => {
+                hap1.coverage += 1;
+                if let Some(hp) = m_haps[idx].hp {
+                    *hap1_hps.entry(hp).or_default() += 1;
+                }
+            }
+            _ => {
+                hap2.coverage += 1; // k=2
+                if let Some(hp) = m_haps[idx].hp {
+                    *hap2_hps.entry(hp).or_default() += 1;
+                }
+            }
         }
+
+        if g_ps.is_none() && m_haps[idx].ps.is_some() {
+            g_ps = m_haps[idx].ps;
+        }
+    }
+    // Assignment of PS and HP just takes most common
+    hap1.ps = g_ps;
+    if let Some((key, _value)) = hap1_hps.into_iter().max_by_key(|(_, val)| *val) {
+        hap1.hp = Some(key);
+    }
+    hap2.ps = g_ps;
+    if let Some((key, _value)) = hap2_hps.into_iter().max_by_key(|(_, val)| *val) {
+        hap2.hp = Some(key);
     }
 
     trace!("Hap1 in {:?}", hap1);
