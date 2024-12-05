@@ -166,8 +166,8 @@ fn diploid(
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
-
-    let ps = paths[0].ps;
+    let ps = if !paths.is_empty() { paths[0].ps } else { None };
+    debug!("{:?}", ps);
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 
@@ -273,7 +273,7 @@ fn haploid(
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
 
-    let ps = paths[0].ps;
+    let ps = path1.ps;
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 

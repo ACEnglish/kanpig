@@ -52,6 +52,7 @@ impl ReadParser for BamParser {
         // track the changes made by each read
         let mut reads = ReadsMap::new();
         let mut hps = HPMap::new();
+        let mut ps = None;
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
 
@@ -75,6 +76,11 @@ impl ReadParser for BamParser {
                 self.params.sizemin as u32,
                 self.params.sizemax as u32,
             );
+
+            if ps.is_none() && read.ps.is_some() {
+                ps = read.ps;
+            }
+
             if !read.pileups.is_empty() {
                 hps.entry(qname).or_insert(read.hp);
             }
@@ -94,7 +100,7 @@ impl ReadParser for BamParser {
                 &self.reference,
                 &self.params,
                 hps,
-                None,
+                ps,
             ),
             coverage,
         )
@@ -136,6 +142,7 @@ impl ReadParser for PlupParser {
 
         let mut reads = ReadsMap::new();
         let mut hps = HPMap::new();
+        let mut ps = None;
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
 
@@ -145,6 +152,9 @@ impl ReadParser for PlupParser {
             {
                 if read.start < window_start && read.end > window_end {
                     coverage += 1;
+                    if ps.is_none() && read.ps.is_some() {
+                        ps = read.ps;
+                    }
                     if !read.pileups.is_empty() {
                         hps.entry(qname).or_insert(read.hp);
                     }
@@ -166,7 +176,7 @@ impl ReadParser for PlupParser {
                 &self.reference,
                 &self.params,
                 hps,
-                None,
+                ps,
             ),
             coverage,
         )
