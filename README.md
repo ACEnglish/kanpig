@@ -102,7 +102,8 @@ The `SAMPLE` column fields populated by kanpig are:
 | **FT**  | Bit flag for properties of the variant's genotyping. Flags == 0 are considered PASS. |
 | **SQ**  | Phred scaled likelihood variant alternate is present in the sample |
 | **GQ**  | Phred scale difference between most and second-most likely genotypes |
-| **NE**  | Neighborhood id of variants evaluated together |
+| **PS**  | Phase set pulled from haplotagged reads for long-range phasing |
+| **NE**  | Neighborhood id of variants evaluated together for short-range phasing |
 | **DP**  | Read coverage over the region |
 | **AD**  | Read coverage supporting the reference and alternate alleles. |
 | **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
