@@ -140,7 +140,6 @@ pub fn plup_main(args: PlupArgs) {
         )
         .unwrap()
         .progress_chars("##-");
-        let pbar = ProgressBar::new(num_regions).with_style(sty);
         thread::spawn(move || {
             let mut writer: Box<dyn Write> = match m_args.output {
                 Some(ref path) => {
@@ -154,6 +153,8 @@ pub fn plup_main(args: PlupArgs) {
             let header_main = bam::Header::from_template(bam.header());
             let header = bam::HeaderView::from_header(&header_main);
             let mut n_reads = 0;
+            let pbar = ProgressBar::new(num_regions).with_style(sty);
+            pbar.inc(0);
             loop {
                 match result_receiver.recv() {
                     Ok(None) | Err(_) => break,

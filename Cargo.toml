@@ -4,6 +4,7 @@ version = "1.0.0-dev"
 edition = "2021"
 
 [dependencies]
+kmedoids = { version = "0.5.3" }
 bitflags = { version = "2.5.0" }
 clap = { version = "4.0", features = ["derive"] }
 crossbeam-channel = { version = "0.5.12" }
@@ -19,6 +20,8 @@ petgraph = { version = "0.6.2" }
 pretty_env_logger = { version = "0.4.0" }
 rust-htslib = { version = "0.46.0" }
 rust-lapper = { version = "1.1.0" }
+ndarray = "0.16.1"
+rand = "0.8.5"
 
 [profile.release]
 opt-level = 3

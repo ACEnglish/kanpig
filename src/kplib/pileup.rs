@@ -3,6 +3,7 @@ use crate::kplib::Svtype;
 use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::hash::{Hash, Hasher};
 
+#[derive(Debug)]
 pub struct ReadPileup {
     pub chrom: i32,
     pub start: u64,
@@ -91,7 +92,7 @@ impl ReadPileup {
                 }
             }
         }
- 
+
         let ps = match record.aux(b"PS") {
             Ok(Aux::U16(value)) => Some(value),
             _ => None,

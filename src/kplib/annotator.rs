@@ -28,6 +28,7 @@ pub struct GenotypeAnno {
     pub filt: FiltFlags,
     pub sq: i32,
     pub gq: i32,
+    pub ps: Option<u16>,
     pub dp: i32,
     pub ad: IntG,
     pub ks: IntG,
@@ -68,7 +69,7 @@ impl GenotypeAnno {
     ///
     /// # Returns
     /// A vector containing optional `Value` instances representing the fields of the `GenotypeAnno`.
-    pub fn make_fields(&self, phase_group: i32) -> Vec<Option<Value>> {
+    pub fn make_fields(&self, neigh_group: i32) -> Vec<Option<Value>> {
         vec![
             Some(Value::Genotype(
                 self.gt.parse().expect("Should have made GT correctly"),
@@ -76,13 +77,19 @@ impl GenotypeAnno {
             Some(Value::Integer(self.filt.bits() as i32)),
             Some(Value::Integer(self.sq)),
             Some(Value::Integer(self.gq)),
-            Some(Value::Integer(phase_group)),
+            self.ps.map(|ps| Value::Integer(ps as i32)),
+            Some(Value::Integer(neigh_group)),
             Some(Value::Integer(self.dp)),
             Some(Value::Array(Array::Integer(self.ad.clone()))),
             Some(Value::Array(Array::Integer(self.ks.clone()))),
         ]
     }
 }
+
+/// Tries to figure out the order of the GT allele numbers
+//fn get_gt_string(is_het: bool, paths: &[PathScore]) -> str {
+// I only need to do this for a single pathscore het
+// IF, I sort the paths based on their hp
 
 /// For annotating a variant in diploid regions
 fn diploid(
@@ -109,7 +116,14 @@ fn diploid(
                 let alt_cov = m_path.coverage.unwrap() as f64;
                 let ref_cov = (coverage as f64) - alt_cov;
                 let (genotype, state) = match metrics::genotyper(ref_cov, alt_cov) {
-                    metrics::GTstate::Ref | metrics::GTstate::Het => ("0|1", metrics::GTstate::Het),
+                    metrics::GTstate::Ref | metrics::GTstate::Het => {
+                        let gt = match m_path.hp {
+                            None => "0|1",
+                            Some(1) => "0|1",
+                            _ => "1|0",
+                        };
+                        (gt, metrics::GTstate::Het)
+                    }
                     metrics::GTstate::Hom => ("1|1", metrics::GTstate::Hom),
                     _ => panic!("Cannot happen here"),
                 };
@@ -152,6 +166,8 @@ fn diploid(
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
+    let ps = if !paths.is_empty() { paths[0].ps } else { None };
+    debug!("{:?}", ps);
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 
@@ -189,6 +205,7 @@ fn diploid(
         filt,
         sq: sq.round() as i32,
         gq: gq.round() as i32,
+        ps,
         dp: coverage as i32,
         ad,
         ks,
@@ -204,6 +221,7 @@ fn zero(entry: RecordBuf, coverage: u64) -> GenotypeAnno {
         filt: FiltFlags::PASS,
         sq: 0,
         gq: 0,
+        ps: None,
         dp: coverage as i32,
         ad: vec![None],
         ks: vec![None],
@@ -235,6 +253,7 @@ fn haploid(
             filt,
             sq: 0,
             gq,
+            ps: None,
             dp: coverage as i32,
             ad: vec![Some(coverage as i32), Some(0)],
             ks: vec![],
@@ -253,6 +272,8 @@ fn haploid(
     let ref_cov = (coverage as f64) - alt_cov;
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
+
+    let ps = path1.ps;
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 
@@ -283,6 +304,7 @@ fn haploid(
         filt,
         sq: sq.round() as i32,
         gq: gq.round() as i32,
+        ps,
         dp: coverage as i32,
         ad,
         ks,

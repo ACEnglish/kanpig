@@ -13,9 +13,6 @@ pub use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};
 mod haplotype;
 pub use crate::kplib::haplotype::Haplotype;
 
-mod kmeans;
-pub use crate::kplib::kmeans::kmeans;
-
 mod kmer;
 pub use crate::kplib::kmer::seq_to_kmer;
 

@@ -15,6 +15,27 @@ use crate::kplib::{
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
 type OutputType = Option<Vec<GenotypeAnno>>;
 
+fn hp_sorter(a: &Option<u8>, b: &Option<u8>) -> std::cmp::Ordering {
+    match (a, b) {
+        // If both are Some, reverse order
+        (Some(va), Some(vb)) => vb.cmp(va),
+
+        // If one is None and the other is Some(1), None comes first
+        (Some(1), None) => std::cmp::Ordering::Greater,
+        (None, Some(1)) => std::cmp::Ordering::Less,
+
+        // If one is None and the other is Some(2), None comes last
+        (Some(2), None) => std::cmp::Ordering::Less,
+        (None, Some(2)) => std::cmp::Ordering::Greater,
+
+        // If both are None, do nothing
+        (None, None) => std::cmp::Ordering::Equal,
+
+        // Default fallback (not strictly needed with the cases above)
+        _ => std::cmp::Ordering::Equal,
+    }
+}
+
 pub fn genotype_main(args: GTArgs) {
     let mut input_vcf = vcf::io::reader::Builder::default()
         .build_from_path(args.io.input.clone())
@@ -80,13 +101,16 @@ pub fn genotype_main(args: GTArgs) {
                                 // and then eventually this could allow a --ploidy flag to branch to
                                 // polyploid_haplotypes
                             };
+                            debug!("{:?}", haps);
 
-                            let paths: Vec<PathScore> = haps
+                            let mut paths: Vec<PathScore> = haps
                                 .iter()
                                 .map(|h| m_graph.apply_coverage(h, &m_args.kd))
                                 .filter(|p| *p != PathScore::default())
                                 .collect();
+                            paths.sort_by(|a, b| hp_sorter(&a.hp, &b.hp));
 
+                            // Sort paths based on their HP if set
                             m_result_sender
                                 .send(Some(m_graph.take_annotated(&paths, coverage, &ploidy)))
                                 .unwrap();

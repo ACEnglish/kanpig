@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 pub type ReadsMap = IndexMap<usize, Vec<usize>>;
 pub type PileupSet = IndexSet<PileupVariant>;
-
+type HPMap = IndexMap<usize, Option<u8>>;
 pub trait ReadParser {
     fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64);
 }
@@ -51,7 +51,8 @@ impl ReadParser for BamParser {
 
         // track the changes made by each read
         let mut reads = ReadsMap::new();
-        // consolidate common variants
+        let mut hps = HPMap::new();
+        let mut ps = None;
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
 
@@ -70,27 +71,38 @@ impl ReadParser for BamParser {
             .enumerate()
         {
             coverage += 1;
-            let mut m_plups = ReadPileup::new(
+            let mut read = ReadPileup::new(
                 record,
                 self.params.sizemin as u32,
                 self.params.sizemax as u32,
             );
-            for m_var in m_plups.pileups.drain(..) {
+
+            if ps.is_none() && read.ps.is_some() {
+                ps = read.ps;
+            }
+
+            if !read.pileups.is_empty() {
+                hps.entry(qname).or_insert(read.hp);
+            }
+            for m_var in read.pileups.drain(..) {
                 if m_var.position >= window_start && m_var.position <= window_end {
-                    trace!("{:?}", m_var);
                     let (p_idx, _) = p_variants.insert_full(m_var);
                     reads.entry(qname).or_default().push(p_idx);
                 }
             }
         }
 
-        pileups_to_haps(
-            chrom,
-            reads,
-            p_variants,
+        (
+            pileups_to_haps(
+                chrom,
+                reads,
+                p_variants,
+                &self.reference,
+                &self.params,
+                hps,
+                ps,
+            ),
             coverage,
-            &self.reference,
-            &self.params,
         )
     }
 }
@@ -129,6 +141,8 @@ impl ReadParser for PlupParser {
             .expect("Could not fetch region from TBX");
 
         let mut reads = ReadsMap::new();
+        let mut hps = HPMap::new();
+        let mut ps = None;
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
 
@@ -138,9 +152,14 @@ impl ReadParser for PlupParser {
             {
                 if read.start < window_start && read.end > window_end {
                     coverage += 1;
+                    if ps.is_none() && read.ps.is_some() {
+                        ps = read.ps;
+                    }
+                    if !read.pileups.is_empty() {
+                        hps.entry(qname).or_insert(read.hp);
+                    }
                     for m_var in read.pileups.drain(..) {
                         if m_var.position >= window_start && m_var.position <= window_end {
-                            trace!("{:?}", m_var);
                             let (p_idx, _) = p_variants.insert_full(m_var);
                             reads.entry(qname).or_default().push(p_idx);
                         }
@@ -149,13 +168,17 @@ impl ReadParser for PlupParser {
             }
         }
 
-        pileups_to_haps(
-            chrom,
-            reads,
-            p_variants,
+        (
+            pileups_to_haps(
+                chrom,
+                reads,
+                p_variants,
+                &self.reference,
+                &self.params,
+                hps,
+                ps,
+            ),
             coverage,
-            &self.reference,
-            &self.params,
         )
     }
 }
@@ -166,7 +189,6 @@ impl ReadParser for PlupParser {
 /// - `chrom`: The name of the reference chromosome or contig as a `&str`.
 /// - `reads`: A `ReadsMap` mapping read identifiers to a list of pileup indices.
 /// - `plups`: A `PileupSet` representing the pileups to process.
-/// - `coverage`: The total coverage for the region being analyzed.
 /// - `reference`: A reference to a `faidx::Reader` for querying the reference genome.
 /// - `params`: A reference to a `KDParams` struct containing user-defined parameters, including:
 ///     - `kmer`: The k-mer size for generating haplotype sequences.
@@ -175,7 +197,6 @@ impl ReadParser for PlupParser {
 /// # Returns
 /// - `(Vec<Haplotype>, u64)`: A tuple containing:
 ///   - A `Vec<Haplotype>`: The deduplicated and sorted list of haplotypes generated from the pileups.
-///   - A `u64`: The total coverage used for haplotype generation.
 ///
 /// # Function Details
 /// - The function processes each pileup in `plups` to construct the corresponding sequence.
@@ -199,11 +220,10 @@ impl ReadParser for PlupParser {
 /// let chrom = "chr1";
 /// let reads: ReadsMap = HashMap::new(); // Populate with actual read-pileup mappings
 /// let plups: PileupSet = Vec::new(); // Populate with pileups
-/// let coverage = 100;
 /// let reference = Reader::from_path("reference.fa").unwrap();
 /// let params = KDParams { kmer: 31, maxhom: 5 };
 ///
-/// let (haplotypes, total_coverage) = pileups_to_haps(chrom, reads, plups, coverage, &reference, &params);
+/// let haplotypes = pileups_to_haps(chrom, reads, plups, &reference, &params);
 /// for hap in haplotypes {
 ///     println!("{:?}", hap);
 /// }
@@ -212,11 +232,13 @@ pub fn pileups_to_haps(
     chrom: &str,
     reads: ReadsMap,
     mut plups: PileupSet,
-    coverage: u64,
     reference: &faidx::Reader,
     params: &KDParams,
-) -> (Vec<Haplotype>, u64) {
+    hps: HPMap,      // HP tags per-read
+    ps: Option<u16>, // The window's PS tag
+) -> Vec<Haplotype> {
     let mut hap_parts = Vec::<Haplotype>::with_capacity(plups.len());
+    let mut ret = Vec::<Haplotype>::with_capacity(reads.len());
 
     while let Some(mut p) = plups.pop() {
         // Need to fill in deleted sequence
@@ -242,28 +264,23 @@ pub fn pileups_to_haps(
             p.size,
             1,
             1,
+            None,
+            None,
         );
         hap_parts.push(n_hap);
     }
 
-    // Deduplicate reads by pileup combination
-    let mut unique_reads: IndexMap<&Vec<usize>, u64> = IndexMap::new();
-    for m_plups in reads.values() {
-        *unique_reads.entry(m_plups).or_insert(0) += 1;
-    }
-
-    // Turn variants into haplotypes
-    let mut ret = Vec::<Haplotype>::new();
-    for (read_pileups, coverage) in unique_reads {
+    // qname: [plup_idx, ]
+    for (read_idx, read) in reads.into_iter() {
         let mut cur_hap = Haplotype::blank(params.kmer, 1);
-        for p in read_pileups {
-            cur_hap.add(&hap_parts[hap_parts.len() - *p - 1]);
+        cur_hap.ps = ps;
+        cur_hap.hp = *hps.get(&read_idx).expect("hp populated with reads");
+        for p in read {
+            cur_hap.add(&hap_parts[hap_parts.len() - p - 1]);
         }
-        cur_hap.coverage = coverage;
         ret.push(cur_hap);
     }
 
     ret.sort_by(|a, b| b.cmp(a));
-    trace!("{:?}", ret);
-    (ret, coverage)
+    ret
 }

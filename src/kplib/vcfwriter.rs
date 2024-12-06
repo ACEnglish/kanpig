@@ -56,7 +56,7 @@ impl VcfWriter {
         // Setup FORMAT header definitions
         // Overwrites existing definitions
         let all_formats = header.formats_mut();
-        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:NE:DP:AD:KS"
+        let new_fmts: Vec<String> = "GT:FT:SQ:GQ:PS:NE:DP:AD:KS"
             .split(':')
             .map(String::from)
             .collect();
@@ -94,6 +94,14 @@ impl VcfWriter {
         *gqfmt.type_mut() = format::Type::Integer;
         *gqfmt.description_mut() = "Phred scaled quality of genotype".to_string();
         all_formats.insert(gqid.to_string(), gqfmt);
+
+        // PS
+        let psid = "PS";
+        let mut psfmt = Map::<format::Format>::from(psid);
+        *psfmt.number_mut() = format::Number::Count(1);
+        *psfmt.type_mut() = format::Type::Integer;
+        *psfmt.description_mut() = "PhaseSet tag from reads".to_string();
+        all_formats.insert(psid.to_string(), psfmt);
 
         // NE
         let neid = "NE";

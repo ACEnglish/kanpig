@@ -1,26 +1,36 @@
-use crate::kplib::{kmeans, metrics, Haplotype, KDParams};
-use itertools::{Either, Itertools};
+use crate::kplib::{metrics, Haplotype, KDParams};
+use ndarray::Array2;
+use rand::SeedableRng;
+use std::collections::HashMap;
 
 /// Simply takes the best-covered haplotype as the representative
 pub fn haploid_haplotypes(
-    mut m_haps: Vec<Haplotype>,
+    mut haps: Vec<Haplotype>,
     coverage: u64,
-    params: &KDParams,
+    _params: &KDParams,
 ) -> Vec<Haplotype> {
-    if coverage == 0 || m_haps.is_empty() {
-        return vec![Haplotype::blank(params.kmer, coverage)];
+    if coverage == 0 || haps.is_empty() {
+        return vec![];
     }
 
-    if m_haps.len() == 1 {
-        return m_haps;
+    let cnt = haps.len() as u64;
+    if cnt == 1 {
+        return haps;
     }
 
-    m_haps.sort();
+    let hap_counts: HashMap<Haplotype, usize> =
+        haps.drain(..).fold(HashMap::new(), |mut acc, hap| {
+            *acc.entry(hap).or_insert(0) += 1;
+            acc
+        });
 
-    let mut hap = m_haps.pop().unwrap();
-    hap.coverage += m_haps.iter().map(|i| i.coverage).sum::<u64>();
+    let (mut most_common_hap, _) = hap_counts
+        .into_iter()
+        .max_by(|(hap1, count1), (hap2, count2)| count1.cmp(count2).then_with(|| hap1.cmp(hap2)))
+        .expect("Must be >1 hap to get here");
+    most_common_hap.coverage = cnt;
 
-    vec![hap]
+    vec![most_common_hap]
 }
 
 /// Cluster multiple haplotypes together to try and reduce them to at most two haplotypes
@@ -41,48 +51,76 @@ pub fn diploid_haplotypes(
         return vec![hap];
     }
 
-    let allk = m_haps.iter().map(|i| i.kfeat.clone()).collect::<Vec<_>>();
-    let clusts = kmeans(&allk, 2);
-
-    // Separate the two haplotypes and sort
-    let (mut hap_a, mut hap_b): (Vec<Haplotype>, Vec<Haplotype>) =
-        m_haps.drain(..).enumerate().partition_map(|(idx, hap)| {
-            if clusts[0].points_idx.contains(&idx) {
-                Either::Left(hap)
-            } else {
-                Either::Right(hap)
+    // Create a distance matrix
+    let distance_matrix: Array2<f32> =
+        Array2::from_shape_fn((m_haps.len(), m_haps.len()), |(i, j)| {
+            // Convert similarity to distance
+            let dist =
+                1.0 - (metrics::seqsim(&m_haps[i].kfeat, &m_haps[j].kfeat, params.minkfreq as f32));
+            // Penalize only if both points have defined, different groups
+            match (m_haps[i].hp, m_haps[j].hp) {
+                (Some(group_i), Some(group_j)) if group_i != group_j => dist + params.hps_weight,
+                _ => dist,
             }
         });
 
-    // Averaging Haplotypes could be done here?
-    // However, 'low-quality' long-reads are now ~97% (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10070092/)
-    // Which is reasonably within the thresholds of size/seqsim's search space
-    hap_a.sort();
-    hap_b.sort();
-    if hap_a.len() < hap_b.len() {
-        std::mem::swap(&mut hap_a, &mut hap_b);
+    let mut medoids = kmedoids::random_initialization(
+        m_haps.len(),
+        2, // K
+        &mut rand::rngs::StdRng::seed_from_u64(21),
+    );
+
+    let (loss, assignments, _, _): (f32, _, _, _) =
+        kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
+    trace!("Loss: {}", loss);
+
+    // grab ps from whoever
+    let mut g_ps = None;
+    let mut hap1 = m_haps[medoids[0]].clone();
+    let mut hap1_hps = HashMap::<u8, u16>::new();
+
+    let mut hap2 = m_haps[medoids[1]].clone();
+    let mut hap2_hps = HashMap::<u8, u16>::new();
+    for (idx, _hap) in m_haps.iter().enumerate() {
+        if idx == medoids[0] || idx == medoids[1] {
+            continue;
+        }
+        match assignments[idx] {
+            0 => {
+                hap1.coverage += 1;
+                if let Some(hp) = m_haps[idx].hp {
+                    *hap1_hps.entry(hp).or_default() += 1;
+                }
+            }
+            _ => {
+                hap2.coverage += 1; // k=2
+                if let Some(hp) = m_haps[idx].hp {
+                    *hap2_hps.entry(hp).or_default() += 1;
+                }
+            }
+        }
+
+        if g_ps.is_none() && m_haps[idx].ps.is_some() {
+            g_ps = m_haps[idx].ps;
+        }
     }
-
-    // Guaranteed to have one cluster
-    let mut hap2 = hap_a.pop().unwrap();
-    hap2.coverage += hap_a.iter().map(|i| i.coverage).sum::<u64>();
-
-    let mut hap1 = if !hap_b.is_empty() {
-        let mut hap_t = hap_b.pop().unwrap();
-        hap_t.coverage += hap_b.iter().map(|i| i.coverage).sum::<u64>();
-        hap_t
-    } else {
-        // No deduping needed
-        return vec![hap2];
-    };
-
-    // hap2 should always be the more supported event
-    if hap1 > hap2 {
-        std::mem::swap(&mut hap1, &mut hap2);
+    // Assignment of PS and HP just takes most common
+    hap1.ps = g_ps;
+    if let Some((key, _value)) = hap1_hps.into_iter().max_by_key(|(_, val)| *val) {
+        hap1.hp = Some(key);
+    }
+    hap2.ps = g_ps;
+    if let Some((key, _value)) = hap2_hps.into_iter().max_by_key(|(_, val)| *val) {
+        hap2.hp = Some(key);
     }
 
     trace!("Hap1 in {:?}", hap1);
     trace!("Hap2 in {:?}", hap2);
+
+    // Hap2 is always the higher covered allele
+    if hap2.coverage < hap1.coverage {
+        std::mem::swap(&mut hap1, &mut hap2);
+    }
 
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar
@@ -92,6 +130,11 @@ pub fn diploid_haplotypes(
         hap2.coverage += hap1.coverage;
         return vec![hap2];
     };
+    // Need some way to challenge if an outlier is by itself..
+    /*if hap1.coverage < 3 {
+        hap2.coverage += hap1.coverage;
+        return vec![hap2];
+    }*/
 
     // Now we figure out if the we need two alt alleles or not
     // The reason this takes two steps is the above code is just trying to figure out if
@@ -100,23 +143,11 @@ pub fn diploid_haplotypes(
     let remaining_coverage = coverage as f64 - applied_coverage;
     match metrics::genotyper(remaining_coverage, applied_coverage) {
         // We need the one higher covered alt
-        // and probably should assign this GT as lowq if REF
         metrics::GTstate::Ref | metrics::GTstate::Het => {
             hap2.coverage += hap1.coverage;
             vec![hap2]
         }
-        metrics::GTstate::Hom => {
-            if hap1.n == 0 {
-                // HOMALT
-                vec![hap2]
-            } else if hap2.n == 0 {
-                // Doesn't happen?
-                vec![hap1]
-            } else {
-                // Compound Het
-                vec![hap1, hap2]
-            }
-        }
+        metrics::GTstate::Hom => vec![hap1, hap2],
         _ => panic!("The genotyper can't do this, yet"),
     }
 }
