@@ -4,24 +4,24 @@ version = "1.0.0-dev"
 edition = "2021"
 
 [dependencies]
-kmedoids = { version = "0.5.3" }
-bitflags = { version = "2.5.0" }
+bitflags = { version = "2.6.0" }
 clap = { version = "4.0", features = ["derive"] }
-crossbeam-channel = { version = "0.5.12" }
-indexmap = { version = "2.2.3" }
-indicatif = { version = "0.17.8" }
-itertools = { version = "0.12.1" }
-lazy_static = { version = "1.4.0" }
+crossbeam-channel = { version = "0.5.13" }
+indexmap = { version = "2.7.0" }
+indicatif = { version = "0.17.9" }
+itertools = { version = "0.13.0" }
+kmedoids = { version = "0.5.3" }
+lazy_static = { version = "1.5.0" }
 log = { version = "0.4", features = ["std", "serde"] }
-noodles-vcf = { version = "0.57.0" }
+ndarray = "0.16.1"
+noodles-vcf = { version = "0.68.0" }
 ordered-float = { version = "4.0", default-features = false }
 page_size = { version = "0.6.0" }
-petgraph = { version = "0.6.2" }
-pretty_env_logger = { version = "0.4.0" }
-rust-htslib = { version = "0.46.0" }
-rust-lapper = { version = "1.1.0" }
-ndarray = "0.16.1"
+petgraph = { version = "0.6.5" }
+pretty_env_logger = { version = "0.5.0" }
 rand = "0.8.5"
+rust-htslib = { version = "0.49.0" }
+rust-lapper = { version = "1.1.0" }
 
 [profile.release]
 opt-level = 3
