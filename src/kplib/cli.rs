@@ -35,11 +35,11 @@ pub struct PlupArgs {
     #[arg(short, long)]
     pub bam: PathBuf,
 
-    /// CRAM file reference
+    /// Reference file for CRAMs
     #[arg(short, long)]
     pub reference: Option<PathBuf>,
 
-    /// Output file
+    /// Output plup (unsorted, uncompressed, default stdout)
     #[arg(short, long)]
     pub output: Option<PathBuf>,
 
