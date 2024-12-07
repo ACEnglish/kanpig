@@ -250,7 +250,7 @@ impl KanpigParams for GTArgs {
         let mut is_ok = true;
 
         is_ok &= validate_file(&self.io.input, "--input");
-        is_ok &= validate_reads(&self.io.reads, &self);
+        is_ok &= validate_reads(&self.io.reads, self);
         is_ok &= validate_file(&self.io.reference, "--reference");
 
         if let Some(bed_file) = &self.io.bed {
@@ -300,7 +300,7 @@ impl KanpigParams for GTArgs {
 }
 
 /// Helper function to validate a file's existence and type
-fn validate_file(path: &PathBuf, label: &str) -> bool {
+fn validate_file(path: &std::path::Path, label: &str) -> bool {
     if !path.exists() {
         error!("{} does not exist", label);
         return false;
@@ -313,11 +313,8 @@ fn validate_file(path: &PathBuf, label: &str) -> bool {
 }
 
 /// Helper function to validate reads (.bam, .cram, or .plup.gz)
-fn validate_reads(reads: &PathBuf, params: &GTArgs) -> bool {
-    if !validate_file(reads, "--reads") {
-        return false;
-    }
-    let mut is_ok = true;
+fn validate_reads(reads: &std::path::Path, params: &GTArgs) -> bool {
+    let mut is_ok = validate_file(reads, "--reads");
 
     let file_path = reads.to_str().unwrap_or_default();
     if file_path.ends_with(".bam") || file_path.ends_with(".cram") {
@@ -341,7 +338,7 @@ fn validate_reads(reads: &PathBuf, params: &GTArgs) -> bool {
             error!("Index file {} does not exist", tbi_path);
             is_ok = false;
         } else {
-            let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
+            let tbx = tbx::Reader::from_path(file_path).expect("Failed to open TBX file");
             let header = tbx.header();
             if header.len() != 1 {
                 error!("Malformed plup.gz header. Unable to validate parameters");

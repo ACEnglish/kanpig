@@ -71,11 +71,7 @@ impl ReadParser for BamParser {
             .enumerate()
         {
             coverage += 1;
-            let mut read = ReadPileup::new(
-                record,
-                self.params.sizemin as u32,
-                self.params.sizemax as u32,
-            );
+            let mut read = ReadPileup::new(record, self.params.sizemin, self.params.sizemax);
 
             if ps.is_none() && read.ps.is_some() {
                 ps = read.ps;
