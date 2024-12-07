@@ -301,8 +301,7 @@ impl KanpigParams for GTArgs {
                 let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
                 let header = tbx.header();
                 if header.len() != 1 {
-                    is_ok = false;
-                    error!("Malformed plup.gz header");
+                    error!("Malformed plup.gz header. Unable to validate parameters");
                 } else {
                     match serde_json::from_str::<PlupArgs>(&header[0][2..]) {
                         Ok(plup_args) => {
@@ -335,8 +334,7 @@ impl KanpigParams for GTArgs {
                             }
                         }
                         Err(e) => {
-                            is_ok = false;
-                            error!("Failed to parse plup.gz header: {}", e);
+                            error!("Failed to parse plup.gz header for parameter validation: {}", e);
                         }
                     }
                 }
