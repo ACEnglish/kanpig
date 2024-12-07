@@ -3,6 +3,7 @@ extern crate pretty_env_logger;
 use clap::{Parser, Subcommand};
 use rust_htslib::tbx::{self, Read as TbxRead};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Parser, Clone, Debug)]
 #[command(name = "kanpig")]
@@ -32,15 +33,15 @@ pub enum Commands {
 pub struct PlupArgs {
     /// Input BAM/CRAM file
     #[arg(short, long)]
-    pub bam: std::path::PathBuf,
+    pub bam: PathBuf,
 
     /// CRAM file reference
     #[arg(short, long)]
-    pub reference: Option<std::path::PathBuf>,
+    pub reference: Option<PathBuf>,
 
     /// Output file
     #[arg(short, long)]
-    pub output: Option<std::path::PathBuf>,
+    pub output: Option<PathBuf>,
 
     /// Number of threads
     #[arg(short, long, default_value_t = 1)]
@@ -87,22 +88,10 @@ impl KanpigParams for PlupArgs {
     fn validate(&self) -> bool {
         let mut is_ok = true;
 
-        if !self.bam.exists() {
-            error!("--bam does not exist");
-            is_ok = false;
-        } else if !self.bam.is_file() {
-            error!("--bam is not a file");
-            is_ok = false;
-        }
+        is_ok &= validate_file(&self.bam, "--bam");
 
-        if let Some(path) = &self.reference {
-            if !path.exists() {
-                error!("--reference does not exist");
-                is_ok = false;
-            } else if !path.is_file() {
-                error!("--reference is not a file");
-                is_ok = false;
-            }
+        if let Some(ref_path) = &self.reference {
+            is_ok &= validate_file(ref_path, "--reference");
         }
 
         if self.sizemin < 20 {
@@ -126,27 +115,27 @@ pub struct GTArgs {
 pub struct IOParams {
     /// VCF to genotype
     #[arg(short, long)]
-    pub input: std::path::PathBuf,
+    pub input: PathBuf,
 
     /// Reads to genotype (.bam, .cram, or .plup.gz)
     #[arg(short, long)]
-    pub reads: std::path::PathBuf,
+    pub reads: PathBuf,
 
     /// Reference reads are aligned to
     #[arg(short = 'f', long)]
-    pub reference: std::path::PathBuf,
+    pub reference: PathBuf,
 
     /// Output vcf (unsorted, uncompressed, default stdout)
     #[arg(short, long)]
-    pub out: Option<std::path::PathBuf>,
+    pub out: Option<PathBuf>,
 
     /// Regions to analyze
     #[arg(long)]
-    pub bed: Option<std::path::PathBuf>,
+    pub bed: Option<PathBuf>,
 
     /// Bed file of non-diploid regions
     #[arg(long)]
-    pub ploidy_bed: Option<std::path::PathBuf>,
+    pub ploidy_bed: Option<PathBuf>,
 
     /// Sample to apply genotypes to, default first column
     #[arg(long)]
@@ -260,122 +249,12 @@ impl KanpigParams for GTArgs {
     fn validate(&self) -> bool {
         let mut is_ok = true;
 
-        if !self.io.input.exists() {
-            error!("--input does not exist");
-            is_ok = false;
-        } else if !self.io.input.is_file() {
-            error!("--input is not a file");
-            is_ok = false;
-        }
-
-        if !self.io.reads.exists() {
-            error!("--reads does not exist");
-            is_ok = false;
-        } else if !self.io.reads.is_file() {
-            error!("--reads is not a file");
-            is_ok = false;
-        } else {
-            let file_path = self.io.reads.to_str().unwrap_or_default();
-            if file_path.ends_with(".bam") || file_path.ends_with(".cram") {
-                let index_extensions = [".bai", ".crai"];
-                let index_exists = index_extensions.iter().any(|ext| {
-                    let index_path = format!("{}{}", file_path, ext);
-                    std::path::Path::new(&index_path).exists()
-                });
-
-                if !index_exists {
-                    error!(
-                        "Index file for {} does not exist. Expected one of: {}",
-                        file_path,
-                        index_extensions.join(", ")
-                    );
-                    is_ok = false;
-                }
-            } else if file_path.ends_with(".plup.gz") {
-                let tbi_path = format!("{}.tbi", file_path);
-                if !std::path::Path::new(&tbi_path).exists() {
-                    error!("Index file {} does not exist", tbi_path);
-                    is_ok = false;
-                }
-
-                let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
-                let header = tbx.header();
-                if header.len() != 1 {
-                    error!("Malformed plup.gz header. Unable to validate parameters");
-                } else {
-                    match serde_json::from_str::<PlupArgs>(&header[0][2..]) {
-                        Ok(plup_args) => {
-                            if plup_args.sizemin != self.kd.sizemin {
-                                warn!(
-                                    "--reads created with plup --sizemin {} != gt --sizemin {}",
-                                    plup_args.sizemin, self.kd.sizemin
-                                );
-                            }
-
-                            if plup_args.sizemax != self.kd.sizemax {
-                                warn!(
-                                    "--reads created with plup --sizemax {} != gt --sizemax {}",
-                                    plup_args.sizemax, self.kd.sizemax
-                                );
-                            }
-
-                            if plup_args.mapq != self.kd.mapq {
-                                warn!(
-                                    "--reads created with plup --mapq {} != gt --mapq {}",
-                                    plup_args.mapq, self.kd.mapq
-                                );
-                            }
-
-                            if plup_args.mapflag != self.kd.mapflag {
-                                warn!(
-                                    "--reads created plup --mapflag {} != gt --mapflag {}",
-                                    plup_args.mapflag, self.kd.mapflag
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            error!(
-                                "Failed to parse plup.gz header for parameter validation: {}",
-                                e
-                            );
-                        }
-                    }
-                }
-            } else {
-                error!("Unsupported file type: {}", file_path);
-                is_ok = false;
-            }
-        }
-
-        if !self.io.reference.exists() {
-            error!("--reference does not exist");
-            is_ok = false;
-        } else if !self.io.reference.is_file() {
-            error!("--reference is not a file");
-            is_ok = false;
-        }
-
-        let mut fai_path = self.io.reference.clone();
-        fai_path.set_file_name(format!(
-            "{}.fai",
-            fai_path.file_name().unwrap().to_string_lossy()
-        ));
-        if !fai_path.exists() {
-            error!("--reference index (.fai) does not exist");
-            is_ok = false;
-        } else if !fai_path.is_file() {
-            error!("--reference index is not a file");
-            is_ok = false;
-        }
+        is_ok &= validate_file(&self.io.input, "--input");
+        is_ok &= validate_reads(&self.io.reads, &self);
+        is_ok &= validate_file(&self.io.reference, "--reference");
 
         if let Some(bed_file) = &self.io.bed {
-            if !bed_file.exists() {
-                error!("--bed does not exist");
-                is_ok = false;
-            } else if !bed_file.is_file() {
-                error!("--bed is not a file");
-                is_ok = false;
-            }
+            is_ok &= validate_file(bed_file, "--bed");
         }
 
         if self.kd.sizemin < 20 {
@@ -418,4 +297,98 @@ impl KanpigParams for GTArgs {
 
         is_ok
     }
+}
+
+/// Helper function to validate a file's existence and type
+fn validate_file(path: &PathBuf, label: &str) -> bool {
+    if !path.exists() {
+        error!("{} does not exist", label);
+        return false;
+    }
+    if !path.is_file() {
+        error!("{} is not a file", label);
+        return false;
+    }
+    true
+}
+
+/// Helper function to validate reads (.bam, .cram, or .plup.gz)
+fn validate_reads(reads: &PathBuf, params: &GTArgs) -> bool {
+    if !validate_file(reads, "--reads") {
+        return false;
+    }
+    let mut is_ok = true;
+
+    let file_path = reads.to_str().unwrap_or_default();
+    if file_path.ends_with(".bam") || file_path.ends_with(".cram") {
+        let index_extensions = [".bai", ".crai"];
+        let index_exists = index_extensions.iter().any(|ext| {
+            let index_path = format!("{}{}", file_path, ext);
+            std::path::Path::new(&index_path).exists()
+        });
+
+        if !index_exists {
+            error!(
+                "Index file for {} does not exist. Expected one of: {}",
+                file_path,
+                index_extensions.join(", ")
+            );
+            is_ok = false;
+        }
+    } else if file_path.ends_with(".plup.gz") {
+        let tbi_path = format!("{}.tbi", file_path);
+        if !std::path::Path::new(&tbi_path).exists() {
+            error!("Index file {} does not exist", tbi_path);
+            is_ok = false;
+        } else {
+            let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
+            let header = tbx.header();
+            if header.len() != 1 {
+                error!("Malformed plup.gz header. Unable to validate parameters");
+            } else {
+                match serde_json::from_str::<PlupArgs>(&header[0][2..]) {
+                    Ok(plup_args) => {
+                        if plup_args.sizemin != params.kd.sizemin {
+                            warn!(
+                                "--reads created with plup --sizemin {} != gt --sizemin {}",
+                                plup_args.sizemin, params.kd.sizemin
+                            );
+                        }
+
+                        if plup_args.sizemax != params.kd.sizemax {
+                            warn!(
+                                "--reads created with plup --sizemax {} != gt --sizemax {}",
+                                plup_args.sizemax, params.kd.sizemax
+                            );
+                        }
+
+                        if plup_args.mapq != params.kd.mapq {
+                            warn!(
+                                "--reads created with plup --mapq {} != gt --mapq {}",
+                                plup_args.mapq, params.kd.mapq
+                            );
+                        }
+
+                        if plup_args.mapflag != params.kd.mapflag {
+                            warn!(
+                                "--reads created plup --mapflag {} != gt --mapflag {}",
+                                plup_args.mapflag, params.kd.mapflag
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        error!(
+                            "Failed to parse plup.gz header for parameter validation: {}",
+                            e
+                        );
+                    }
+                }
+            }
+        }
+    } else {
+        error!("Unsupported file type: {}", file_path);
+        is_ok = false;
+    }
+
+    is_ok
 }
