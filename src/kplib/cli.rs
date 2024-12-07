@@ -91,7 +91,7 @@ impl KanpigParams for PlupArgs {
         is_ok &= validate_file(&self.bam, "--bam");
 
         if let Some(ref_path) = &self.reference {
-            is_ok &= validate_file(ref_path, "--reference");
+            is_ok &= validate_reference(ref_path);
         }
 
         if self.sizemin < 20 {
@@ -251,14 +251,7 @@ impl KanpigParams for GTArgs {
 
         is_ok &= validate_file(&self.io.input, "--input");
         is_ok &= validate_reads(&self.io.reads, self);
-        is_ok &= validate_file(&self.io.reference, "--reference");
-        
-        let mut fai_path = self.io.reference.clone();
-        fai_path.set_file_name(format!(
-            "{}.fai",
-            fai_path.file_name().unwrap().to_string_lossy()
-        ));
-        is_ok &= validate_file(&fai_path, "--reference index (.fai)");
+        is_ok &= validate_reference(&self.io.reference);
 
         if let Some(bed_file) = &self.io.bed {
             is_ok &= validate_file(bed_file, "--bed");
@@ -393,6 +386,20 @@ fn validate_reads(reads: &std::path::Path, params: &GTArgs) -> bool {
         error!("Unsupported file type: {}", file_path);
         is_ok = false;
     }
+
+    is_ok
+}
+
+/// Checks reference and its .fai index
+fn validate_reference(reference: &PathBuf) -> bool {
+    let mut is_ok = validate_file(reference, "--reference");
+
+    let mut fai_path = reference.clone();
+    fai_path.set_file_name(format!(
+        "{}.fai",
+        fai_path.file_name().unwrap().to_string_lossy()
+    ));
+    is_ok &= validate_file(&fai_path, "--reference index (.fai)");
 
     is_ok
 }
