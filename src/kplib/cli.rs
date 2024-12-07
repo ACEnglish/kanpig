@@ -334,7 +334,10 @@ impl KanpigParams for GTArgs {
                             }
                         }
                         Err(e) => {
-                            error!("Failed to parse plup.gz header for parameter validation: {}", e);
+                            error!(
+                                "Failed to parse plup.gz header for parameter validation: {}",
+                                e
+                            );
                         }
                     }
                 }
