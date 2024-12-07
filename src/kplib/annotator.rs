@@ -179,7 +179,6 @@ fn handle_diploid_two_paths<'a>(
     path2: &PathScore,
     coverage: u64,
 ) -> HelperReturn<'a> {
-
     match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
         (true, true) => (
             "1|1",
@@ -214,10 +213,12 @@ fn finalize_annotation(
     paths: &[PathScore],
 ) -> GenotypeAnno {
     let ref_cov = coverage as f64 - alt_cov;
+
     let gt_obs = metrics::genotyper(ref_cov, alt_cov);
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
+
     let ps = if !paths.is_empty() { paths[0].ps } else { None };
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
@@ -228,16 +229,18 @@ fn finalize_annotation(
         .collect();
 
     let mut filt = FiltFlags::PASS;
-    // The genotype from AD doesn't match path genotype
     if gt_obs != gt_path {
         filt |= FiltFlags::GTMISMATCH;
     }
+
     if gq < 5.0 {
         filt |= FiltFlags::LOWGQ;
     }
+
     if coverage < 5 {
         filt |= FiltFlags::LOWCOV;
     }
+
     if gt_path != metrics::GTstate::Ref {
         if sq < 5.0 {
             filt |= FiltFlags::LOWSQ;
@@ -246,6 +249,7 @@ fn finalize_annotation(
             filt |= FiltFlags::LOWALT;
         }
     }
+
     if !full_target {
         filt |= FiltFlags::PARTIAL;
     }

@@ -56,10 +56,11 @@ impl VcfWriter {
 
         // Setup FORMAT header definitions
         let all_formats = header.formats_mut();
+        all_formats.clear();
         let num1 = format::Number::Count(1);
         // Edits to these must be sync'd with GenotypeAnno::make_fields
         let format_definitions = vec![
-            ("GT", num1, format::Type::String, "Kanplug genotype"),
+            ("GT", num1, format::Type::String, "Kanpig genotype"),
             ("FT", num1, format::Type::Integer, "Kanpig filter"),
             ("SQ", num1, format::Type::Integer, "Phred quality of being non-ref"),
             ("GQ", num1, format::Type::Integer, "Phred quality of genotype"),
