@@ -1,6 +1,8 @@
 extern crate pretty_env_logger;
 
 use clap::{Parser, Subcommand};
+use rust_htslib::tbx::{self, Read as TbxRead};
+use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Clone, Debug)]
 #[command(name = "kanpig")]
@@ -26,7 +28,7 @@ pub enum Commands {
     Plup(PlupArgs),
 }
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 pub struct PlupArgs {
     /// Input BAM/CRAM file
     #[arg(short, long)]
@@ -179,11 +181,11 @@ pub struct KDParams {
 
     /// Minimum size of variant to analyze
     #[arg(long, default_value_t = 50)]
-    pub sizemin: u64,
+    pub sizemin: u32,
 
     /// Maximum size of variant to analyze
     #[arg(long, default_value_t = 10000)]
-    pub sizemax: u64,
+    pub sizemax: u32,
 
     /// Maximum number of paths in a graph to traverse
     #[arg(long, default_value_t = 5000)]
@@ -272,6 +274,76 @@ impl KanpigParams for GTArgs {
         } else if !self.io.reads.is_file() {
             error!("--reads is not a file");
             is_ok = false;
+        } else {
+            let file_path = self.io.reads.to_str().unwrap_or_default();
+            if file_path.ends_with(".bam") || file_path.ends_with(".cram") {
+                let index_extensions = [".bai", ".crai"];
+                let index_exists = index_extensions.iter().any(|ext| {
+                    let index_path = format!("{}{}", file_path, ext);
+                    std::path::Path::new(&index_path).exists()
+                });
+
+                if !index_exists {
+                    error!(
+                        "Index file for {} does not exist. Expected one of: {}",
+                        file_path,
+                        index_extensions.join(", ")
+                    );
+                    is_ok = false;
+                }
+            } else if file_path.ends_with(".plup.gz") {
+                let tbi_path = format!("{}.tbi", file_path);
+                if !std::path::Path::new(&tbi_path).exists() {
+                    error!("Index file {} does not exist", tbi_path);
+                    is_ok = false;
+                }
+
+                let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
+                let header = tbx.header();
+                if header.len() != 1 {
+                    is_ok = false;
+                    error!("Malformed plup.gz header");
+                } else {
+                    match serde_json::from_str::<PlupArgs>(&header[0][2..]) {
+                        Ok(plup_args) => {
+                            if plup_args.sizemin != self.kd.sizemin {
+                                warn!(
+                                    "--reads created with plup --sizemin {} != gt --sizemin {}",
+                                    plup_args.sizemin, self.kd.sizemin
+                                );
+                            }
+
+                            if plup_args.sizemax != self.kd.sizemax {
+                                warn!(
+                                    "--reads created with plup --sizemax {} != gt --sizemax {}",
+                                    plup_args.sizemax, self.kd.sizemax
+                                );
+                            }
+
+                            if plup_args.mapq != self.kd.mapq {
+                                warn!(
+                                    "--reads created with plup --mapq {} != gt --mapq {}",
+                                    plup_args.mapq, self.kd.mapq
+                                );
+                            }
+
+                            if plup_args.mapflag != self.kd.mapflag {
+                                warn!(
+                                    "--reads created plup --mapflag {} != gt --mapflag {}",
+                                    plup_args.mapflag, self.kd.mapflag
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            is_ok = false;
+                            error!("Failed to parse plup.gz header: {}", e);
+                        }
+                    }
+                }
+            } else {
+                error!("Unsupported file type: {}", file_path);
+                is_ok = false;
+            }
         }
 
         if !self.io.reference.exists() {

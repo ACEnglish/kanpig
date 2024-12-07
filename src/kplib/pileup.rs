@@ -139,7 +139,7 @@ impl ReadPileup {
     /// let pileup = ReadPileup::decode(line, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn decode(line: &[u8], sizemin: u64, sizemax: u64) -> Option<Self> {
+    pub fn decode(line: &[u8], sizemin: u32, sizemax: u32) -> Option<Self> {
         let line_str = std::str::from_utf8(line).ok()?;
         let mut fields = line_str.split('\t');
 
@@ -154,7 +154,8 @@ impl ReadPileup {
                 .split(',')
                 .filter_map(|entry| PileupVariant::decode(entry, start))
                 .filter(|variant| {
-                    variant.size.unsigned_abs() >= sizemin && variant.size.unsigned_abs() <= sizemax
+                    variant.size.unsigned_abs() >= sizemin as u64
+                        && variant.size.unsigned_abs() <= sizemax as u64
                 })
                 .collect(),
         };

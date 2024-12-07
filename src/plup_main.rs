@@ -149,6 +149,11 @@ pub fn plup_main(args: PlupArgs) {
                 }
                 None => Box::new(BufWriter::new(std::io::stdout())),
             };
+            // Header
+            let serialized = serde_json::to_string(&m_args).expect("Error writing header");
+            let prefixed = format!("# {}\n", serialized);
+            let _ = writer.write_all(prefixed.as_bytes());
+
             let bam = bam::Reader::from_path(m_args.bam).expect("Error opening BAM file");
             let header_main = bam::Header::from_template(bam.header());
             let header = bam::HeaderView::from_header(&header_main);

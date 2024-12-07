@@ -58,7 +58,7 @@ impl<R: BufRead> VcfChunker<R> {
             return false;
         }
 
-        let size = entry.size();
+        let size = entry.size() as u32;
         if self.params.sizemin > size || self.params.sizemax < size {
             return false;
         }

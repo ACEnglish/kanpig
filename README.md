@@ -24,7 +24,7 @@ Kanpig can also create a pileup index from a bam that is smaller and faster for 
 for long-term projects or multiple reanalysis operations like N+1 for a cohort.
 
 ```
-kanpig plup --bam alignments.bam | bedtools sort | bgzip > alignments.plup.gz
+kanpig plup --bam alignments.bam | bedtools sort -header | bgzip > alignments.plup.gz
 tabix -p bed alignments.plup.gz
 ```
 
