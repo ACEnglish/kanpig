@@ -117,7 +117,7 @@ pub struct IOParams {
     #[arg(short, long)]
     pub input: PathBuf,
 
-    /// Reads to genotype (.bam, .cram, or .plup.gz)
+    /// Reads to genotype (indexed .bam, .cram, or .plup.gz)
     #[arg(short, long)]
     pub reads: PathBuf,
 
@@ -128,6 +128,10 @@ pub struct IOParams {
     /// Output vcf (unsorted, uncompressed, default stdout)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
+
+    /// Number of threads
+    #[arg(short, long, default_value_t = 1)]
+    pub threads: usize,
 
     /// Regions to analyze
     #[arg(long)]
@@ -140,10 +144,6 @@ pub struct IOParams {
     /// Sample to apply genotypes to, default first column
     #[arg(long)]
     pub sample: Option<String>,
-
-    /// Number of threads
-    #[arg(long, default_value_t = 1)]
-    pub threads: usize,
 
     /// Verbose logging
     #[arg(long, default_value_t = false)]
@@ -216,14 +216,6 @@ pub struct KDParams {
     #[arg(long, default_value_t = 1.0)]
     pub hps_weight: f32,
 
-    /// Search for a 1-to-1 match before graph traversal
-    #[arg(long, default_value_t = false)]
-    pub try_exact: bool,
-
-    /// Prune paths which don't traverse 1-to-1 nodes
-    #[arg(long, default_value_t = false)]
-    pub prune: bool,
-
     /// Minimum mapq of reads to consider
     #[arg(long, default_value_t = 5)]
     pub mapq: u8,
@@ -232,7 +224,15 @@ pub struct KDParams {
     #[arg(long, default_value_t = 3840)]
     pub mapflag: u16,
 
-    /// Maximum homopolymer length to kmerize (off=0)
+    /// (Experimental) Search for a 1-to-1 match before graph traversal
+    #[arg(long, default_value_t = false)]
+    pub try_exact: bool,
+
+    /// (Experimental) Prune paths which don't traverse 1-to-1 nodes
+    #[arg(long, default_value_t = false)]
+    pub prune: bool,
+
+    /// (Experimental) Maximum homopolymer length to kmerize (off=0)
     #[arg(long, default_value_t = 0)]
     pub maxhom: usize,
 }
@@ -252,6 +252,13 @@ impl KanpigParams for GTArgs {
         is_ok &= validate_file(&self.io.input, "--input");
         is_ok &= validate_reads(&self.io.reads, self);
         is_ok &= validate_file(&self.io.reference, "--reference");
+        
+        let mut fai_path = self.io.reference.clone();
+        fai_path.set_file_name(format!(
+            "{}.fai",
+            fai_path.file_name().unwrap().to_string_lossy()
+        ));
+        is_ok &= validate_file(&fai_path, "--reference index (.fai)");
 
         if let Some(bed_file) = &self.io.bed {
             is_ok &= validate_file(bed_file, "--bed");
