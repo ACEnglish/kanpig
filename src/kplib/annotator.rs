@@ -77,22 +77,14 @@ fn diploid(
     paths: &[PathScore],
     coverage: u64,
 ) -> GenotypeAnno {
-    let (gt_str, gt_path, alt_cov, full_target) = match &paths {
+    let handle = match &paths {
         [] => handle_diploid_no_paths(coverage),
         [p] => handle_diploid_single_path(var_idx, p, coverage),
         [p1, p2] => handle_diploid_two_paths(var_idx, p1, p2, coverage),
         _ => panic!("Unexpected number of paths for diploid region"),
     };
 
-    finalize_annotation(
-        entry,
-        gt_str,
-        gt_path,
-        coverage,
-        alt_cov,
-        full_target,
-        paths,
-    )
+    finalize_annotation(entry, handle, paths, coverage)
 }
 
 /// Helper for zero ploidy regions.
@@ -119,27 +111,25 @@ fn haploid(
     coverage: u64,
 ) -> GenotypeAnno {
     let path1 = &paths[0];
-    let (gt_str, gt_path, alt_cov) = match path1.path.contains(var_idx) {
-        true => ("1", metrics::GTstate::Hom, path1.coverage.unwrap() as f64),
+    let handle = match path1.path.contains(var_idx) {
+        true => (
+            "1",
+            metrics::GTstate::Hom,
+            path1.coverage.unwrap() as f64,
+            true,
+        ),
         // sometimes I used the same path twice
-        false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0),
-        false => (".", metrics::GTstate::Non, 0.0),
+        false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0, true),
+        false => (".", metrics::GTstate::Non, 0.0, true),
     };
 
-    finalize_annotation(
-        entry,
-        gt_str,
-        gt_path,
-        coverage,
-        alt_cov,
-        path1.full_target,
-        paths,
-    )
+    finalize_annotation(entry, handle, paths, coverage)
 }
 
-type HelperReturn<'a> = (&'a str, metrics::GTstate, f64, bool);
+/// GT str, GTstate, alt_cov, is_fulltarget
+type HandleReturn<'a> = (&'a str, metrics::GTstate, f64, bool);
 
-fn handle_diploid_no_paths<'a>(coverage: u64) -> HelperReturn<'a> {
+fn handle_diploid_no_paths<'a>(coverage: u64) -> HandleReturn<'a> {
     if coverage != 0 {
         ("0|0", metrics::GTstate::Ref, 0.0, true)
     } else {
@@ -151,7 +141,7 @@ fn handle_diploid_single_path<'a>(
     var_idx: &NodeIndex,
     path: &PathScore,
     coverage: u64,
-) -> HelperReturn<'a> {
+) -> HandleReturn<'a> {
     if !path.path.contains(var_idx) {
         ("0|0", metrics::GTstate::Ref, 0.0, true)
     } else {
@@ -178,7 +168,7 @@ fn handle_diploid_two_paths<'a>(
     path1: &PathScore,
     path2: &PathScore,
     coverage: u64,
-) -> HelperReturn<'a> {
+) -> HandleReturn<'a> {
     match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
         (true, true) => (
             "1|1",
@@ -205,13 +195,11 @@ fn handle_diploid_two_paths<'a>(
 
 fn finalize_annotation(
     entry: RecordBuf,
-    gt_str: &str,
-    gt_path: metrics::GTstate,
-    coverage: u64,
-    alt_cov: f64,
-    full_target: bool,
+    handle: HandleReturn,
     paths: &[PathScore],
+    coverage: u64,
 ) -> GenotypeAnno {
+    let (gt_str, gt_path, alt_cov, full_target) = handle;
     let ref_cov = coverage as f64 - alt_cov;
 
     let gt_obs = metrics::genotyper(ref_cov, alt_cov);
