@@ -77,10 +77,10 @@ fn diploid(
     paths: &[PathScore],
     coverage: u64,
 ) -> GenotypeAnno {
-    let (gt_str, gt_path, alt_cov, full_target) = match paths.len() {
-        0 => handle_diploid_no_paths(coverage),
-        1 => handle_diploid_single_path(var_idx, &paths[0], coverage),
-        2 => handle_diploid_two_paths(var_idx, paths, coverage),
+    let (gt_str, gt_path, alt_cov, full_target) = match &paths {
+        [] => handle_diploid_no_paths(coverage),
+        [p] => handle_diploid_single_path(var_idx, p, coverage),
+        [p1, p2] => handle_diploid_two_paths(var_idx, p1, p2, coverage),
         _ => panic!("Unexpected number of paths for diploid region"),
     };
 
@@ -175,11 +175,10 @@ fn handle_diploid_single_path<'a>(
 
 fn handle_diploid_two_paths<'a>(
     var_idx: &NodeIndex,
-    paths: &[PathScore],
+    path1: &PathScore,
+    path2: &PathScore,
     coverage: u64,
 ) -> HelperReturn<'a> {
-    let path1 = &paths[0];
-    let path2 = &paths[1];
 
     match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
         (true, true) => (
