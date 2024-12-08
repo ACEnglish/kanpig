@@ -2,7 +2,7 @@ use crate::kplib::{GenotypeAnno, KDParams, KdpVcf, Ploidy, Regions};
 use crossbeam_channel::Sender;
 use noodles_vcf::{self as vcf, variant::RecordBuf};
 use petgraph::graph::NodeIndex;
-use std::{collections::VecDeque, io::BufRead};
+use std::io::BufRead;
 
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
@@ -64,11 +64,9 @@ impl<R: BufRead> VcfChunker<R> {
         }
 
         // Is it inside a region
-        let mut default = VecDeque::new();
-        let m_coords = self
-            .regions
-            .get_mut(entry.reference_sequence_name())
-            .unwrap_or(&mut default);
+        let Some(m_coords) = self.regions.get_mut(entry.reference_sequence_name()) else {
+            return false;
+        };
 
         if m_coords.is_empty() {
             return false;

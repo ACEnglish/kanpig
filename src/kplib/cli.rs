@@ -3,7 +3,7 @@ extern crate pretty_env_logger;
 use clap::{Parser, Subcommand};
 use rust_htslib::tbx::{self, Read as TbxRead};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser, Clone, Debug)]
 #[command(name = "kanpig")]
@@ -300,7 +300,7 @@ impl KanpigParams for GTArgs {
 }
 
 /// Helper function to validate a file's existence and type
-fn validate_file(path: &std::path::Path, label: &str) -> bool {
+fn validate_file(path: &Path, label: &str) -> bool {
     if !path.exists() {
         error!("{} does not exist", label);
         return false;
@@ -313,7 +313,7 @@ fn validate_file(path: &std::path::Path, label: &str) -> bool {
 }
 
 /// Helper function to validate reads (.bam, .cram, or .plup.gz)
-fn validate_reads(reads: &std::path::Path, params: &GTArgs) -> bool {
+fn validate_reads(reads: &Path, params: &GTArgs) -> bool {
     let mut is_ok = validate_file(reads, "--reads");
 
     let file_path = reads.to_str().unwrap_or_default();
@@ -321,7 +321,7 @@ fn validate_reads(reads: &std::path::Path, params: &GTArgs) -> bool {
         let index_extensions = [".bai", ".crai"];
         let index_exists = index_extensions.iter().any(|ext| {
             let index_path = format!("{}{}", file_path, ext);
-            std::path::Path::new(&index_path).exists()
+            Path::new(&index_path).exists()
         });
 
         if !index_exists {
@@ -334,7 +334,7 @@ fn validate_reads(reads: &std::path::Path, params: &GTArgs) -> bool {
         }
     } else if file_path.ends_with(".plup.gz") {
         let tbi_path = format!("{}.tbi", file_path);
-        if !std::path::Path::new(&tbi_path).exists() {
+        if !Path::new(&tbi_path).exists() {
             error!("Index file {} does not exist", tbi_path);
             is_ok = false;
         } else {
@@ -391,10 +391,10 @@ fn validate_reads(reads: &std::path::Path, params: &GTArgs) -> bool {
 }
 
 /// Checks reference and its .fai index
-fn validate_reference(reference: &PathBuf) -> bool {
+fn validate_reference(reference: &Path) -> bool {
     let mut is_ok = validate_file(reference, "--reference");
 
-    let mut fai_path = reference.clone();
+    let mut fai_path = reference.to_path_buf();
     fai_path.set_file_name(format!(
         "{}.fai",
         fai_path.file_name().unwrap().to_string_lossy()
