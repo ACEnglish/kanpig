@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "kanpig"
-version = "1.0.0-dev"
+version = "1.0.0"
 dependencies = [
  "bitflags",
  "clap",

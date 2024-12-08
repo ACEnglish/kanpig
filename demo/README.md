@@ -32,6 +32,6 @@ were correctly genotyped. Alternatively, open `answer.vcf.gz` to read the genoty
 
 Extra Information
 -----------------
-- Typical time on a "normal" desktop computer - 3 seconds.
+- Typical time on a "normal" desktop computer - <1 second.
 - Expected output - 4 correctly genotyped SVs in a vcf.
 
