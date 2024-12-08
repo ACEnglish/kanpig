@@ -9,7 +9,8 @@ use std::{
 
 use crate::kplib::{
     build_region_tree, diploid_haplotypes, haploid_haplotypes, BamParser, GTArgs, GenotypeAnno,
-    PathScore, Ploidy, PloidyRegions, PlupParser, ReadParser, Variants, VcfChunker, VcfWriter,
+    IOParams, PathScore, Ploidy, PloidyRegions, PlupParser, ReadParser, Variants, VcfChunker,
+    VcfWriter,
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
@@ -36,6 +37,123 @@ fn hp_sorter(a: &Option<u8>, b: &Option<u8>) -> std::cmp::Ordering {
     }
 }
 
+fn write_thread(
+    result_receiver: Receiver<OutputType>,
+    wt_io: IOParams,
+    wt_header: vcf::Header,
+    wt_num_variants: Arc<Mutex<u64>>,
+) {
+    let mut m_writer = VcfWriter::new(&wt_io.out, wt_header.clone(), &wt_io.sample);
+
+    let mut pbar: Option<ProgressBar> = None;
+    let sty =
+        ProgressStyle::with_template(" [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed")
+            .unwrap()
+            .progress_chars("##-");
+
+    let mut phase_group: i32 = 0;
+    let mut completed_variants: u64 = 0;
+    loop {
+        match result_receiver.recv() {
+            Ok(None) | Err(_) => {
+                pbar.expect("I actually shouldn't be expecting the bar")
+                    .finish();
+                break;
+            }
+            Ok(Some(result)) => {
+                let mut rsize: u64 = 0;
+                for entry in result {
+                    m_writer.anno_write(entry, phase_group);
+                    rsize += 1;
+                }
+
+                if let Some(ref mut bar) = pbar {
+                    bar.inc(rsize);
+                } else {
+                    completed_variants += rsize;
+                    // check if the reader is finished so we can setup the pbar
+                    let value = *wt_num_variants.lock().unwrap();
+                    if value != 0 {
+                        let t_bar = ProgressBar::new(value).with_style(sty.clone());
+                        t_bar.inc(completed_variants);
+                        pbar = Some(t_bar);
+                    }
+                }
+                phase_group += 1;
+            }
+        }
+    }
+    if m_writer.iupac_fixed {
+        warn!("Some IUPAC codes in REF sequences have been fixed in output");
+    }
+    info!("genotype counts: {:#?}", m_writer.gtcounts);
+}
+
+fn task_thread(
+    m_args: GTArgs,
+    m_receiver: Receiver<InputType>,
+    m_result_sender: Sender<OutputType>,
+    m_ploidy: PloidyRegions,
+) {
+    let reference = faidx::Reader::from_path(&m_args.io.reference).unwrap();
+    let mut m_reads: Box<dyn ReadParser> =
+        match m_args.io.reads.file_name().and_then(|name| name.to_str()) {
+            Some(name) if name.ends_with(".plup.gz") => Box::new(PlupParser::new(
+                m_args.io.reads,
+                reference,
+                m_args.kd.clone(),
+            )),
+            _ => Box::new(BamParser::new(
+                m_args.io.reads,
+                m_args.io.reference,
+                reference,
+                m_args.kd.clone(),
+            )),
+        };
+
+    loop {
+        match m_receiver.recv() {
+            Ok(None) | Err(_) => break,
+            Ok(Some(chunk)) => {
+                let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
+
+                let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
+                // For zero, we don't have to waste time going into the bam
+                if ploidy == Ploidy::Zero {
+                    m_result_sender
+                        .send(Some(m_graph.take_annotated(&[], 0, &ploidy)))
+                        .unwrap();
+                    continue;
+                }
+
+                let (haps, coverage) =
+                    m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+
+                let haps = match ploidy {
+                    Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),
+                    _ => diploid_haplotypes(haps, coverage, &m_args.kd),
+                    // and then eventually this could allow a --ploidy flag to branch to
+                    // polyploid_haplotypes
+                };
+                debug!("{:?}", haps);
+
+                let mut paths: Vec<PathScore> = haps
+                    .iter()
+                    .map(|h| m_graph.apply_coverage(h, &m_args.kd))
+                    .filter(|p| *p != PathScore::default())
+                    .collect();
+                paths.sort_by(|a, b| hp_sorter(&a.hp, &b.hp));
+
+                // Sort paths based on their HP if set
+                m_result_sender
+                    .send(Some(m_graph.take_annotated(&paths, coverage, &ploidy)))
+                    .unwrap();
+            }
+        }
+    }
+    // This should give a result
+}
+
 pub fn genotype_main(args: GTArgs) {
     let mut input_vcf = vcf::io::reader::Builder::default()
         .build_from_path(args.io.input.clone())
@@ -60,69 +178,12 @@ pub fn genotype_main(args: GTArgs) {
             let m_ploidy = ploidy.clone();
 
             thread::spawn(move || {
-                let reference = faidx::Reader::from_path(&m_args.io.reference).unwrap();
-                let mut m_reads: Box<dyn ReadParser> =
-                    match m_args.io.reads.file_name().and_then(|name| name.to_str()) {
-                        Some(name) if name.ends_with(".plup.gz") => Box::new(PlupParser::new(
-                            m_args.io.reads,
-                            reference,
-                            m_args.kd.clone(),
-                        )),
-                        _ => Box::new(BamParser::new(
-                            m_args.io.reads,
-                            m_args.io.reference,
-                            reference,
-                            m_args.kd.clone(),
-                        )),
-                    };
-
-                loop {
-                    match m_receiver.recv() {
-                        Ok(None) | Err(_) => break,
-                        Ok(Some(chunk)) => {
-                            let mut m_graph =
-                                Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
-
-                            let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
-                            // For zero, we don't have to waste time going into the bam
-                            if ploidy == Ploidy::Zero {
-                                m_result_sender
-                                    .send(Some(m_graph.take_annotated(&[], 0, &ploidy)))
-                                    .unwrap();
-                                continue;
-                            }
-
-                            let (haps, coverage) =
-                                m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-
-                            let haps = match ploidy {
-                                Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),
-                                _ => diploid_haplotypes(haps, coverage, &m_args.kd),
-                                // and then eventually this could allow a --ploidy flag to branch to
-                                // polyploid_haplotypes
-                            };
-                            debug!("{:?}", haps);
-
-                            let mut paths: Vec<PathScore> = haps
-                                .iter()
-                                .map(|h| m_graph.apply_coverage(h, &m_args.kd))
-                                .filter(|p| *p != PathScore::default())
-                                .collect();
-                            paths.sort_by(|a, b| hp_sorter(&a.hp, &b.hp));
-
-                            // Sort paths based on their HP if set
-                            m_result_sender
-                                .send(Some(m_graph.take_annotated(&paths, coverage, &ploidy)))
-                                .unwrap();
-                        }
-                    }
-                }
-                // This should give a result
+                task_thread(m_args, m_receiver, m_result_sender, m_ploidy);
             })
         })
         .collect();
 
-    //Before we start the workers, we'll start the writer
+    // Before we start the workers, we'll start the writer
     // This is the semaphore for the progress bar that communicates between main and writer
     let num_variants = Arc::new(Mutex::new(0));
 
@@ -131,51 +192,7 @@ pub fn genotype_main(args: GTArgs) {
     let wt_num_variants = num_variants.clone();
 
     let write_handler = std::thread::spawn(move || {
-        let mut m_writer = VcfWriter::new(&wt_io.out, wt_header.clone(), &wt_io.sample);
-
-        let mut pbar: Option<ProgressBar> = None;
-        let sty = ProgressStyle::with_template(
-            " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
-        )
-        .unwrap()
-        .progress_chars("##-");
-
-        let mut phase_group: i32 = 0;
-        let mut completed_variants: u64 = 0;
-        loop {
-            match result_receiver.recv() {
-                Ok(None) | Err(_) => {
-                    pbar.expect("I actually shouldn't be expecting the bar")
-                        .finish();
-                    break;
-                }
-                Ok(Some(result)) => {
-                    let mut rsize: u64 = 0;
-                    for entry in result {
-                        m_writer.anno_write(entry, phase_group);
-                        rsize += 1;
-                    }
-
-                    if let Some(ref mut bar) = pbar {
-                        bar.inc(rsize);
-                    } else {
-                        completed_variants += rsize;
-                        // check if the reader is finished so we can setup the pbar
-                        let value = *wt_num_variants.lock().unwrap();
-                        if value != 0 {
-                            let t_bar = ProgressBar::new(value).with_style(sty.clone());
-                            t_bar.inc(completed_variants);
-                            pbar = Some(t_bar);
-                        }
-                    }
-                    phase_group += 1;
-                }
-            }
-        }
-        if m_writer.iupac_fixed {
-            warn!("Some IUPAC codes in REF sequences have been fixed in output");
-        }
-        info!("genotype counts: {:#?}", m_writer.gtcounts);
+        write_thread(result_receiver, wt_io, wt_header.clone(), wt_num_variants);
     });
 
     info!("building variant graphs");
