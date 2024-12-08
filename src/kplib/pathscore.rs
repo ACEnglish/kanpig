@@ -90,7 +90,7 @@ impl PathScore {
                 );
             }
 
-            let seqsim = metrics::seqsim(
+            let seqsim = metrics::seqsim_corrected(
                 path_k.as_ref().unwrap(),
                 &hap_parts.kfeat,
                 params.minkfreq as f32,

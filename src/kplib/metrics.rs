@@ -36,6 +36,75 @@ pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
     1.0 - (neum / deno)
 }
 
+pub fn seqsim_corrected(a: &[f32], b: &[f32], mink: f32) -> f32 {
+    let mut deno: f32 = 0.0;
+    let mut neum: f32 = 0.0;
+
+    // Correction function
+    let correction = |v: f32, corr: f32| {
+        let mut t = v.abs();
+        t = (t / corr) + (t % corr);
+        if v < 0.0 { -t } else { t }
+    };
+
+    // Combine a and b to calculate absolute values
+    let mut view: Vec<f32> = a.iter().chain(b.iter()).map(|&v| v.abs()).collect();
+
+    // Filter values greater than mink
+    view.retain(|&v| v > mink);
+
+    // Calculate median
+    view.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let corr = if view.is_empty() {
+        1.0 // Default correction factor if the array is empty
+    } else {
+        let mid = view.len() / 2;
+        if view.len() % 2 == 0 {
+            (view[mid - 1] + view[mid]) / 2.0
+        } else {
+            view[mid]
+        }
+    };
+
+    // Calculate 10th percentile threshold
+    let thresh = if view.is_empty() {
+        0.0 // Default threshold if the array is empty
+    } else {
+        let p_index = (view.len() as f32 * 0.1).floor() as usize;
+        view[p_index]
+    };
+
+    // Iterate through a and b, applying corrections and summing numerator/denominator
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        let mut total_d = x.abs() + y.abs();
+
+        let (x_corr, y_corr) = if total_d > thresh {
+            let x_corr = correction(x, corr);
+            let y_corr = correction(y, corr);
+            total_d = x_corr.abs() + y_corr.abs();
+            (x_corr, y_corr)
+        } else {
+            (x, y)
+        };
+
+        if total_d > mink {
+            neum += (x_corr - y_corr).abs();
+            deno += total_d;
+        }
+    }
+
+    if deno == 0.0 {
+        return 0.0;
+    }
+
+    if neum == 0.0 {
+        return 1.0;
+    }
+
+    1.0 - (neum / deno)
+}
+
+
 /// Computes size similarity
 /// The similarity is defined as the ratio of the smaller size to the larger size,
 /// with special handling for cases where either size is zero.
