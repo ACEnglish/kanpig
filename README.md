@@ -3,30 +3,35 @@ kanpig - Kmer ANalysis of PIleups for Genotyping
 ------
 A fast tool for genotyping structural variants with long-reads.
 
-*Kanpig is currently under active research and development. We make no guarantees about its accuracy or the stability of features 
-before version 1.0.*
-
 # 📥 Install
+Binaries are available in [releases](https://github.com/ACEnglish/kanpig/releases).
+
+Alternatively, build from source with:
 ```
 git clone https://github.com/ACEnglish/kanpig
 cd kanpig
 cargo build --release
 # executable in ./target/release/kanpig
 ```
-Alternatively, binaries are available in [releases](https://github.com/ACEnglish/kanpig/releases).
 
 # 🚀 Quick Start
 ```
-kanpig --input variant.vcf.gz --bam alignments.bam --reference ref.fa --out output.vcf
+kanpig gt --input variant.vcf.gz --reads alignments.bam --reference ref.fa --out output.vcf
 ```
 See `kanpig -h` for all available parameters, most of which are detailed below.
+
+Kanpig can also create a pileup index from a bam that is smaller and faster for the genotyper to parse. This is useful
+for long-term projects or multiple reanalysis operations like N+1 for a cohort.
+
+```
+kanpig plup --bam alignments.bam | bedtools sort -header | bgzip > alignments.plup.gz
+tabix -p bed alignments.plup.gz
+```
 
 # ⚠️ Current Limitations
 * Kanpig expects sequence resolved SVs. Variants with symbolic alts (e.g. `<DEL>`) and BNDs are not parsed.
 * Kanpig only looks at read pileups and does not consider split or soft-clipped alignment information. This means
   variants above ~10kbp should be skipped with the `--sizemax` parameter.
-* Please do not publish manuscripts benchmarking kanpig results until we've completed our manuscript. We're aiming to have a preprint 
-available early Q3 2024.
 
 # 🔧 Core Parameter Details
 
@@ -44,15 +49,15 @@ human sample shouldn't have any genotypes on chrY. A male human sample should ha
 non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEnglish/kanpig/tree/develop/ploidy_beds) directory 
 has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
-### `--chunksize`
-Kanpig will build local variant graphs from windows of the genome. These windows are determined by making the maximum end position
-of an upstream window's variants at least `chunksize` base-pairs away from the next window's variants' minimum start position.
+### `--neighdist`
+Kanpig will build local variant graphs from groups of variants in a 'neighborhood'. These neighborhoods are determined by making the maximum end position
+of an upstream neighborhood's variants at least `neighdist` base-pairs away from the next neighborhood's variants' minimum start position.
 
-This chunksize also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
-passing the `mapflag` filter, and which fully span the window are considered.
+This distance also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
+passing the `mapflag` filter, and which fully span the neighborhood are considered.
 
-This is an important parameter because too small of a `chunksize` may not recruit distant read pileups which support variants. Similarly, 
-too large of a value may create windows with many SVs which are also too large for reads to fully-span.
+This is an important parameter because too small of a `neighdist` may not recruit distant read pileups which support variants. Similarly, 
+too large of a value may create long neighborhoods with many SVs which are also too large for reads to fully-span.
 
 ### `--sizemin` and `--sizemax`
 Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of variants not within the size boundaries are set to missing (`./.`).
@@ -73,7 +78,7 @@ where `SS` and `SZ` are sequence and size similarity,  `L(P)` is the number of n
 pileups in the haplotype, and `N` is the number of putative false-negatives in the variant graph. 
 
 The penalty factor `λg` helps reduce paths with split variant representations. The penalty factor `λf` helps penalizes
-false-negatives in the variant graph. Details on how the impact of the scoring penalties are in [the wiki](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function).
+false-negatives in the variant graph. Details on the scoring penalties are in [the wiki](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function).
 
 ### `--maxpaths`
 When performing path-finding, this threshold limits the number of paths which are checked. A lower `maxpaths` will
@@ -97,7 +102,8 @@ The `SAMPLE` column fields populated by kanpig are:
 | **FT**  | Bit flag for properties of the variant's genotyping. Flags == 0 are considered PASS. |
 | **SQ**  | Phred scaled likelihood variant alternate is present in the sample |
 | **GQ**  | Phred scale difference between most and second-most likely genotypes |
-| **PS**  | Each chunk of variants is assigned a phase set |
+| **PS**  | Phase set pulled from haplotagged reads for long-range phasing |
+| **NE**  | Neighborhood id of variants evaluated together for short-range phasing |
 | **DP**  | Read coverage over the region |
 | **AD**  | Read coverage supporting the reference and alternate alleles. |
 | **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
@@ -143,7 +149,3 @@ This parameter will boost the specificity and speed of kanpig at the cost of rec
 
 When performing kmer-featurization of sequences (from reads or variants), homopolymer runs above `maxhom` are trimmed
 to `maxhom`. For example, `--maxhom 5` will only count two four-mers in homopolymer runs above 5bp.
-
-### `--spanoff`
-
-Don't use this.

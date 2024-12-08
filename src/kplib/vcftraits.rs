@@ -59,13 +59,14 @@ impl KdpVcf for RecordBuf {
     }
 
     /// start and end positions of an entry
+    /// Zero-based
     fn boundaries(&self) -> (u64, u64) {
         let start: u64 = u64::try_from(usize::from(self.variant_start().unwrap())).unwrap() - 1;
         let end: u64 = start + self.reference_bases().len() as u64;
         (start, end)
     }
 
-    /// grab entry's length from either SVLEN field or infer it from the REF ALT fields
+    /// grab entry's length as difference between ref and alt lens. Assumes valid_alt()
     fn size(&self) -> u64 {
         let r_len: u64 = self.reference_bases().len() as u64;
         let a_len: u64 = self.get_alt().len() as u64;

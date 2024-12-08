@@ -1,22 +1,18 @@
-use crate::kplib::traverse::{get_one_to_one, prune_graph};
 use crate::kplib::{
-    brute_force_find_path, metrics::overlaps, GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore,
-    Ploidy,
+    brute_force_find_path,
+    metrics::overlaps,
+    traverse::{get_one_to_one, prune_graph},
+    GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
 use petgraph::graph::{DiGraph, NodeIndex};
 
-/// Every --input variant is placed inside a node is turned into a graph.
 #[derive(Debug)]
 pub struct VarNode {
-    pub name: String,
     pub start: u64,
     pub end: u64,
     pub size: i64,
-    pub coverage: (Option<u64>, Option<u64>),
-    pub seqsim: (Option<f32>, Option<f32>),
-    pub sizesim: (Option<f32>, Option<f32>),
     pub entry: Option<RecordBuf>,
     pub kfeat: Vec<f32>,
 }
@@ -24,33 +20,23 @@ pub struct VarNode {
 impl VarNode {
     pub fn new(entry: RecordBuf, kmer: u8, maxhom: usize) -> Self {
         // Want to make a hash for these names for debugging, I think.
-        let name = "".to_string();
         let (start, end) = entry.boundaries();
         let (kfeat, size) = entry.to_kfeat(kmer, maxhom);
         Self {
-            name,
             start,
             end,
             size,
             entry: Some(entry),
-            coverage: (None, None),
-            seqsim: (None, None),
-            sizesim: (None, None),
             kfeat,
         }
     }
 
-    /// For the 'src' and 'snk' nodes, just need the name
-    pub fn new_anchor(name: &str, kmer: u8) -> Self {
+    pub fn new_anchor(kmer: u8) -> Self {
         Self {
-            name: name.to_string(),
             start: 0,
             end: 0,
             size: 0,
             entry: None,
-            coverage: (None, None),
-            seqsim: (None, None),
-            sizesim: (None, None),
             kfeat: vec![0f32; 4_usize.pow(kmer.into())],
         }
     }
@@ -80,7 +66,7 @@ impl Variants {
 
         let (chrom, start, end) = Variants::get_region(&variants);
         let mut node_indices = Vec::<NodeIndex<_>>::with_capacity(variants.len() + 2);
-        node_indices.push(graph.add_node(VarNode::new_anchor("src", kmer)));
+        node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
 
         node_indices.append(
             &mut variants
@@ -89,7 +75,7 @@ impl Variants {
                 .collect(),
         );
 
-        node_indices.push(graph.add_node(VarNode::new_anchor("snk", kmer)));
+        node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
 
         for pair in node_indices.iter().combinations(2) {
             if let [Some(up_node), Some(dn_node)] =
@@ -101,7 +87,7 @@ impl Variants {
             }
         }
 
-        Variants {
+        Self {
             chrom,
             start,
             end,

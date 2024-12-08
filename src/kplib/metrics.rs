@@ -19,7 +19,7 @@ pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
 
     for (&x, &y) in a.iter().zip(b.iter()) {
         total_d = x.abs() + y.abs();
-        if total_d > mink {
+        if total_d >= mink {
             deno += total_d;
             neum += (x - y).abs();
         }
@@ -212,7 +212,7 @@ fn log_choose(n: f64, k: f64) -> f64 {
     if k * 2.0 > n {
         k = n - k;
     }
-    for d in 1..=(k as i32) {
+    for d in 1..((k + 1.0) as i32) {
         r += n.log10();
         r -= d as f64;
         n -= 1.0;

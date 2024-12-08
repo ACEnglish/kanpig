@@ -1,6 +1,8 @@
-use std::fs::File;
-use std::io::{self, BufRead};
-use std::path::Path;
+use std::{
+    fs::File,
+    io::{self, BufRead},
+    path::Path,
+};
 
 type FileHandler = io::Result<io::Lines<io::BufReader<File>>>;
 

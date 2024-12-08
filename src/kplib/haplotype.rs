@@ -1,7 +1,10 @@
 use crate::kplib::seq_to_kmer;
 use itertools::Itertools;
-use std::cmp::Ordering;
-use std::fmt::{Debug, Formatter, Result};
+use std::{
+    cmp::Ordering,
+    fmt::{Debug, Formatter, Result},
+    hash::{Hash, Hasher},
+};
 
 #[derive(Clone)]
 pub struct Haplotype {
@@ -11,17 +14,28 @@ pub struct Haplotype {
     pub kfeat: Vec<f32>,
     pub parts: Vec<(i64, Vec<f32>)>,
     pub partial: usize,
+    pub ps: Option<u16>,
+    pub hp: Option<u8>,
 }
 
 impl Haplotype {
-    pub fn new(kfeat: Vec<f32>, size: i64, n: u64, coverage: u64) -> Self {
-        Haplotype {
+    pub fn new(
+        kfeat: Vec<f32>,
+        size: i64,
+        n: u64,
+        coverage: u64,
+        ps: Option<u16>,
+        hp: Option<u8>,
+    ) -> Self {
+        Self {
             size,
             n,
             coverage,
             kfeat: kfeat.clone(),
             parts: vec![(size, kfeat)],
             partial: 0,
+            ps,
+            hp,
         }
     }
 
@@ -35,6 +49,8 @@ impl Haplotype {
             kfeat: mk.clone(),
             parts: vec![],
             partial: 0,
+            ps: None,
+            hp: None,
         }
     }
 
@@ -52,12 +68,7 @@ impl Haplotype {
         self.parts.push((other.size, other.kfeat.clone()));
     }
 
-    pub fn partial_haplotypes(&self, kmer: u8) -> Vec<Haplotype> {
-        // Consider putting these as parameters. But really we just need smarter clustering
-        let max_fns = 3; // Most number of false-negatives we'll attempt to apply to the graph
-        let max_parts = 100; // Most number of pileups we'll even attempt to split
-                             // If its more than this, we can't evaluate the region reasonably,
-                             // anyway.
+    pub fn partial_haplotypes(&self, kmer: u8, max_fns: usize, max_parts: usize) -> Vec<Haplotype> {
         let mut ret = vec![];
         let m_len = self.parts.len();
         if m_len >= max_parts {
@@ -65,7 +76,7 @@ impl Haplotype {
             return ret;
         }
         let lower = if m_len <= max_fns { 1 } else { m_len - max_fns };
-        for i in (lower..=m_len).rev() {
+        for i in (lower..(m_len + 1)).rev() {
             for j in self.parts.iter().combinations(i) {
                 let mut cur_hap = Haplotype::blank(kmer, self.coverage);
                 for k in j.iter() {
@@ -136,12 +147,22 @@ impl PartialEq for Haplotype {
 
 impl Eq for Haplotype {}
 
+impl Hash for Haplotype {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for &val in &self.kfeat {
+            val.to_bits().hash(state);
+        }
+    }
+}
+
 impl Debug for Haplotype {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("Haplotype")
             .field("size", &self.size)
             .field("n", &self.n)
             .field("coverage", &self.coverage)
+            .field("ps", &self.ps)
+            .field("hp", &self.hp)
             // Exclude kfeat from the debug output
             .finish()
     }

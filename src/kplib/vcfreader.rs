@@ -2,7 +2,6 @@ use crate::kplib::{GenotypeAnno, KDParams, KdpVcf, Ploidy, Regions};
 use crossbeam_channel::Sender;
 use noodles_vcf::{self as vcf, variant::RecordBuf};
 use petgraph::graph::NodeIndex;
-use std::collections::VecDeque;
 use std::io::BufRead;
 
 /// Takes a vcf and filtering parameters to create in iterable which will
@@ -59,17 +58,15 @@ impl<R: BufRead> VcfChunker<R> {
             return false;
         }
 
-        let size = entry.size();
+        let size = entry.size() as u32;
         if self.params.sizemin > size || self.params.sizemax < size {
             return false;
         }
 
         // Is it inside a region
-        let mut default = VecDeque::new();
-        let m_coords = self
-            .regions
-            .get_mut(entry.reference_sequence_name())
-            .unwrap_or(&mut default);
+        let Some(m_coords) = self.regions.get_mut(entry.reference_sequence_name()) else {
+            return false;
+        };
 
         if m_coords.is_empty() {
             return false;
@@ -110,6 +107,8 @@ impl<R: BufRead> VcfChunker<R> {
                 }
                 Ok(_) => {
                     if self.filter_entry(&entry) {
+                        // Clear samples early
+                        *entry.samples_mut() = vcf::variant::record_buf::Samples::default();
                         return Some(entry);
                     } else {
                         self.skip_count += 1;
@@ -136,7 +135,7 @@ impl<R: BufRead> VcfChunker<R> {
         let new_chrom = !self.cur_chrom.is_empty() && check_chrom != self.cur_chrom;
 
         let (start, end) = entry.boundaries();
-        let new_chunk = self.cur_end != 0 && self.cur_end + self.params.chunksize < start;
+        let new_chunk = self.cur_end != 0 && self.cur_end + self.params.neighdist < start;
 
         self.cur_chrom = check_chrom;
         self.cur_end = if new_chrom {
