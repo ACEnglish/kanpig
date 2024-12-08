@@ -70,7 +70,7 @@ pub fn seqsim_corrected(a: &[f32], b: &[f32], mink: f32) -> f32 {
     let thresh = if view.is_empty() {
         0.0 // Default threshold if the array is empty
     } else {
-        let p_index = (view.len() as f32 * 0.1).floor() as usize;
+        let p_index = (view.len() as f32 * 0.9).floor() as usize;
         view[p_index]
     };
 
