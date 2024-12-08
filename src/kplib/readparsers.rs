@@ -224,7 +224,7 @@ impl ReadParser for PlupParser {
 ///     println!("{:?}", hap);
 /// }
 /// ```
-pub fn pileups_to_haps(
+fn pileups_to_haps(
     chrom: &str,
     reads: ReadsMap,
     mut plups: PileupSet,
