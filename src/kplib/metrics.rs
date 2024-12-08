@@ -40,59 +40,47 @@ pub fn seqsim_corrected(a: &[f32], b: &[f32], mink: f32) -> f32 {
     let mut deno: f32 = 0.0;
     let mut neum: f32 = 0.0;
 
-    // Correction function
-    let correction = |v: f32, corr: f32| {
-        let mut t = v.abs();
-        t = (t / corr) + (t % corr);
-        if v < 0.0 { -t } else { t }
-    };
-
-    // Combine a and b to calculate absolute values
+    // Combine k-mer counts from both sequences
     let mut view: Vec<f32> = a.iter().chain(b.iter()).map(|&v| v.abs()).collect();
 
     // Filter values greater than mink
     view.retain(|&v| v > mink);
 
-    // Calculate median
+    // Calculate scaling factor (mean of top 90% values)
     view.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let top_90_index = (view.len() as f32 * 0.5).ceil() as usize;
     let corr = if view.is_empty() {
-        1.0 // Default correction factor if the array is empty
+        1.0 // Default correction if empty
     } else {
-        let mid = view.len() / 2;
-        if view.len() % 2 == 0 {
-            (view[mid - 1] + view[mid]) / 2.0
-        } else {
-            view[mid]
-        }
+        view.iter().take(top_90_index).copied().sum::<f32>() / top_90_index as f32
     };
 
-    // Calculate 10th percentile threshold
+    // Threshold: 10th percentile
     let thresh = if view.is_empty() {
-        0.0 // Default threshold if the array is empty
+        0.0 // Default threshold if empty
     } else {
-        let p_index = (view.len() as f32 * 0.9).floor() as usize;
-        view[p_index]
+        let thresh_index = (view.len() as f32 * 0.5).floor() as usize;
+        view[thresh_index]
     };
 
-    // Iterate through a and b, applying corrections and summing numerator/denominator
+    // Apply corrected Canberra distance
     for (&x, &y) in a.iter().zip(b.iter()) {
         let mut total_d = x.abs() + y.abs();
 
-        let (x_corr, y_corr) = if total_d > thresh {
-            let x_corr = correction(x, corr);
-            let y_corr = correction(y, corr);
+        if total_d > thresh {
+            // Scale k-mer counts by correction factor
+            let x_corr = x.abs() / corr;
+            let y_corr = y.abs() / corr;
             total_d = x_corr.abs() + y_corr.abs();
-            (x_corr, y_corr)
-        } else {
-            (x, y)
-        };
+        }
 
         if total_d > mink {
-            neum += (x_corr - y_corr).abs();
+            neum += (x - y).abs();
             deno += total_d;
         }
     }
 
+    // Handle edge cases
     if deno == 0.0 {
         return 0.0;
     }
@@ -101,8 +89,10 @@ pub fn seqsim_corrected(a: &[f32], b: &[f32], mink: f32) -> f32 {
         return 1.0;
     }
 
+    // Compute similarity
     1.0 - (neum / deno)
 }
+
 
 
 /// Computes size similarity
