@@ -11,9 +11,7 @@ use clap::Parser;
 use kplib::{Cli, Commands, KanpigParams};
 
 fn setup_logging(args: &impl KanpigParams) {
-    let level = if args.trace() {
-        log::LevelFilter::Trace
-    } else if args.debug() {
+    let level = if args.debug() {
         log::LevelFilter::Debug
     } else {
         log::LevelFilter::Info

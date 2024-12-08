@@ -99,7 +99,7 @@ pub fn brute_force_find_path(
         }
     }
 
-    trace!("best path {:?}", best_path);
+    debug!("best path {:?}", best_path);
     best_path
 }
 

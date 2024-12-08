@@ -8,7 +8,6 @@ mod cli;
 pub use crate::kplib::cli::{Cli, Commands, GTArgs, IOParams, KDParams, KanpigParams, PlupArgs};
 
 mod cluster;
-pub use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};
 
 mod haplotype;
 pub use crate::kplib::haplotype::Haplotype;

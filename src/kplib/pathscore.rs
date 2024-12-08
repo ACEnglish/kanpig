@@ -70,7 +70,7 @@ impl PathScore {
             }
 
             let sizesim = metrics::sizesim(path_size.unsigned_abs(), hap_parts.size.unsigned_abs());
-            //debug!("szsim: {}", sizesim);
+
             if sizesim < params.sizesim {
                 continue;
             }

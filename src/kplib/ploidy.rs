@@ -1,4 +1,5 @@
-use crate::kplib::BedParser;
+use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};
+use crate::kplib::{BedParser, Haplotype, KDParams};
 use rust_lapper::{Interval, Lapper};
 use std::{collections::HashMap, str::FromStr};
 
@@ -31,6 +32,20 @@ impl Ploidy {
             2 => Ploidy::Diploid,
             3 => Ploidy::Polyploid,
             _ => Ploidy::Unset,
+        }
+    }
+
+    pub fn cluster(
+        &self,
+        haps: Vec<Haplotype>,
+        coverage: u64,
+        params: &KDParams,
+    ) -> Vec<Haplotype> {
+        match self {
+            Ploidy::Haploid => haploid_haplotypes(haps, coverage, params),
+            _ => diploid_haplotypes(haps, coverage, params),
+            // and then eventually this could allow a --ploidy flag to branch to
+            // polyploid_haplotypes
         }
     }
 }

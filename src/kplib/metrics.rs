@@ -110,7 +110,7 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
         Some(2) => GTstate::Hom,
         _ => panic!("not possible"),
     };
-    trace!("{} {} -> {:?}", alt1_cov, alt2_cov, ret);
+    debug!("{} {} -> {:?}", alt1_cov, alt2_cov, ret);
     ret
 }
 

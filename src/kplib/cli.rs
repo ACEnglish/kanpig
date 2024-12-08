@@ -16,7 +16,6 @@ pub struct Cli {
 
 pub trait KanpigParams: std::fmt::Debug {
     fn validate(&self) -> bool;
-    fn trace(&self) -> bool;
     fn debug(&self) -> bool;
 }
 
@@ -70,17 +69,9 @@ pub struct PlupArgs {
     /// Verbose logging
     #[arg(long, default_value_t = false)]
     pub debug: bool,
-
-    /// Very Verbose logging
-    #[arg(long, default_value_t = false)]
-    pub trace: bool,
 }
 
 impl KanpigParams for PlupArgs {
-    fn trace(&self) -> bool {
-        self.trace
-    }
-
     fn debug(&self) -> bool {
         self.debug
     }
@@ -148,10 +139,6 @@ pub struct IOParams {
     /// Verbose logging
     #[arg(long, default_value_t = false)]
     pub debug: bool,
-
-    /// Very Verbose logging
-    #[arg(long, default_value_t = false)]
-    pub trace: bool,
 }
 
 #[derive(clap::Args, Clone, Debug)]
@@ -238,10 +225,6 @@ pub struct KDParams {
 }
 
 impl KanpigParams for GTArgs {
-    fn trace(&self) -> bool {
-        self.io.trace
-    }
-
     fn debug(&self) -> bool {
         self.io.debug
     }

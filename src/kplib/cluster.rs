@@ -72,7 +72,7 @@ pub fn diploid_haplotypes(
 
     let (loss, assignments, _, _): (f32, _, _, _) =
         kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
-    trace!("Loss: {}", loss);
+    debug!("Loss: {}", loss);
 
     // grab ps from whoever
     let mut g_ps = None;
@@ -114,8 +114,8 @@ pub fn diploid_haplotypes(
         hap2.hp = Some(key);
     }
 
-    trace!("Hap1 in {:?}", hap1);
-    trace!("Hap2 in {:?}", hap2);
+    debug!("Hap1 in {:?}", hap1);
+    debug!("Hap2 in {:?}", hap2);
 
     // Hap2 is always the higher covered allele
     if hap2.coverage < hap1.coverage {

@@ -8,9 +8,8 @@ use std::{
 };
 
 use crate::kplib::{
-    build_region_tree, diploid_haplotypes, haploid_haplotypes, BamParser, GTArgs, GenotypeAnno,
-    IOParams, PathScore, Ploidy, PloidyRegions, PlupParser, ReadParser, Variants, VcfChunker,
-    VcfWriter,
+    build_region_tree, BamParser, GTArgs, GenotypeAnno, IOParams, PathScore, Ploidy, PloidyRegions,
+    PlupParser, ReadParser, Variants, VcfChunker, VcfWriter,
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
@@ -129,13 +128,7 @@ fn task_thread(
                 let (haps, coverage) =
                     m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
 
-                let haps = match ploidy {
-                    Ploidy::Haploid => haploid_haplotypes(haps, coverage, &m_args.kd),
-                    _ => diploid_haplotypes(haps, coverage, &m_args.kd),
-                    // and then eventually this could allow a --ploidy flag to branch to
-                    // polyploid_haplotypes
-                };
-                debug!("{:?}", haps);
+                let haps = ploidy.cluster(haps, coverage, &m_args.kd);
 
                 let mut paths: Vec<PathScore> = haps
                     .iter()
