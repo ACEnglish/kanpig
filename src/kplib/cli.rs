@@ -304,21 +304,20 @@ fn validate_reads(reads: &Path, params: &GTArgs) -> bool {
         let index_extensions = [".bai", ".crai"];
         let index_exists = index_extensions.iter().any(|ext| {
             let index_path = format!("{}{}", file_path, ext);
-            Path::new(&index_path).exists()
+            let p = Path::new(&index_path);
+            p.exists() & p.is_file()
         });
 
         if !index_exists {
             error!(
-                "Index file for {} does not exist. Expected one of: {}",
-                file_path,
+                "--reads index ({}) does not exist",
                 index_extensions.join(", ")
             );
             is_ok = false;
         }
     } else if file_path.ends_with(".plup.gz") {
         let tbi_path = format!("{}.tbi", file_path);
-        if !Path::new(&tbi_path).exists() {
-            error!("Index file {} does not exist", tbi_path);
+        if !validate_file(Path::new(&tbi_path), "--reads index (.tbi)") {
             is_ok = false;
         } else {
             let tbx = tbx::Reader::from_path(file_path).expect("Failed to open TBX file");
