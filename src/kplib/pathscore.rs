@@ -11,7 +11,7 @@ pub struct PathScore {
     pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
     pub full_target: bool, // Does this path use partial
-    pub ps: Option<u16>,
+    pub ps: Option<u32>,
     pub hp: Option<u8>,
 }
 

@@ -29,7 +29,7 @@ pub struct GenotypeAnno {
     pub filt: FiltFlags,
     pub sq: i32,
     pub gq: i32,
-    pub ps: Option<u16>,
+    pub ps: Option<u32>,
     pub dp: i32,
     pub ad: IntG,
     pub ks: IntG,

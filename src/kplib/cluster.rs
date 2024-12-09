@@ -77,10 +77,10 @@ pub fn diploid_haplotypes(
     // grab ps from whoever
     let mut g_ps = None;
     let mut hap1 = m_haps[medoids[0]].clone();
-    let mut hap1_hps = HashMap::<u8, u16>::new();
+    let mut hap1_hps = HashMap::<u8, u32>::new();
 
     let mut hap2 = m_haps[medoids[1]].clone();
-    let mut hap2_hps = HashMap::<u8, u16>::new();
+    let mut hap2_hps = HashMap::<u8, u32>::new();
     for (idx, _hap) in m_haps.iter().enumerate() {
         if idx == medoids[0] || idx == medoids[1] {
             continue;

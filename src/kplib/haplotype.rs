@@ -14,7 +14,7 @@ pub struct Haplotype {
     pub kfeat: Vec<f32>,
     pub parts: Vec<(i64, Vec<f32>)>,
     pub partial: usize,
-    pub ps: Option<u16>,
+    pub ps: Option<u32>,
     pub hp: Option<u8>,
 }
 
@@ -24,7 +24,7 @@ impl Haplotype {
         size: i64,
         n: u64,
         coverage: u64,
-        ps: Option<u16>,
+        ps: Option<u32>,
         hp: Option<u8>,
     ) -> Self {
         Self {
