@@ -211,13 +211,13 @@ pub struct KDParams {
     #[arg(long, default_value_t = 3840)]
     pub mapflag: u16,
 
-    /// (Experimental) Search for a 1-to-1 match before graph traversal
-    #[arg(long, default_value_t = false)]
-    pub try_exact: bool,
+    /// Maximum number of nodes to attempt graph search, otherwise perform 1-to-1
+    #[arg(long, default_value_t = 5000)]
+    pub maxnodes: usize,
 
-    /// (Experimental) Prune paths which don't traverse 1-to-1 nodes
+    /// (Experimental) Only perform 1-to-1 haplotype/node matching without graph search
     #[arg(long, default_value_t = false)]
-    pub prune: bool,
+    pub one_to_one: bool,
 
     /// (Experimental) Maximum homopolymer length to kmerize (off=0)
     #[arg(long, default_value_t = 0)]

@@ -85,6 +85,12 @@ When performing path-finding, this threshold limits the number of paths which ar
 speed up runtime but may come at a cost of recall. A higher `maxpaths` is slower and may come at a cost to
 specificity.
 
+### `--maxnodes`
+If a neighborhood has too many variants, its graph will become large in memory and slow to traverse This parameter 
+will turn off path-finding in favor of `--one-to-one` haplotype to variant comparison (see Experimental Parameters 
+below), reducing runtime and memory usage. This may reduce recall in regions with many SVs, but these regions are
+problematic anyway.
+
 ### `--hapsim`
 After performing kmeans clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
 above `hapsim`, they are consolidated into a homozygous allele.
@@ -121,29 +127,29 @@ Details of `FT`
 # 🔌 Compute Resources
 
 Kanpig is highly parallelized and will fully utilize all threads it is given. However, hyperthreading doesn't seem to
-help and therefore the number of threads should probably be limited to the number of physical processors available. 
+help and therefore the number of threads should probably be limited to the number of physical processors available. For
+memory, giving kanpig 2GB per-core is usually more than enough.
 
-For memory, a general rule is kanpig will need about 20x the size of the compressed `.vcf.gz`. The minimum required 
-memory is also dependent on the number of threads running as each will need space for its processing. For example, 
-a 1.6Gb vcf (~5 million SVs) using 16 cores needs at least 32Gb of RAM. That same vcf with 8 or 4 cores needs at least
- 24Gb and 20Gb of RAM, respectively. 
+The actual runtime and memory usage of kanpig run will depend on the read coverage and the number of SVs in the input
+VCF. As a example of kanpig's resource usage with 16 cores available, genotyping a 30x long-read bam against a 2,199
+sample VCF (4.3 million SVs) took 13 minutes with a maximum memory usage of 12GB. Converting the bam to a plup file took
+4 minutes (8GB of memory) and genotyping with this plup file took 3 minutes (12GB memory). 
+
+While genotyping against a plup file is usually faster, bam to plup conversion is most useful for:
+* genotyping a large VCF or super-high (>50x) coverage bam.
+* a sample that will be genotyped multiple times (e.g. N+1 pipelines) 
+* long-term access to reads (a plup file is up to ~2,000x smaller than a bam)
 
 # 🔬 Experimental Parameter Details
 
 These parameters have a varying effect on the results and are not guaranteed to be stable across releases. 
 
-### `--try-exact`
-Before performing the path-finding algorithm that applies a haplotype to the variant graph, perform a 1-to-1 comparison
-of the haplotype to each node in the variant graph. If a single node matches above `sizesim` and `seqsim`, the
-path-finding is skipped and haplotype applied to the node. 
+### `--one-to-one`
+Instead of performing the path-finding algorithm that applies a haplotype to the variant graph, perform a 1-to-1 
+comparison of the haplotype to each node in the variant graph. If a single node matches above `sizesim` and `seqsim`, 
+the haplotype is applied to it. 
 
-This parameter will boost the specificity and speed of kanpig at the cost of recall.
-
-### `--prune`
-Similar to `try-exact`, a 1-to-1 comparison is performed before path-finding. If any matches are found, all paths
-which do not traverse the matching nodes are pruned from the variant graph. 
-
-This parameter will boost the specificity and speed of kanpig at the cost of recall.
+This parameter will boost the specificity, increase speed, and lower memory usage of kanpig at the cost of recall.
 
 ### `--maxhom`
 
