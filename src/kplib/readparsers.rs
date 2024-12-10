@@ -231,7 +231,7 @@ fn pileups_to_haps(
     reference: &faidx::Reader,
     params: &KDParams,
     hps: HPMap,      // HP tags per-read
-    ps: Option<u16>, // The window's PS tag
+    ps: Option<u32>, // The window's PS tag
 ) -> Vec<Haplotype> {
     let mut hap_parts = Vec::<Haplotype>::with_capacity(plups.len());
     let mut ret = Vec::<Haplotype>::with_capacity(reads.len());

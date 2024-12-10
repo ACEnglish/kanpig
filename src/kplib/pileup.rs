@@ -9,7 +9,7 @@ pub struct ReadPileup {
     pub start: u64,
     pub end: u64,
     pub pileups: Vec<PileupVariant>,
-    pub ps: Option<u16>,
+    pub ps: Option<u32>,
     pub hp: Option<u8>,
 }
 
@@ -94,13 +94,29 @@ impl ReadPileup {
         }
 
         let ps = match record.aux(b"PS") {
-            Ok(Aux::U16(value)) => Some(value),
-            _ => None,
+            Ok(Aux::U32(value)) => Some(value),
+            Ok(Aux::U16(value)) => Some(value as u32),
+            Ok(Aux::I32(value)) => Some(value as u32), // Convert signed to unsigned if necessary
+            Ok(Aux::I16(value)) => Some(value as u32),
+            Ok(Aux::U8(value)) => Some(value as u32),
+            Ok(Aux::I8(value)) => Some(value as u32),
+            Ok(other) => {
+                panic!("Unexpected type for PS tag: {:?}", other);
+            }
+            Err(_) => None,
         };
 
         let hp = match record.aux(b"HP") {
             Ok(Aux::U8(value)) => Some(value),
-            _ => None,
+            Ok(Aux::U16(value)) => Some(value as u8),
+            Ok(Aux::U32(value)) => Some(value as u8),
+            Ok(Aux::I32(value)) => Some(value as u8), // Convert signed to unsigned if necessary
+            Ok(Aux::I16(value)) => Some(value as u8),
+            Ok(Aux::I8(value)) => Some(value as u8),
+            Ok(other) => {
+                panic!("Unexpected type for PS tag: {:?}", other);
+            }
+            Err(_) => None,
         };
 
         Self {
