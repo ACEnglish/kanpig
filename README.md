@@ -121,12 +121,24 @@ Details of `FT`
 # 🔌 Compute Resources
 
 Kanpig is highly parallelized and will fully utilize all threads it is given. However, hyperthreading doesn't seem to
-help and therefore the number of threads should probably be limited to the number of physical processors available. 
+help and therefore the number of threads should probably be limited to the number of physical processors available. For
+memory, approximately 2GB per-core is more than enough.
 
-For memory, a general rule is kanpig will need about 20x the size of the compressed `.vcf.gz`. The minimum required 
-memory is also dependent on the number of threads running as each will need space for its processing. For example, 
-a 1.6Gb vcf (~5 million SVs) using 16 cores needs at least 32Gb of RAM. That same vcf with 8 or 4 cores needs at least
- 24Gb and 20Gb of RAM, respectively. 
+As a extreme example of kanpig's resource requirements, genotyping a 170x long-read bam against a 2,199 sample VCF 
+(N SVs) took N on 16 cores with a maximum memory usage of N. Alternatively, converting the bam to a plup file took 
+14 minutes (m) 58 seconds (s) N GB of memory on 16 cores. Genotyping with a plup file took N minutes with maximum 
+memory usage of N. 
+
+While genotyping against a plup file is much faster, bam to plup conversion is most useful for long-term access to reads
+(a plup file is up to ~2,000x smaller than a bam), when a sample will be genotyped multiple times (e.g. against multiple 
+VCFs or N+1 pipelines) or when genotyping a large VCF. For example, genotyping the same 170x sample against a 
+single-sample VCF took 3m 10s from a bam, and only 3 seconds from a plup, but that time savings is lost due to the 15 
+minute conversion step.
+
+will be genotyped multiple times
+genotyping a large VCF. Genotyping the same 170x
+sample against a single-sample VCF took 3 minutes from a bam, while the plup conversion and then genotyping process took
+N minutes and then 3 seconds, respectively. Therefore, the total time used processing the sample was less from a bam.
 
 # 🔬 Experimental Parameter Details
 

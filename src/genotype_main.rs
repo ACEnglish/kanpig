@@ -128,6 +128,8 @@ fn task_thread(
                 let (haps, coverage) =
                     m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
 
+                m_graph.build(!haps.is_empty());
+
                 let haps = ploidy.cluster(haps, coverage, &m_args.kd);
 
                 let mut paths: Vec<PathScore> = haps

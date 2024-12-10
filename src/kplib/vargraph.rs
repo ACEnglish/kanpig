@@ -77,15 +77,7 @@ impl Variants {
 
         node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
 
-        for pair in node_indices.iter().combinations(2) {
-            if let [Some(up_node), Some(dn_node)] =
-                [graph.node_weight(*pair[0]), graph.node_weight(*pair[1])]
-            {
-                if !overlaps(up_node.start, up_node.end, dn_node.start, dn_node.end) {
-                    graph.add_edge(*pair[0], *pair[1], ());
-                }
-            }
-        }
+
 
         Self {
             chrom,
@@ -93,6 +85,26 @@ impl Variants {
             end,
             node_indices,
             graph,
+        }
+    }
+
+    /// Build the edges in the graph
+    /// Only needs to be done fully if there are pileups to consider
+    pub fn build(&mut self, full: bool) {
+        if full {
+            for pair in self.node_indices.iter().combinations(2) {
+                if let [Some(up_node), Some(dn_node)] =
+                    [self.graph.node_weight(*pair[0]), self.graph.node_weight(*pair[1])]
+                {
+                    if !overlaps(up_node.start, up_node.end, dn_node.start, dn_node.end) {
+                        self.graph.add_edge(*pair[0], *pair[1], ());
+                    }
+                }
+            }
+        } else {
+            let src_node = NodeIndex::new(0);
+            let snk_node = NodeIndex::new(self.graph.node_count() - 1);
+            self.graph.add_edge(src_node, snk_node, ());
         }
     }
 
