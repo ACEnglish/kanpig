@@ -1,8 +1,6 @@
 use crate::kplib::{
-    brute_force_find_path,
-    metrics::overlaps,
-    traverse::{get_one_to_one, prune_graph},
-    GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore, Ploidy,
+    brute_force_find_path, metrics::overlaps, traverse::get_one_to_one, GenotypeAnno, Haplotype,
+    KDParams, KdpVcf, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -77,8 +75,6 @@ impl Variants {
 
         node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
 
-
-
         Self {
             chrom,
             start,
@@ -93,9 +89,10 @@ impl Variants {
     pub fn build(&mut self, full: bool) {
         if full {
             for pair in self.node_indices.iter().combinations(2) {
-                if let [Some(up_node), Some(dn_node)] =
-                    [self.graph.node_weight(*pair[0]), self.graph.node_weight(*pair[1])]
-                {
+                if let [Some(up_node), Some(dn_node)] = [
+                    self.graph.node_weight(*pair[0]),
+                    self.graph.node_weight(*pair[1]),
+                ] {
                     if !overlaps(up_node.start, up_node.end, dn_node.start, dn_node.end) {
                         self.graph.add_edge(*pair[0], *pair[1], ());
                     }
@@ -125,29 +122,16 @@ impl Variants {
     // the haplotype push coverage onto the VarNodes
     pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
         // if there are no variants in the hap, we don't want to apply the coverage.
-        let partial_matches = if params.prune || params.try_exact {
-            get_one_to_one(&self.graph, hap, params)
-        } else {
-            vec![]
-        };
-
-        let skip_edges = if params.prune {
-            prune_graph(
-                &self.graph,
-                &partial_matches,
-                &self.node_indices[0],
-                self.node_indices.last().unwrap(),
-            )
-        } else {
-            vec![]
-        };
-
-        if params.try_exact & !partial_matches.is_empty() {
-            let mut ret = partial_matches.iter().max().cloned().unwrap();
+        if params.one_to_one || (self.node_indices.len() - 2) > params.maxnodes {
+            let mut ret = get_one_to_one(&self.graph, hap, params)
+                .iter()
+                .max()
+                .cloned()
+                .unwrap_or_else(PathScore::default);
             ret.coverage = Some(hap.coverage);
             ret
         } else {
-            let mut ret = brute_force_find_path(&self.graph, hap, params, &skip_edges);
+            let mut ret = brute_force_find_path(&self.graph, hap, params);
             ret.coverage = Some(hap.coverage);
             ret
         }

@@ -85,6 +85,12 @@ When performing path-finding, this threshold limits the number of paths which ar
 speed up runtime but may come at a cost of recall. A higher `maxpaths` is slower and may come at a cost to
 specificity.
 
+### `--maxnodes`
+If a neighborhood has too many variants, its graph will become large in memory and slow to traverse This parameter 
+will turn off path-finding in favor of `--one-to-one` haplotype to variant comparison (see Experimental Parameters 
+below), reducing runtime and memory usage. This may reduce recall in regions with many SVs, but these regions are
+problematic anyway.
+
 ### `--hapsim`
 After performing kmeans clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
 above `hapsim`, they are consolidated into a homozygous allele.
@@ -122,40 +128,28 @@ Details of `FT`
 
 Kanpig is highly parallelized and will fully utilize all threads it is given. However, hyperthreading doesn't seem to
 help and therefore the number of threads should probably be limited to the number of physical processors available. For
-memory, approximately 2GB per-core is more than enough.
+memory, giving kanpig 2GB per-core is usually more than enough.
 
-As a extreme example of kanpig's resource requirements, genotyping a 170x long-read bam against a 2,199 sample VCF 
-(N SVs) took N on 16 cores with a maximum memory usage of N. Alternatively, converting the bam to a plup file took 
-14 minutes (m) 58 seconds (s) N GB of memory on 16 cores. Genotyping with a plup file took N minutes with maximum 
-memory usage of N. 
+The actual runtime and memory usage of kanpig run will depend on the read coverage and the number of SVs in the input
+VCF. As a example of kanpig's resource usage with 16 cores available, genotyping a 30x long-read bam against a 2,199
+sample VCF (4.3 million SVs) took 13 minutes with a maximum memory usage of 12GB. Converting the bam to a plup file took
+4 minutes (8GB of memory) and genotyping with this plup file took 3 minutes (12GB memory). 
 
-While genotyping against a plup file is much faster, bam to plup conversion is most useful for long-term access to reads
-(a plup file is up to ~2,000x smaller than a bam), when a sample will be genotyped multiple times (e.g. against multiple 
-VCFs or N+1 pipelines) or when genotyping a large VCF. For example, genotyping the same 170x sample against a 
-single-sample VCF took 3m 10s from a bam, and only 3 seconds from a plup, but that time savings is lost due to the 15 
-minute conversion step.
-
-will be genotyped multiple times
-genotyping a large VCF. Genotyping the same 170x
-sample against a single-sample VCF took 3 minutes from a bam, while the plup conversion and then genotyping process took
-N minutes and then 3 seconds, respectively. Therefore, the total time used processing the sample was less from a bam.
+While genotyping against a plup file is usually faster, bam to plup conversion is most useful for:
+* genotyping a large VCF or super-high (>50x) coverage bam.
+* a sample that will be genotyped multiple times (e.g. N+1 pipelines) 
+* long-term access to reads (a plup file is up to ~2,000x smaller than a bam)
 
 # 🔬 Experimental Parameter Details
 
 These parameters have a varying effect on the results and are not guaranteed to be stable across releases. 
 
-### `--try-exact`
-Before performing the path-finding algorithm that applies a haplotype to the variant graph, perform a 1-to-1 comparison
-of the haplotype to each node in the variant graph. If a single node matches above `sizesim` and `seqsim`, the
-path-finding is skipped and haplotype applied to the node. 
+### `--one-to-one`
+Instead of performing the path-finding algorithm that applies a haplotype to the variant graph, perform a 1-to-1 
+comparison of the haplotype to each node in the variant graph. If a single node matches above `sizesim` and `seqsim`, 
+the haplotype is applied to it. 
 
-This parameter will boost the specificity and speed of kanpig at the cost of recall.
-
-### `--prune`
-Similar to `try-exact`, a 1-to-1 comparison is performed before path-finding. If any matches are found, all paths
-which do not traverse the matching nodes are pruned from the variant graph. 
-
-This parameter will boost the specificity and speed of kanpig at the cost of recall.
+This parameter will boost the specificity, increase speed, and lower memory usage of kanpig at the cost of recall.
 
 ### `--maxhom`
 

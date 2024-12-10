@@ -127,10 +127,13 @@ fn task_thread(
 
                 let (haps, coverage) =
                     m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-
-                m_graph.build(!haps.is_empty());
-
                 let haps = ploidy.cluster(haps, coverage, &m_args.kd);
+
+                // Only need to build the full graph sometimes
+                let should_build = !haps.is_empty()
+                    && !m_args.kd.one_to_one
+                    && (m_graph.node_indices.len() - 2) <= m_args.kd.maxnodes;
+                m_graph.build(should_build);
 
                 let mut paths: Vec<PathScore> = haps
                     .iter()

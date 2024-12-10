@@ -1,12 +1,7 @@
 /// Approaches for applying Haplotypes to a VarGraph
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::prelude::EdgeIndex;
-use petgraph::visit::{Dfs, EdgeRef};
-use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashSet},
-    iter::FromIterator,
-};
+use petgraph::visit::EdgeRef;
+use std::{cmp::Ordering, collections::BinaryHeap};
 
 use crate::kplib::{Haplotype, KDParams, PathScore, VarNode};
 
@@ -45,7 +40,6 @@ pub fn brute_force_find_path(
     graph: &DiGraph<VarNode, ()>,
     target: &Haplotype,
     params: &KDParams,
-    skip_edges: &[EdgeIndex],
 ) -> PathScore {
     let mut npaths = 0;
     let mut best_path = PathScore::default();
@@ -64,13 +58,7 @@ pub fn brute_force_find_path(
         // Throw all of cur_node's neighbors on the stack
         // Except snk_node, which is an indicator that the
         // current path has ended
-        for next_node in graph.edges(cur_path.node).filter_map(|edge| {
-            if skip_edges.contains(&edge.id()) {
-                None
-            } else {
-                Some(edge.target())
-            }
-        }) {
+        for next_node in graph.edges(cur_path.node).map(|edge| edge.target()) {
             if next_node == snk_node {
                 best_path = best_path.max(PathScore::new(
                     graph,
@@ -127,32 +115,4 @@ pub fn get_one_to_one(
             }
         })
         .collect()
-}
-
-/// Remove edges from graph that lead to paths which never pass through the kept nodes
-pub fn prune_graph(
-    graph: &DiGraph<VarNode, ()>,
-    kept_paths: &[PathScore],
-    source: &NodeIndex,
-    sink: &NodeIndex,
-) -> Vec<EdgeIndex> {
-    let mut visited = HashSet::new();
-    let mut dfs = Dfs::new(&graph, *sink);
-    let kept_nodes: HashSet<NodeIndex> = HashSet::from_iter(
-        kept_paths
-            .iter()
-            .flat_map(|i| i.path.clone())
-            .collect::<Vec<NodeIndex>>(),
-    );
-
-    while let Some(node) = dfs.next(&graph) {
-        visited.insert(node);
-    }
-
-    //edges_to_remove
-    graph
-        .edges_directed(*source, petgraph::Direction::Outgoing)
-        .filter(|e| !kept_nodes.contains(&e.target()))
-        .map(|e| e.id())
-        .collect::<Vec<_>>()
 }
