@@ -48,7 +48,7 @@ fn write_thread(
     let sty =
         ProgressStyle::with_template(" [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed")
             .unwrap()
-            .progress_chars("##-");
+            .progress_chars("・🐷🥫");
 
     let mut phase_group: i32 = 0;
     let mut completed_variants: u64 = 0;

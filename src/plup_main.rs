@@ -139,7 +139,7 @@ pub fn plup_main(args: PlupArgs) {
             " [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed",
         )
         .unwrap()
-        .progress_chars("##-");
+        .progress_chars("・🐷🥫");
         thread::spawn(move || {
             let mut writer: Box<dyn Write> = match m_args.output {
                 Some(ref path) => {
