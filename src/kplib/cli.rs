@@ -38,7 +38,7 @@ pub struct PlupArgs {
     #[arg(short, long)]
     pub reference: Option<PathBuf>,
 
-    /// Output plup (unsorted, uncompressed, default stdout)
+    /// Output plup (unsorted, uncompressed) [default: stdout]
     #[arg(short, long)]
     pub output: Option<PathBuf>,
 
@@ -116,7 +116,7 @@ pub struct IOParams {
     #[arg(short = 'f', long, help_heading = "I/O")]
     pub reference: PathBuf,
 
-    /// Output VCF (unsorted, uncompressed, default stdout)
+    /// Output VCF (unsorted, uncompressed) [default: stdout]
     #[arg(short, long, help_heading = "I/O")]
     pub out: Option<PathBuf>,
 
