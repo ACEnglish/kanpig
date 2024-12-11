@@ -112,7 +112,7 @@ pub struct IOParams {
     #[arg(short, long, help_heading = "I/O")]
     pub reads: PathBuf,
 
-    /// Reference reads are aligned to
+    /// Reference genome
     #[arg(short = 'f', long, help_heading = "I/O")]
     pub reference: PathBuf,
 
@@ -159,7 +159,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 10000, help_heading = "Variants & Reads")]
     pub sizemax: u32,
 
-    /// Minimum mapq of reads to consider
+    /// Minimum mapq score for reads
     #[arg(long, default_value_t = 5, help_heading = "Variants & Reads")]
     pub mapq: u8,
 
@@ -195,31 +195,31 @@ pub struct KDParams {
     #[arg(long, default_value_t = 4, help_heading = "Scoring / Advanced")]
     pub kmer: u8,
 
-    /// Minimum frequency of kmer
+    /// Minimum frequency of kmers
     #[arg(long, default_value_t = 2, help_heading = "Scoring / Advanced")]
     pub minkfreq: u64,
 
-    /// Maximum graph size to search, otherwise perform 1-to-1
+    /// Maximum graph size to search; otherwise perform 1-to-1
     #[arg(long, default_value_t = 5000, help_heading = "Scoring / Advanced")]
     pub maxnodes: usize,
 
-    /// Maximum number of paths in a graph to traverse
+    /// Maximum paths to traverse per graph
     #[arg(long, default_value_t = 5000, help_heading = "Scoring / Advanced")]
     pub maxpaths: u64,
 
-    /// Maximum pileups to allow partials matching
+    /// Maximum pileups allowed for partials matching
     #[arg(long, default_value_t = 100, help_heading = "Scoring / Advanced")]
     pub pileupmax: usize,
 
-    /// Maximum number of FNs allowed in a chunk
+    /// Maximum FNs allowed in a chunk
     #[arg(long, default_value_t = 3, help_heading = "Scoring / Advanced")]
     pub fnmax: usize,
 
-    /// (Experimental) Only perform 1-to-1 haplotype/node matching
+    /// (Experimental) Restrict to 1-to-1 haplotype/node matching
     #[arg(long, default_value_t = false, help_heading = "Scoring / Advanced")]
     pub one_to_one: bool,
 
-    /// (Experimental) Maximum homopolymer length (off=0)
+    /// (Experimental) Limit homopolymer length (off=0)
     #[arg(long, default_value_t = 0, help_heading = "Scoring / Advanced")]
     pub maxhom: usize,
 }
