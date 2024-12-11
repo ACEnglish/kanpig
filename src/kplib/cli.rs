@@ -58,7 +58,7 @@ pub struct PlupArgs {
     #[arg(long, default_value_t = 5)]
     pub mapq: u8,
 
-    /// Alignments with flag matching this value are ignored
+    /// Ignore alignments matching flag
     #[arg(long, default_value_t = 3840)]
     pub mapflag: u16,
 
@@ -212,7 +212,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 100, help_heading = "Scoring / Advanced")]
     pub pileupmax: usize,
 
-    /// Maximum FNs allowed in a chunk
+    /// Maximum FNs allowed in a path
     #[arg(long, default_value_t = 3, help_heading = "Scoring / Advanced")]
     pub fnmax: usize,
 
