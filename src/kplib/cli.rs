@@ -105,36 +105,36 @@ pub struct GTArgs {
 #[derive(clap::Args, Clone, Debug)]
 pub struct IOParams {
     /// VCF to genotype
-    #[arg(short, long)]
+    #[arg(short, long, help_heading = "I/O")]
     pub input: PathBuf,
 
     /// Reads to genotype (indexed .bam, .cram, or .plup.gz)
-    #[arg(short, long)]
+    #[arg(short, long, help_heading = "I/O")]
     pub reads: PathBuf,
 
     /// Reference reads are aligned to
-    #[arg(short = 'f', long)]
+    #[arg(short = 'f', long, help_heading = "I/O")]
     pub reference: PathBuf,
 
-    /// Output vcf (unsorted, uncompressed, default stdout)
-    #[arg(short, long)]
+    /// Output VCF (unsorted, uncompressed, default stdout)
+    #[arg(short, long, help_heading = "I/O")]
     pub out: Option<PathBuf>,
 
     /// Number of threads
-    #[arg(short, long, default_value_t = 1)]
+    #[arg(short, long, default_value_t = 1, help_heading = "I/O")]
     pub threads: usize,
 
-    /// Regions to analyze
-    #[arg(long)]
-    pub bed: Option<PathBuf>,
+    /// Output VCF sample name
+    #[arg(long, help_heading = "I/O")]
+    pub sample: Option<String>,
 
     /// Bed file of non-diploid regions
-    #[arg(long)]
+    #[arg(long, help_heading = "I/O")]
     pub ploidy_bed: Option<PathBuf>,
 
-    /// Sample to apply genotypes to, default first column
-    #[arg(long)]
-    pub sample: Option<String>,
+    /// Regions to analyze
+    #[arg(long, help_heading = "I/O")]
+    pub bed: Option<PathBuf>,
 
     /// Verbose logging
     #[arg(long, default_value_t = false)]
@@ -143,84 +143,84 @@ pub struct IOParams {
 
 #[derive(clap::Args, Clone, Debug)]
 pub struct KDParams {
-    /// Kmer size for featurization
-    #[arg(long, default_value_t = 4)]
-    pub kmer: u8,
-
-    /// Minimum distance between variants to create independent graphs
-    #[arg(long, default_value_t = 1000)]
-    pub neighdist: u64,
-
     /// Only analyze variants with PASS FILTER
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, help_heading = "Variants & Reads")]
     pub passonly: bool,
 
+    /// Distance between variants to create independent graphs
+    #[arg(long, default_value_t = 1000, help_heading = "Variants & Reads")]
+    pub neighdist: u64,
+
     /// Minimum size of variant to analyze
-    #[arg(long, default_value_t = 50)]
+    #[arg(long, default_value_t = 50, help_heading = "Variants & Reads")]
     pub sizemin: u32,
 
     /// Maximum size of variant to analyze
-    #[arg(long, default_value_t = 10000)]
+    #[arg(long, default_value_t = 10000, help_heading = "Variants & Reads")]
     pub sizemax: u32,
 
-    /// Maximum number of paths in a graph to traverse
-    #[arg(long, default_value_t = 5000)]
-    pub maxpaths: u64,
-
-    /// Minimum sequence similarity for paths
-    #[arg(long, default_value_t = 0.90)]
-    pub seqsim: f32,
-
-    /// Minimum size similarity for paths
-    #[arg(long, default_value_t = 0.90)]
-    pub sizesim: f32,
-
-    /// Minimum frequency of kmer
-    #[arg(long, default_value_t = 2)]
-    pub minkfreq: u64,
-
-    /// Haplotype size similarity collapse threshold (off=1)
-    #[arg(long, default_value_t = 1.0)]
-    pub hapsim: f32,
-
-    /// Scoring penalty for 'gaps'
-    #[arg(long, default_value_t = 0.02)]
-    pub gpenalty: f32,
-
-    /// Scoring penalty for 'fns'
-    #[arg(long, default_value_t = 0.10)]
-    pub fpenalty: f32,
-
-    /// Maximum number of FNs allowed in a chunk
-    #[arg(long, default_value_t = 3)]
-    pub fnmax: usize,
-
-    /// Maximum number of pileups in a chunk to attempt partials
-    #[arg(long, default_value_t = 100)]
-    pub pileupmax: usize,
-
-    /// Read clustering weight for haplotagged reads (off=0, full=1)
-    #[arg(long, default_value_t = 1.0)]
-    pub hps_weight: f32,
-
     /// Minimum mapq of reads to consider
-    #[arg(long, default_value_t = 5)]
+    #[arg(long, default_value_t = 5, help_heading = "Variants & Reads")]
     pub mapq: u8,
 
     /// Alignments with flag matching this value are ignored
-    #[arg(long, default_value_t = 3840)]
+    #[arg(long, default_value_t = 3840, help_heading = "Variants & Reads")]
     pub mapflag: u16,
 
+    /// Clustering weight for haplotagged reads (off=0, full=1)
+    #[arg(long, default_value_t = 1.0, help_heading = "Variants & Reads")]
+    pub hps_weight: f32,
+
+    /// Minimum sequence similarity for paths
+    #[arg(long, default_value_t = 0.90, help_heading = "Scoring / Advanced")]
+    pub seqsim: f32,
+
+    /// Minimum size similarity for paths
+    #[arg(long, default_value_t = 0.90, help_heading = "Scoring / Advanced")]
+    pub sizesim: f32,
+
+    /// Haplotype size similarity collapse threshold (off=1)
+    #[arg(long, default_value_t = 1.0, help_heading = "Scoring / Advanced")]
+    pub hapsim: f32,
+
+    /// Scoring penalty for gaps
+    #[arg(long, default_value_t = 0.02, help_heading = "Scoring / Advanced")]
+    pub gpenalty: f32,
+
+    /// Scoring penalty for FNs
+    #[arg(long, default_value_t = 0.10, help_heading = "Scoring / Advanced")]
+    pub fpenalty: f32,
+
+    /// Kmer size for featurization
+    #[arg(long, default_value_t = 4, help_heading = "Scoring / Advanced")]
+    pub kmer: u8,
+
+    /// Minimum frequency of kmer
+    #[arg(long, default_value_t = 2, help_heading = "Scoring / Advanced")]
+    pub minkfreq: u64,
+
     /// Maximum number of nodes to attempt graph search, otherwise perform 1-to-1
-    #[arg(long, default_value_t = 5000)]
+    #[arg(long, default_value_t = 5000, help_heading = "Scoring / Advanced")]
     pub maxnodes: usize,
 
+    /// Maximum number of paths in a graph to traverse
+    #[arg(long, default_value_t = 5000, help_heading = "Scoring / Advanced")]
+    pub maxpaths: u64,
+
+    /// Maximum number of pileups in a chunk to attempt partials
+    #[arg(long, default_value_t = 100, help_heading = "Scoring / Advanced")]
+    pub pileupmax: usize,
+
+    /// Maximum number of FNs allowed in a chunk
+    #[arg(long, default_value_t = 3, help_heading = "Scoring / Advanced")]
+    pub fnmax: usize,
+
     /// (Experimental) Only perform 1-to-1 haplotype/node matching without graph search
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, help_heading = "Scoring / Advanced")]
     pub one_to_one: bool,
 
     /// (Experimental) Maximum homopolymer length to kmerize (off=0)
-    #[arg(long, default_value_t = 0)]
+    #[arg(long, default_value_t = 0, help_heading = "Scoring / Advanced")]
     pub maxhom: usize,
 }
 

@@ -132,7 +132,7 @@ fn task_thread(
                 // Only need to build the full graph sometimes
                 let should_build = !haps.is_empty()
                     && !m_args.kd.one_to_one
-                    && (m_graph.node_indices.len() - 2) <= m_args.kd.maxnodes;
+                    && m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
                 m_graph.build(should_build);
 
                 let mut paths: Vec<PathScore> = haps
