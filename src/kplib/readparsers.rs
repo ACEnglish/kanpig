@@ -128,10 +128,10 @@ impl ReadParser for PlupParser {
         let window_start = start.saturating_sub(self.params.neighdist);
         let window_end = end + self.params.neighdist;
 
-        let tid = self
-            .tbx
-            .tid(chrom)
-            .unwrap_or_else(|_| panic!("Could not resolve '{}' to contig ID", chrom));
+        let tid = match self.tbx.tid(chrom) {
+            Ok(t) => t,
+            Err(_) => return (vec![], 0),
+        };
         self.tbx
             .fetch(tid, window_start, window_end)
             .expect("Could not fetch region from TBX");

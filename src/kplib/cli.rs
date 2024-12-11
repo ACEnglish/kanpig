@@ -80,6 +80,7 @@ impl KanpigParams for PlupArgs {
         let mut is_ok = true;
 
         is_ok &= validate_file(&self.bam, "--bam");
+        is_ok &= validate_bam(self.bam.to_str().unwrap_or_default());
 
         if let Some(ref_path) = &self.reference {
             is_ok &= validate_reference(ref_path);
@@ -295,11 +296,8 @@ fn validate_file(path: &Path, label: &str) -> bool {
     true
 }
 
-/// Helper function to validate reads (.bam, .cram, or .plup.gz)
-fn validate_reads(reads: &Path, params: &GTArgs) -> bool {
-    let mut is_ok = validate_file(reads, "--reads");
-
-    let file_path = reads.to_str().unwrap_or_default();
+fn validate_bam(file_path: &str) -> bool {
+    let mut is_ok = true;
     if file_path.ends_with(".bam") || file_path.ends_with(".cram") {
         let index_extensions = [".bai", ".crai"];
         let index_exists = index_extensions.iter().any(|ext| {
@@ -310,14 +308,22 @@ fn validate_reads(reads: &Path, params: &GTArgs) -> bool {
 
         if !index_exists {
             error!(
-                "--reads index ({}) does not exist",
+                "bam/cram index ({}) does not exist",
                 index_extensions.join(", ")
             );
             is_ok = false;
         }
-    } else if file_path.ends_with(".plup.gz") {
+    }
+    is_ok
+}
+
+fn validate_plup(file_path: &str, params: &GTArgs) -> bool {
+    let mut is_ok = true;
+    if !file_path.ends_with(".plup.gz") {
+        is_ok = false;
+    } else {
         let tbi_path = format!("{}.tbi", file_path);
-        if !validate_file(Path::new(&tbi_path), "--reads index (.tbi)") {
+        if !validate_file(Path::new(&tbi_path), "plup index (.tbi)") {
             is_ok = false;
         } else {
             let tbx = tbx::Reader::from_path(file_path).expect("Failed to open TBX file");
@@ -329,28 +335,28 @@ fn validate_reads(reads: &Path, params: &GTArgs) -> bool {
                     Ok(plup_args) => {
                         if plup_args.sizemin != params.kd.sizemin {
                             warn!(
-                                "--reads created with plup --sizemin {} != gt --sizemin {}",
+                                "plup created with --sizemin {} != gt --sizemin {}",
                                 plup_args.sizemin, params.kd.sizemin
                             );
                         }
 
                         if plup_args.sizemax != params.kd.sizemax {
                             warn!(
-                                "--reads created with plup --sizemax {} != gt --sizemax {}",
+                                "plup created with --sizemax {} != gt --sizemax {}",
                                 plup_args.sizemax, params.kd.sizemax
                             );
                         }
 
                         if plup_args.mapq != params.kd.mapq {
                             warn!(
-                                "--reads created with plup --mapq {} != gt --mapq {}",
+                                "plup created with --mapq {} != gt --mapq {}",
                                 plup_args.mapq, params.kd.mapq
                             );
                         }
 
                         if plup_args.mapflag != params.kd.mapflag {
                             warn!(
-                                "--reads created plup --mapflag {} != gt --mapflag {}",
+                                "plup created with --mapflag {} != gt --mapflag {}",
                                 plup_args.mapflag, params.kd.mapflag
                             );
                         }
@@ -364,11 +370,19 @@ fn validate_reads(reads: &Path, params: &GTArgs) -> bool {
                 }
             }
         }
-    } else {
+    }
+    is_ok
+}
+/// Helper function to validate reads (.bam, .cram, or .plup.gz)
+fn validate_reads(reads: &Path, params: &GTArgs) -> bool {
+    let mut is_ok = validate_file(reads, "--reads");
+    let file_path = reads.to_str().unwrap_or_default();
+    let bam_ok = validate_bam(file_path);
+    let plup_ok = validate_plup(file_path, params);
+    if !(bam_ok || plup_ok) {
         error!("Unsupported file type: {}", file_path);
         is_ok = false;
     }
-
     is_ok
 }
 
