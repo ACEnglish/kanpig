@@ -147,7 +147,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = false, help_heading = "Variants & Reads")]
     pub passonly: bool,
 
-    /// Distance between variants to create independent graphs
+    /// Maximum variant distance within graphs
     #[arg(long, default_value_t = 1000, help_heading = "Variants & Reads")]
     pub neighdist: u64,
 
@@ -163,7 +163,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 5, help_heading = "Variants & Reads")]
     pub mapq: u8,
 
-    /// Alignments with flag matching this value are ignored
+    /// Ignore alignments matching flag
     #[arg(long, default_value_t = 3840, help_heading = "Variants & Reads")]
     pub mapflag: u16,
 
@@ -179,7 +179,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 0.90, help_heading = "Scoring / Advanced")]
     pub sizesim: f32,
 
-    /// Haplotype size similarity collapse threshold (off=1)
+    /// Collapse haplotypes of similar size (off=1)
     #[arg(long, default_value_t = 1.0, help_heading = "Scoring / Advanced")]
     pub hapsim: f32,
 
@@ -199,7 +199,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 2, help_heading = "Scoring / Advanced")]
     pub minkfreq: u64,
 
-    /// Maximum number of nodes to attempt graph search, otherwise perform 1-to-1
+    /// Maximum graph size to search, otherwise perform 1-to-1
     #[arg(long, default_value_t = 5000, help_heading = "Scoring / Advanced")]
     pub maxnodes: usize,
 
@@ -207,7 +207,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 5000, help_heading = "Scoring / Advanced")]
     pub maxpaths: u64,
 
-    /// Maximum number of pileups in a chunk to attempt partials
+    /// Maximum pileups to allow partials matching
     #[arg(long, default_value_t = 100, help_heading = "Scoring / Advanced")]
     pub pileupmax: usize,
 
@@ -215,11 +215,11 @@ pub struct KDParams {
     #[arg(long, default_value_t = 3, help_heading = "Scoring / Advanced")]
     pub fnmax: usize,
 
-    /// (Experimental) Only perform 1-to-1 haplotype/node matching without graph search
+    /// (Experimental) Only perform 1-to-1 haplotype/node matching
     #[arg(long, default_value_t = false, help_heading = "Scoring / Advanced")]
     pub one_to_one: bool,
 
-    /// (Experimental) Maximum homopolymer length to kmerize (off=0)
+    /// (Experimental) Maximum homopolymer length (off=0)
     #[arg(long, default_value_t = 0, help_heading = "Scoring / Advanced")]
     pub maxhom: usize,
 }
