@@ -39,7 +39,7 @@ impl ReadPileup {
     /// let pileup = ReadPileup::new(record, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new(record: Record, sizemin: u32, sizemax: u32) -> Self {
+    pub fn new(record: &Record, sizemin: u32, sizemax: u32) -> Self {
         let chrom = record.tid();
         let start = record.reference_start();
         let end = record.reference_end();

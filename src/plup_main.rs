@@ -61,21 +61,20 @@ fn process_bam_region(
         .fetch((chrom, start, end))
         .expect("Failed to fetch region");
 
-    Some(
-        reader
-            .records()
-            .filter_map(|r| {
-                r.ok().filter(|rec| {
-                    !rec.seq().is_empty()
-                        && rec.mapq() >= params.mapq
-                        && (rec.flags() & params.mapflag) == 0
-                        && rec.reference_start().unsigned_abs() >= start
-                        && rec.reference_start().unsigned_abs() < end
-                })
-            })
-            .map(|record| ReadPileup::new(record, params.sizemin, params.sizemax))
-            .collect(),
-    )
+    let mut ret = Vec::with_capacity((params.chunk_size as usize) * 2000);
+    let mut record = bam::Record::new();
+    while let Some(r) = reader.read(&mut record) {
+        r.expect("Failed to parse record");
+        if !record.seq().is_empty()
+            && record.mapq() >= params.mapq
+            && (record.flags() & params.mapflag) == 0
+            && record.reference_start().unsigned_abs() >= start
+            && record.reference_start().unsigned_abs() < end
+        {
+            ret.push(ReadPileup::new(&record, params.sizemin, params.sizemax));
+        }
+    }
+    Some(ret)
 }
 
 /// Splits the reference sequences in a BAM file into regions of a specified size.
