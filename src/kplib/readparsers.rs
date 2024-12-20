@@ -3,7 +3,7 @@ use indexmap::{IndexMap, IndexSet};
 use rust_htslib::faidx;
 use rust_htslib::{
     bam::ext::BamRecordExtensions,
-    bam::{IndexedReader, Read as BamRead},
+    bam::{self, IndexedReader, Read as BamRead},
     tbx::{self, Read as TbxRead},
 };
 use std::path::PathBuf;
@@ -55,36 +55,33 @@ impl ReadParser for BamParser {
         let mut ps = None;
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
+        let mut qname = 0;
+        let mut record = bam::Record::new();
+        while let Some(r) = self.bam.read(&mut record) {
+            r.expect("Failed to parse record");
+            if !record.seq().is_empty()
+                && record.mapq() >= self.params.mapq
+                && (record.flags() & self.params.mapflag) == 0
+                && (record.reference_start() as u64) < window_start
+                && (record.reference_end() as u64) > window_end
+            {
+                coverage += 1;
+                let mut read = ReadPileup::new(&record, self.params.sizemin, self.params.sizemax);
 
-        for (qname, record) in self
-            .bam
-            .records()
-            .filter_map(|r| {
-                r.ok().filter(|rec| {
-                    !rec.seq().is_empty()
-                        && rec.mapq() >= self.params.mapq
-                        && (rec.flags() & self.params.mapflag) == 0
-                        && (rec.reference_start() as u64) < window_start
-                        && (rec.reference_end() as u64) > window_end
-                })
-            })
-            .enumerate()
-        {
-            coverage += 1;
-            let mut read = ReadPileup::new(record, self.params.sizemin, self.params.sizemax);
-
-            if ps.is_none() && read.ps.is_some() {
-                ps = read.ps;
-            }
-
-            if !read.pileups.is_empty() {
-                hps.entry(qname).or_insert(read.hp);
-            }
-            for m_var in read.pileups.drain(..) {
-                if m_var.position >= window_start && m_var.position <= window_end {
-                    let (p_idx, _) = p_variants.insert_full(m_var);
-                    reads.entry(qname).or_default().push(p_idx);
+                if ps.is_none() && read.ps.is_some() {
+                    ps = read.ps;
                 }
+
+                if !read.pileups.is_empty() {
+                    hps.entry(qname).or_insert(read.hp);
+                }
+                for m_var in read.pileups.drain(..) {
+                    if m_var.position >= window_start && m_var.position <= window_end {
+                        let (p_idx, _) = p_variants.insert_full(m_var);
+                        reads.entry(qname).or_default().push(p_idx);
+                    }
+                }
+                qname += 1;
             }
         }
 

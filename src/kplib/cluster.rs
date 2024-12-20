@@ -76,43 +76,37 @@ pub fn diploid_haplotypes(
 
     // grab ps from whoever
     let mut g_ps = None;
-    let mut hap1 = m_haps[medoids[0]].clone();
-    let mut hap1_hps = HashMap::<u8, u32>::new();
+    let mut haps = vec![m_haps[medoids[0]].clone(), m_haps[medoids[1]].clone()];
+    let mut hps_cnt = vec![vec![0, 0], vec![0, 0]];
 
-    let mut hap2 = m_haps[medoids[1]].clone();
-    let mut hap2_hps = HashMap::<u8, u32>::new();
-    for (idx, _hap) in m_haps.iter().enumerate() {
+    for (idx, clu_hap) in m_haps.iter().enumerate() {
         if idx == medoids[0] || idx == medoids[1] {
             continue;
         }
-        match assignments[idx] {
-            0 => {
-                hap1.coverage += 1;
-                if let Some(hp) = m_haps[idx].hp {
-                    *hap1_hps.entry(hp).or_default() += 1;
-                }
-            }
-            _ => {
-                hap2.coverage += 1; // k=2
-                if let Some(hp) = m_haps[idx].hp {
-                    *hap2_hps.entry(hp).or_default() += 1;
-                }
-            }
+        let hap_num = assignments[idx];
+        haps[hap_num].coverage += 1;
+        if let Some(hp) = clu_hap.hp {
+            hps_cnt[hap_num][hp as usize - 1] += 1
         }
 
-        if g_ps.is_none() && m_haps[idx].ps.is_some() {
-            g_ps = m_haps[idx].ps;
+        if g_ps.is_none() && clu_hap.ps.is_some() {
+            g_ps = clu_hap.ps;
         }
     }
     // Assignment of PS and HP just takes most common
-    hap1.ps = g_ps;
-    if let Some((key, _value)) = hap1_hps.into_iter().max_by_key(|(_, val)| *val) {
-        hap1.hp = Some(key);
+    for i in 0..2 {
+        haps[i].ps = g_ps;
+        haps[i].hp = if hps_cnt[i][0] == 0 && hps_cnt[i][1] == 0 {
+            None
+        } else if hps_cnt[i][0] >= hps_cnt[i][1] {
+            Some(1)
+        } else {
+            Some(2)
+        };
     }
-    hap2.ps = g_ps;
-    if let Some((key, _value)) = hap2_hps.into_iter().max_by_key(|(_, val)| *val) {
-        hap2.hp = Some(key);
-    }
+
+    let mut hap1 = haps.swap_remove(0);
+    let mut hap2 = haps.swap_remove(0);
 
     debug!("Hap1 in {:?}", hap1);
     debug!("Hap2 in {:?}", hap2);
