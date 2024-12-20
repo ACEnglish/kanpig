@@ -77,7 +77,7 @@ pub fn diploid_haplotypes(
     // grab ps from whoever
     let mut g_ps = None;
     let mut haps = vec![m_haps[medoids[0]].clone(), m_haps[medoids[1]].clone()];
-    let mut hps_cnt = vec![vec![0, 0], vec![0, 0]];
+    let mut hps_cnt = [[0, 0], [0, 0]];
 
     for (idx, clu_hap) in m_haps.iter().enumerate() {
         if idx == medoids[0] || idx == medoids[1] {
