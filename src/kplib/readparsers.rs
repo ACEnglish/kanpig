@@ -66,7 +66,12 @@ impl ReadParser for BamParser {
                 && (record.reference_end() as u64) > window_end
             {
                 coverage += 1;
-                let mut read = ReadPileup::new(&record, self.params.sizemin, self.params.sizemax);
+                let mut read = ReadPileup::new(
+                    chrom.to_string(),
+                    &record,
+                    self.params.sizemin,
+                    self.params.sizemax,
+                );
 
                 if ps.is_none() && read.ps.is_some() {
                     ps = read.ps;

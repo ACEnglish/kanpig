@@ -71,7 +71,12 @@ fn process_bam_region(
             && record.reference_start().unsigned_abs() >= start
             && record.reference_start().unsigned_abs() < end
         {
-            ret.push(ReadPileup::new(&record, params.sizemin, params.sizemax));
+            ret.push(ReadPileup::new(
+                chrom.clone(),
+                &record,
+                params.sizemin,
+                params.sizemax,
+            ));
         }
     }
     Some(ret)
@@ -153,9 +158,6 @@ pub fn plup_main(args: PlupArgs) {
             let prefixed = format!("# {}\n", serialized);
             let _ = writer.write_all(prefixed.as_bytes());
 
-            let bam = bam::Reader::from_path(m_args.bam).expect("Error opening BAM file");
-            let header_main = bam::Header::from_template(bam.header());
-            let header = bam::HeaderView::from_header(&header_main);
             let mut n_reads = 0;
             let pbar = ProgressBar::new(num_regions).with_style(sty);
             pbar.inc(0);
@@ -164,10 +166,7 @@ pub fn plup_main(args: PlupArgs) {
                     Ok(None) | Err(_) => break,
                     Ok(Some(readplups)) => {
                         for read in readplups {
-                            let chrom = std::str::from_utf8(header.tid2name(read.chrom as u32))
-                                .expect("Unable to lookup tid");
-                            writeln!(writer, "{}", read.to_string(chrom))
-                                .expect("Error writing to output file");
+                            writeln!(writer, "{}", read).expect("Error writing to output file");
                             n_reads += 1;
                         }
                         pbar.inc(1);
