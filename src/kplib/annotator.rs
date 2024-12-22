@@ -104,6 +104,7 @@ fn zero(entry: RecordBuf, coverage: u64) -> GenotypeAnno {
 }
 
 /// Helper for haploid regions.
+/// Assumed to have ≤1 Path
 fn haploid(
     entry: RecordBuf,
     var_idx: &NodeIndex,
@@ -118,7 +119,6 @@ fn haploid(
         return finalize_annotation(entry, handle, paths, coverage);
     }
 
-    // Case 2: At least one path exists
     let path1 = &paths[0];
     let handle = match path1.path.contains(var_idx) {
         true => (

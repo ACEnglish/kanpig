@@ -189,7 +189,7 @@ pub fn genotype_main(args: GTArgs) {
     let wt_header = input_header.clone();
     let wt_num_variants = num_variants.clone();
 
-    let write_handler = std::thread::spawn(move || {
+    let write_handler = thread::spawn(move || {
         write_thread(result_receiver, wt_io, wt_header.clone(), wt_num_variants);
     });
 
