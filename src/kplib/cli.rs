@@ -241,8 +241,8 @@ impl KanpigParams for GTArgs {
             is_ok &= validate_file(bed_file, "--bed");
         }
 
-        if self.kd.sizemin < 20 {
-            warn!("--sizemin is recommended to be at least 20");
+        if self.kd.sizemin < 10 {
+            warn!("--sizemin is recommended to be at least 10");
         }
 
         if self.kd.kmer >= 8 {
@@ -251,6 +251,11 @@ impl KanpigParams for GTArgs {
 
         if self.kd.kmer < 1 {
             error!("--kmer must be at least 1");
+            is_ok = false;
+        }
+
+        if self.kd.sizemin < self.kd.kmer {
+            error!("--sizemin must be ≥ --kmer");
             is_ok = false;
         }
 

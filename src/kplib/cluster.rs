@@ -18,8 +18,10 @@ pub fn haploid_haplotypes(
         return haps;
     }
 
+    let mut g_ps = None;
     let hap_counts: HashMap<Haplotype, usize> =
         haps.drain(..).fold(HashMap::new(), |mut acc, hap| {
+            g_ps = g_ps.or(hap.ps);
             *acc.entry(hap).or_insert(0) += 1;
             acc
         });
@@ -29,6 +31,7 @@ pub fn haploid_haplotypes(
         .max_by(|(hap1, count1), (hap2, count2)| count1.cmp(count2).then_with(|| hap1.cmp(hap2)))
         .expect("Must be >1 hap to get here");
     most_common_hap.coverage = cnt;
+    most_common_hap.ps = g_ps;
 
     vec![most_common_hap]
 }
@@ -37,35 +40,35 @@ pub fn haploid_haplotypes(
 /// This is 'actually' the genotyper. Whatever come out of here is mapped to the variants
 /// So inaccurate descriptions of the two haplotypes can not produce good genotypes.
 pub fn diploid_haplotypes(
-    mut m_haps: Vec<Haplotype>,
+    mut haplos: Vec<Haplotype>,
     coverage: u64,
     params: &KDParams,
 ) -> Vec<Haplotype> {
-    if coverage == 0 || m_haps.is_empty() {
+    if coverage == 0 || haplos.is_empty() {
         return vec![];
     };
 
     // Nothing to cluster
-    if m_haps.len() == 1 {
-        let hap = m_haps.pop().unwrap();
+    if haplos.len() == 1 {
+        let hap = haplos.pop().unwrap();
         return vec![hap];
     }
 
     // Create a distance matrix
     let distance_matrix: Array2<f32> =
-        Array2::from_shape_fn((m_haps.len(), m_haps.len()), |(i, j)| {
+        Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
             // Convert similarity to distance
             let dist =
-                1.0 - (metrics::seqsim(&m_haps[i].kfeat, &m_haps[j].kfeat, params.minkfreq as f32));
+                1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, params.minkfreq as f32));
             // Penalize only if both points have defined, different groups
-            match (m_haps[i].hp, m_haps[j].hp) {
+            match (haplos[i].hp, haplos[j].hp) {
                 (Some(group_i), Some(group_j)) if group_i != group_j => dist + params.hps_weight,
                 _ => dist,
             }
         });
 
     let mut medoids = kmedoids::random_initialization(
-        m_haps.len(),
+        haplos.len(),
         2, // K
         &mut rand::rngs::StdRng::seed_from_u64(21),
     );
@@ -74,27 +77,28 @@ pub fn diploid_haplotypes(
         kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
     debug!("Loss: {}", loss);
 
-    let mut haps = vec![m_haps[medoids[0]].clone(), m_haps[medoids[1]].clone()];
+    let mut haps = vec![haplos[medoids[0]].clone(), haplos[medoids[1]].clone()];
     let mut hps_cnt = [[0, 0], [0, 0]];
 
-    for (idx, clu_hap) in m_haps.iter().enumerate() {
-        let hap_num = assignments[idx];
-        haps[hap_num].coverage += 1;
+    assignments
+        .into_iter()
+        .zip(haplos)
+        .for_each(|(idx, m_hap)| {
+            let k_hap = &mut haps[idx];
+            k_hap.coverage += 1;
+            k_hap.ps = k_hap.ps.or(m_hap.ps);
 
-        // Grab ps from whoever, assumed to all be the same
-        haps[hap_num].ps = haps[hap_num].ps.or(clu_hap.ps);
-
-        if let Some(hp) = clu_hap.hp {
-            hps_cnt[hap_num][hp as usize - 1] += 1;
-        }
-    }
+            if let Some(hp) = m_hap.hp {
+                hps_cnt[idx][hp as usize - 1] += 1;
+            }
+        });
 
     // HP just takes most common
-    for i in 0..2 {
-        haps[i].coverage -= 1; // Correct overcounting above
-        haps[i].hp = if hps_cnt[i][0] == 0 && hps_cnt[i][1] == 0 {
+    for (m_hap, hcnts) in haps.iter_mut().zip(hps_cnt) {
+        m_hap.coverage -= 1; // Correct overcounting above
+        m_hap.hp = if hcnts[0] == 0 && hcnts[1] == 0 {
             None
-        } else if hps_cnt[i][0] >= hps_cnt[i][1] {
+        } else if hcnts[0] >= hcnts[1] {
             Some(1)
         } else {
             Some(2)
