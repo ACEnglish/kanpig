@@ -254,7 +254,7 @@ impl KanpigParams for GTArgs {
             is_ok = false;
         }
 
-        if self.kd.sizemin < self.kd.kmer {
+        if self.kd.sizemin < self.kd.kmer.into() {
             error!("--sizemin must be ≥ --kmer");
             is_ok = false;
         }
