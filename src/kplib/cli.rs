@@ -168,7 +168,7 @@ pub struct KDParams {
     #[arg(long, default_value_t = 3840, help_heading = "Variants & Reads")]
     pub mapflag: u16,
 
-    /// Clustering weight for haplotagged reads (off=0, full=1)
+    /// Clustering weight for haplotagged reads (off=0.0, full=1.0)
     #[arg(long, default_value_t = 1.0, help_heading = "Variants & Reads")]
     pub hps_weight: f32,
 

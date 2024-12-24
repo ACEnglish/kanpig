@@ -74,28 +74,24 @@ pub fn diploid_haplotypes(
         kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
     debug!("Loss: {}", loss);
 
-    // grab ps from whoever
-    let mut g_ps = None;
     let mut haps = vec![m_haps[medoids[0]].clone(), m_haps[medoids[1]].clone()];
     let mut hps_cnt = [[0, 0], [0, 0]];
 
     for (idx, clu_hap) in m_haps.iter().enumerate() {
-        if idx == medoids[0] || idx == medoids[1] {
-            continue;
-        }
         let hap_num = assignments[idx];
         haps[hap_num].coverage += 1;
-        if let Some(hp) = clu_hap.hp {
-            hps_cnt[hap_num][hp as usize - 1] += 1
-        }
 
-        if g_ps.is_none() && clu_hap.ps.is_some() {
-            g_ps = clu_hap.ps;
+        // Grab ps from whoever, assumed to all be the same
+        haps[hap_num].ps = haps[hap_num].ps.or(clu_hap.ps);
+
+        if let Some(hp) = clu_hap.hp {
+            hps_cnt[hap_num][hp as usize - 1] += 1;
         }
     }
-    // Assignment of PS and HP just takes most common
+
+    // HP just takes most common
     for i in 0..2 {
-        haps[i].ps = g_ps;
+        haps[i].coverage -= 1; // Correct overcounting above
         haps[i].hp = if hps_cnt[i][0] == 0 && hps_cnt[i][1] == 0 {
             None
         } else if hps_cnt[i][0] >= hps_cnt[i][1] {
