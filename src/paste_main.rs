@@ -1,8 +1,11 @@
-use std::io::{self, Read};
 use crate::kplib::PasteArgs;
 use rust_htslib::bgzf;
+use std::{
+    fs::File,
+    io::{self, BufWriter, Read, Write},
+};
 
-pub struct PlainVCF<R> {
+struct PlainVCF<R> {
     reader: R,
     buffer: Vec<u8>,
     position: usize,
@@ -102,32 +105,44 @@ impl<R: Read> PlainVCF<R> {
 }
 
 // Example usage
-pub fn paste_main(_args: PasteArgs) -> Result<(), Box<dyn std::error::Error>> {
-    let p1 = "/Users/english/code/truvari/repo_utils/test_files/variants/input1.vcf.gz".to_string();
-    let data1 = b"##fileformat=VCFv4.2\n##source=MyTool\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE1\tSAMPLE2\nchr1\t12345\trs123456\tA\tT\t100\tPASS\t.\tGT\t0|1\t1|1\n";
-    let data2 = b"##fileformat=VCFv4.2\n##source=MyTool\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE3\tSAMPLE4\nchr1\t12345\trs123456\tA\tT\t100\tPASS\t.\tGT\t0|1\t1|1\n";
+pub fn paste_main(args: PasteArgs) -> Result<(), Box<dyn std::error::Error>> {
+    // Should be able to make bgzip writers, also depending..
+    let mut output: Box<dyn Write> = match args.output {
+        Some(ref path) => {
+            let m_page = page_size::get() * 1000;
+            let file = File::create(path).expect("Error creating output file");
+            Box::new(BufWriter::with_capacity(m_page, file))
+        }
+        None => Box::new(BufWriter::new(std::io::stdout())),
+    };
 
-    // let reader =  &data1[..];
-    let reader = bgzf::Reader::from_path(&p1)?;
-    let mut plain_vcf1 = PlainVCF::new(reader);
+    let mut readers: Vec<_> = args
+        .inputs
+        .iter()
+        .map(|path| {
+            let reader = bgzf::Reader::from_path(path).expect("Unable to read");
+            PlainVCF::new(reader)
+        })
+        .collect();
 
-    //let reader2 = &data2[..];
-    let reader2 = bgzf::Reader::from_path(&p1)?;
-    let mut plain_vcf2 = PlainVCF::new(reader2);
+    output.write_all(readers[0].get_header()?.join("\n").as_bytes())?;
+    output.write_all(b"\n")?;
 
-    let headers = plain_vcf1.get_header()?;
-    for header in headers {
-        println!("{}", header);
+    for i in &mut readers[1..] {
+        let _ = i.get_header()?;
     }
-    let _ = plain_vcf2.get_header()?;
 
-    while let Some(line) = plain_vcf1.read_line()? {
-        let Some(sample) = plain_vcf2.get_sample()? else { panic!("bad line at {}", line) };
-
-        print!("{}\t{}", line, sample);
-        print!("\n");
+    while let Some(line) = readers[0].read_line()? {
+        output.write_all(line.as_bytes())?;
+        for i in &mut readers[1..] {
+            let Some(sample) = i.get_sample()? else {
+                panic!("bad line at {}", line)
+            };
+            output.write_all(b"\t")?;
+            output.write_all(sample.as_bytes())?;
+        }
+        output.write_all(b"\n")?;
     }
 
     Ok(())
 }
-

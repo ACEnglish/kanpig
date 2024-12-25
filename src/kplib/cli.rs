@@ -33,6 +33,13 @@ pub enum Commands {
 
 #[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 pub struct PasteArgs {
+    /// Input VCFs
+    pub inputs: Vec<PathBuf>,
+
+    /// Output File
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
+
     /// Verbose logging
     #[arg(long, default_value_t = false)]
     pub debug: bool,
@@ -47,7 +54,6 @@ impl KanpigParams for PasteArgs {
         true
     }
 }
-
 
 #[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 pub struct PlupArgs {

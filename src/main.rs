@@ -7,7 +7,7 @@ mod genotype_main;
 mod kplib;
 mod paste_main;
 mod plup_main;
-use crate::{genotype_main::genotype_main, plup_main::plup_main, paste_main::paste_main};
+use crate::{genotype_main::genotype_main, paste_main::paste_main, plup_main::plup_main};
 use clap::Parser;
 use kplib::{Cli, Commands, KanpigParams};
 
