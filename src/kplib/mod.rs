@@ -5,7 +5,7 @@ mod bedparser;
 pub use crate::kplib::bedparser::BedParser;
 
 mod cli;
-pub use crate::kplib::cli::{Cli, Commands, GTArgs, IOParams, KDParams, KanpigParams, PlupArgs};
+pub use crate::kplib::cli::{Cli, Commands, GTArgs, IOParams, KDParams, KanpigParams, PasteArgs, PlupArgs};
 
 mod cluster;
 

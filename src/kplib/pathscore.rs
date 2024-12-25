@@ -75,8 +75,8 @@ impl PathScore {
                 continue;
             }
 
+            // only make if it is ever needed
             if path_k.is_none() {
-                // only make if it is ever needed
                 path_k = Some(
                     path.iter()
                         .filter_map(|&node_index| graph.node_weight(node_index))

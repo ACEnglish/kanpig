@@ -5,8 +5,9 @@ extern crate log;
 
 mod genotype_main;
 mod kplib;
+mod paste_main;
 mod plup_main;
-use crate::{genotype_main::genotype_main, plup_main::plup_main};
+use crate::{genotype_main::genotype_main, plup_main::plup_main, paste_main::paste_main};
 use clap::Parser;
 use kplib::{Cli, Commands, KanpigParams};
 
@@ -39,6 +40,10 @@ fn main() {
         Commands::Plup(args) => {
             setup_logging(&args);
             plup_main(args)
+        }
+        Commands::Paste(args) => {
+            setup_logging(&args);
+            paste_main(args).expect("paste failed")
         }
     };
 }

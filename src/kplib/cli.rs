@@ -26,7 +26,28 @@ pub enum Commands {
 
     #[command(about = "BAM/CRAM to Pileup Index")]
     Plup(PlupArgs),
+
+    #[command(about = "Paste VCFs' Sample Columns")]
+    Paste(PasteArgs),
 }
+
+#[derive(Parser, Serialize, Deserialize, Debug, Clone)]
+pub struct PasteArgs {
+    /// Verbose logging
+    #[arg(long, default_value_t = false)]
+    pub debug: bool,
+}
+
+impl KanpigParams for PasteArgs {
+    fn debug(&self) -> bool {
+        self.debug
+    }
+
+    fn validate(&self) -> bool {
+        true
+    }
+}
+
 
 #[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 pub struct PlupArgs {

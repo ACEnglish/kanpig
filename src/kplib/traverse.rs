@@ -41,7 +41,7 @@ pub fn brute_force_find_path(
     target: &Haplotype,
     params: &KDParams,
 ) -> PathScore {
-    let mut npaths = 0;
+    let mut path_cnt = 0;
     let mut best_path = PathScore::default();
     let snk_node = NodeIndex::new(graph.node_count() - 1);
     let partial_haps = target.partial_haplotypes(params.kmer, params.fnmax, params.pileupmax);
@@ -68,7 +68,7 @@ pub fn brute_force_find_path(
                     params,
                     target,
                 ));
-                npaths += 1;
+                path_cnt += 1;
             } else {
                 let nsize = cur_path.size + graph.node_weight(next_node).unwrap().size;
                 let mut npath = cur_path.path.clone();
@@ -82,7 +82,7 @@ pub fn brute_force_find_path(
             }
         }
 
-        if npaths > params.maxpaths {
+        if path_cnt > params.maxpaths {
             break;
         }
     }
