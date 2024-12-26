@@ -36,7 +36,12 @@ pub struct PasteArgs {
     /// Input VCFs
     pub inputs: Vec<PathBuf>,
 
-    /// Output File
+    /*
+     * input-list
+     * --no-compress (default to compressed if possible)
+     * --safe (ensure headers are identical, no repeated samples, every line matches up to SAMPLE)
+     */
+    /// Output File (uncompressed) [default: stdout]
     #[arg(short, long)]
     pub output: Option<PathBuf>,
 
