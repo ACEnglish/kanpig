@@ -50,7 +50,7 @@ impl<R: Read> PlainVCF<R> {
             // If we reach here, the buffer is exhausted, so we refill it
             self.buffer.clear();
             self.position = 0;
-            let mut temp_buf = [0; 1024];
+            let mut temp_buf = [0; 65536];
             let bytes_read = self.reader.read(&mut temp_buf)?;
 
             if bytes_read == 0 {
@@ -86,20 +86,31 @@ impl<R: Read> PlainVCF<R> {
 
     /// Gets the 10th+ columns (1-based index) of the next line, tab-delimited
     pub fn get_sample(&mut self) -> io::Result<Option<String>> {
-        if let Some(line) = self.read_line()? {
-            let mut columns = line.split('\t');
+        if let Some(mut line) = self.read_line()? {
+            let mut tab_count = 0;
+            let mut start_index = 0;
 
-            // Skip the first 9 columns
-            for _ in 0..9 {
-                if columns.next().is_none() {
-                    return Ok(Some(String::new()));
+            for (i, byte) in line.as_bytes().iter().enumerate() {
+                if *byte == b'\t' {
+                    tab_count += 1;
+                    if tab_count == 9 {
+                        // Found the 9th tab, so the 10th column starts at the next character
+                        start_index = i + 1;
+                        break;
+                    }
                 }
             }
 
-            // Collect the remaining columns as a single string
-            let sample_columns: String = columns.collect::<Vec<&str>>().join("\t");
-            return Ok(Some(sample_columns));
+            if tab_count < 9 {
+                // Not enough columns; return an empty string
+                panic!("Bad Columns at line {}", line);
+            }
+
+            // Return the substring starting from the 10th column
+            return Ok(Some(line.split_off(start_index)));
+
         }
+
         Ok(None)
     }
 }
