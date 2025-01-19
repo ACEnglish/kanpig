@@ -1,11 +1,14 @@
 /// A pileup variant that's hashable / comparable
 use crate::kplib::Svtype;
 use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
-use std::hash::{Hash, Hasher};
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 #[derive(Debug)]
 pub struct ReadPileup {
-    pub chrom: i32,
+    pub chrom: String,
     pub start: u64,
     pub end: u64,
     pub pileups: Vec<PileupVariant>,
@@ -39,8 +42,7 @@ impl ReadPileup {
     /// let pileup = ReadPileup::new(record, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new(record: Record, sizemin: u32, sizemax: u32) -> Self {
-        let chrom = record.tid();
+    pub fn new(chrom: String, record: &Record, sizemin: u32, sizemax: u32) -> Self {
         let start = record.reference_start();
         let end = record.reference_end();
 
@@ -159,7 +161,7 @@ impl ReadPileup {
         let line_str = std::str::from_utf8(line).ok()?;
         let mut fields = line_str.split('\t');
 
-        let _chrom = fields.next()?.to_string();
+        let chrom = fields.next()?.to_string();
         let start = fields.next()?.parse().ok()?;
         let end = fields.next()?.parse().ok()?;
         let pileups_str = fields.next()?;
@@ -190,7 +192,7 @@ impl ReadPileup {
 
         // I use chrom 0 for the decode because new puts in tid
         Some(ReadPileup {
-            chrom: 0,
+            chrom,
             start,
             end,
             pileups,
@@ -198,26 +200,10 @@ impl ReadPileup {
             hp,
         })
     }
+}
 
-    /// Encodes a `ReadPileup` into a tab-delimited string representation.
-    ///
-    /// # Parameters
-    /// - `chrom`: The chromosome name as a `&str`.
-    ///
-    /// # Returns
-    /// - `String`: A tab-delimited string containing:
-    ///     - Chromosome name
-    ///     - Start position
-    ///     - End position
-    ///     - A comma-separated list of encoded PileupVariants, or `.` if there are no variants.
-    ///
-    /// # Example
-    /// ```rust
-    /// let pileup = ReadPileup { chrom: 1, start: 1000, end: 1010, pileups: Vec::new() };
-    /// let pileup_str = pileup.to_string("chr1");
-    /// println!("{}", pileup_str); // Output: "chr1\t1000\t1010\t."
-    /// ```
-    pub fn to_string(&self, chrom: &str) -> String {
+impl fmt::Display for ReadPileup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         let pstr: String = if self.pileups.is_empty() {
             ".".to_string()
         } else {
@@ -238,13 +224,13 @@ impl ReadPileup {
             None => ".".to_string(),
         };
 
-        format!(
+        write!(
+            f,
             "{}\t{}\t{}\t{}\t{}\t{}",
-            chrom, self.start, self.end, pstr, ps, hp
+            self.chrom, self.start, self.end, pstr, ps, hp
         )
     }
 }
-
 pub struct PileupVariant {
     pub position: u64,
     pub end: u64,

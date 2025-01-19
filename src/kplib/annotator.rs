@@ -104,25 +104,32 @@ fn zero(entry: RecordBuf, coverage: u64) -> GenotypeAnno {
 }
 
 /// Helper for haploid regions.
+/// Assumed to have ≤1 Path
 fn haploid(
     entry: RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
 ) -> GenotypeAnno {
+    if paths.is_empty() {
+        let handle = match coverage {
+            0 => (".", metrics::GTstate::Non, 0.0, true),
+            _ => ("0", metrics::GTstate::Ref, 0.0, true),
+        };
+        return finalize_annotation(entry, handle, paths, coverage);
+    }
+
     let path1 = &paths[0];
     let handle = match path1.path.contains(var_idx) {
         true => (
             "1",
             metrics::GTstate::Hom,
-            path1.coverage.unwrap() as f64,
+            path1.coverage.unwrap_or(0) as f64,
             true,
         ),
-        // sometimes I used the same path twice
         false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0, true),
         false => (".", metrics::GTstate::Non, 0.0, true),
     };
-
     finalize_annotation(entry, handle, paths, coverage)
 }
 

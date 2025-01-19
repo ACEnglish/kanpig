@@ -18,8 +18,10 @@ pub fn haploid_haplotypes(
         return haps;
     }
 
+    let mut g_ps = None;
     let hap_counts: HashMap<Haplotype, usize> =
         haps.drain(..).fold(HashMap::new(), |mut acc, hap| {
+            g_ps = g_ps.or(hap.ps);
             *acc.entry(hap).or_insert(0) += 1;
             acc
         });
@@ -29,6 +31,7 @@ pub fn haploid_haplotypes(
         .max_by(|(hap1, count1), (hap2, count2)| count1.cmp(count2).then_with(|| hap1.cmp(hap2)))
         .expect("Must be >1 hap to get here");
     most_common_hap.coverage = cnt;
+    most_common_hap.ps = g_ps;
 
     vec![most_common_hap]
 }
@@ -37,35 +40,35 @@ pub fn haploid_haplotypes(
 /// This is 'actually' the genotyper. Whatever come out of here is mapped to the variants
 /// So inaccurate descriptions of the two haplotypes can not produce good genotypes.
 pub fn diploid_haplotypes(
-    mut m_haps: Vec<Haplotype>,
+    mut haplos: Vec<Haplotype>,
     coverage: u64,
     params: &KDParams,
 ) -> Vec<Haplotype> {
-    if coverage == 0 || m_haps.is_empty() {
+    if coverage == 0 || haplos.is_empty() {
         return vec![];
     };
 
     // Nothing to cluster
-    if m_haps.len() == 1 {
-        let hap = m_haps.pop().unwrap();
+    if haplos.len() == 1 {
+        let hap = haplos.pop().unwrap();
         return vec![hap];
     }
 
     // Create a distance matrix
     let distance_matrix: Array2<f32> =
-        Array2::from_shape_fn((m_haps.len(), m_haps.len()), |(i, j)| {
+        Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
             // Convert similarity to distance
             let dist =
-                1.0 - (metrics::seqsim(&m_haps[i].kfeat, &m_haps[j].kfeat, params.minkfreq as f32));
+                1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, params.minkfreq as f32));
             // Penalize only if both points have defined, different groups
-            match (m_haps[i].hp, m_haps[j].hp) {
+            match (haplos[i].hp, haplos[j].hp) {
                 (Some(group_i), Some(group_j)) if group_i != group_j => dist + params.hps_weight,
                 _ => dist,
             }
         });
 
     let mut medoids = kmedoids::random_initialization(
-        m_haps.len(),
+        haplos.len(),
         2, // K
         &mut rand::rngs::StdRng::seed_from_u64(21),
     );
@@ -74,45 +77,36 @@ pub fn diploid_haplotypes(
         kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
     debug!("Loss: {}", loss);
 
-    // grab ps from whoever
-    let mut g_ps = None;
-    let mut hap1 = m_haps[medoids[0]].clone();
-    let mut hap1_hps = HashMap::<u8, u32>::new();
+    let mut haps = vec![haplos[medoids[0]].clone(), haplos[medoids[1]].clone()];
+    let mut hps_cnt = [[0, 0], [0, 0]];
 
-    let mut hap2 = m_haps[medoids[1]].clone();
-    let mut hap2_hps = HashMap::<u8, u32>::new();
-    for (idx, _hap) in m_haps.iter().enumerate() {
-        if idx == medoids[0] || idx == medoids[1] {
-            continue;
-        }
-        match assignments[idx] {
-            0 => {
-                hap1.coverage += 1;
-                if let Some(hp) = m_haps[idx].hp {
-                    *hap1_hps.entry(hp).or_default() += 1;
-                }
-            }
-            _ => {
-                hap2.coverage += 1; // k=2
-                if let Some(hp) = m_haps[idx].hp {
-                    *hap2_hps.entry(hp).or_default() += 1;
-                }
-            }
-        }
+    assignments
+        .into_iter()
+        .zip(haplos)
+        .for_each(|(idx, m_hap)| {
+            let k_hap = &mut haps[idx];
+            k_hap.coverage += 1;
+            k_hap.ps = k_hap.ps.or(m_hap.ps);
 
-        if g_ps.is_none() && m_haps[idx].ps.is_some() {
-            g_ps = m_haps[idx].ps;
-        }
+            if let Some(hp) = m_hap.hp {
+                hps_cnt[idx][hp as usize - 1] += 1;
+            }
+        });
+
+    // HP just takes most common
+    for (m_hap, hcnts) in haps.iter_mut().zip(hps_cnt) {
+        m_hap.coverage -= 1; // Correct overcounting above
+        m_hap.hp = if hcnts[0] == 0 && hcnts[1] == 0 {
+            None
+        } else if hcnts[0] >= hcnts[1] {
+            Some(1)
+        } else {
+            Some(2)
+        };
     }
-    // Assignment of PS and HP just takes most common
-    hap1.ps = g_ps;
-    if let Some((key, _value)) = hap1_hps.into_iter().max_by_key(|(_, val)| *val) {
-        hap1.hp = Some(key);
-    }
-    hap2.ps = g_ps;
-    if let Some((key, _value)) = hap2_hps.into_iter().max_by_key(|(_, val)| *val) {
-        hap2.hp = Some(key);
-    }
+
+    let mut hap1 = haps.swap_remove(0);
+    let mut hap2 = haps.swap_remove(0);
 
     debug!("Hap1 in {:?}", hap1);
     debug!("Hap2 in {:?}", hap2);

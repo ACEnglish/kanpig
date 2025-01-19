@@ -48,7 +48,7 @@ fn write_thread(
     let sty =
         ProgressStyle::with_template(" [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed")
             .unwrap()
-            .progress_chars("##-");
+            .progress_chars("・🐷🥫");
 
     let mut phase_group: i32 = 0;
     let mut completed_variants: u64 = 0;
@@ -132,7 +132,7 @@ fn task_thread(
                 // Only need to build the full graph sometimes
                 let should_build = !haps.is_empty()
                     && !m_args.kd.one_to_one
-                    && (m_graph.node_indices.len() - 2) <= m_args.kd.maxnodes;
+                    && m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
                 m_graph.build(should_build);
 
                 let mut paths: Vec<PathScore> = haps
@@ -189,7 +189,7 @@ pub fn genotype_main(args: GTArgs) {
     let wt_header = input_header.clone();
     let wt_num_variants = num_variants.clone();
 
-    let write_handler = std::thread::spawn(move || {
+    let write_handler = thread::spawn(move || {
         write_thread(result_receiver, wt_io, wt_header.clone(), wt_num_variants);
     });
 
