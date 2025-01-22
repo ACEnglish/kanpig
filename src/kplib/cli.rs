@@ -318,6 +318,8 @@ fn validate_bam(file_path: &str) -> bool {
             );
             is_ok = false;
         }
+    } else {
+        is_ok = false;
     }
     is_ok
 }
