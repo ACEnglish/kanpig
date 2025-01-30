@@ -101,7 +101,7 @@ impl PathScore {
             }
 
             let score = ((seqsim + sizesim) / 2.0)
-                - (params.gpenalty * hap_parts.parts.len().abs_diff(path.len()) as f32)
+                - (params.gpenalty * hap_parts.n.abs_diff(path.len() as u64) as f32)
                 - (params.fpenalty * hap_parts.partial as f32);
 
             if score > best_path.score {
