@@ -155,3 +155,8 @@ This parameter will boost the specificity, increase speed, and lower memory usag
 
 When performing kmer-featurization of sequences (from reads or variants), homopolymer runs above `maxhom` are trimmed
 to `maxhom`. For example, `--maxhom 5` will only count two four-mers in homopolymer runs above 5bp.
+
+### `--squish`
+By default, the `--gpenalty` is applied to the scoring function as the difference between a path's node count and a 
+haplotype's variant count. With `--squish` the score is weighed by the path's node count minus one. This means paths
+with fewer nodes are preferred over paths with a consistent representation to the alignment.

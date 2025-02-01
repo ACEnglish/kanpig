@@ -100,9 +100,14 @@ impl PathScore {
                 continue;
             }
 
-            let score = ((seqsim + sizesim) / 2.0)
-                - (params.gpenalty * hap_parts.n.abs_diff(path.len() as u64) as f32)
-                - (params.fpenalty * hap_parts.partial as f32);
+            let mut score =
+                ((seqsim + sizesim) / 2.0) - (params.fpenalty * hap_parts.partial as f32);
+
+            if params.squish {
+                score -= params.gpenalty * (path.len() - 1) as f32;
+            } else {
+                score -= params.gpenalty * hap_parts.n.abs_diff(path.len() as u64) as f32;
+            }
 
             if score > best_path.score {
                 best_path = PathScore {

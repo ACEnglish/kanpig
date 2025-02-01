@@ -223,6 +223,10 @@ pub struct KDParams {
     /// (Experimental) Limit homopolymer length (off=0)
     #[arg(long, default_value_t = 0, help_heading = "Scoring / Advanced")]
     pub maxhom: usize,
+
+    /// (Experimental) Prefer simplier paths during scoring
+    #[arg(long, default_value_t = false, help_heading = "Scoring / Advanced")]
+    pub squish: bool,
 }
 
 impl KanpigParams for GTArgs {
