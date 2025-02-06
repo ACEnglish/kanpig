@@ -152,11 +152,18 @@ the haplotype is applied to it.
 This parameter will boost the specificity, increase speed, and lower memory usage of kanpig at the cost of recall.
 
 ### `--maxhom`
-
 When performing kmer-featurization of sequences (from reads or variants), homopolymer runs above `maxhom` are trimmed
 to `maxhom`. For example, `--maxhom 5` will only count two four-mers in homopolymer runs above 5bp.
 
 ### `--squish`
 By default, the `--gpenalty` is applied to the scoring function as the difference between a path's node count and a 
 haplotype's variant count. With `--squish` the score is weighed by the path's node count minus one. This means paths
-with fewer nodes are preferred over paths with a consistent representation to the alignment.
+with fewer nodes are preferred over paths with a consistent representation to the alignment. This parameter is useful
+for multi-sample VCFs where consistency between variants' genotypes is more important than preserving the set of exact
+set of variants that best reflect those described by the alignments.
+
+### `--ab`
+In loci where reads cluster into a potentially compound heterozygous site, the proportion of reads supporting the
+haplotype with lower coverage must have at least `--ab` fraction of the reads. Otherwise, we assume that the
+lower-covered haplotype is a mapping/sequencing anaomaly and treat its reads as supporting the reference. This parameter
+at 0.20 boosts specificity and genotype concordance at the cost of (a little bit less) recall.
