@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
@@ -79,7 +79,7 @@ jobs:
           fi
       
       - name: Uploading asset
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: asset
           path: ${{ env.ASSET }}
