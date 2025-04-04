@@ -3,6 +3,8 @@ kanpig - Kmer ANalysis of PIleups for Genotyping
 ------
 A fast tool for genotyping structural variants with long-reads.
 
+📝 Read [the paper](https://www.nature.com/articles/s41467-025-58577-w) for more details.
+
 # 📥 Install
 Binaries are available in [releases](https://github.com/ACEnglish/kanpig/releases).
 

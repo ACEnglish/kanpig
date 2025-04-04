@@ -153,7 +153,9 @@ impl Variants {
                     .unwrap()
                     .entry
                     .take()
-                    .map(|entry| GenotypeAnno::new(entry, var_idx, paths, coverage, ploidy))
+                    .map(|entry| {
+                        GenotypeAnno::new(entry, var_idx, paths, coverage, ploidy, self.start)
+                    })
             })
             .collect::<Vec<GenotypeAnno>>()
     }
@@ -170,7 +172,7 @@ impl Variants {
                     .entry
                     .as_ref()
                     .map(|entry| {
-                        GenotypeAnno::new(entry.clone(), &var_idx, paths, coverage, &Ploidy::Unset)
+                        GenotypeAnno::new(entry.clone(), &var_idx, paths, coverage, &Ploidy::Unset, self.start)
                     })
             })
             .collect::<Vec<GenotypeAnno>>()

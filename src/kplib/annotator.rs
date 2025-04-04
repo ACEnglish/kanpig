@@ -34,6 +34,7 @@ pub struct GenotypeAnno {
     pub ad: IntG,
     pub ks: IntG,
     pub gt_state: metrics::GTstate,
+    pub ne: u64,
 }
 
 impl GenotypeAnno {
@@ -44,16 +45,17 @@ impl GenotypeAnno {
         paths: &[PathScore],
         coverage: u64,
         ploidy: &Ploidy,
+        neigh_group: u64,
     ) -> Self {
         match ploidy {
-            Ploidy::Zero => zero(entry, coverage),
-            Ploidy::Haploid => haploid(entry, var_idx, paths, coverage),
-            _ => diploid(entry, var_idx, paths, coverage),
+            Ploidy::Zero => zero(entry, coverage, neigh_group),
+            Ploidy::Haploid => haploid(entry, var_idx, paths, coverage, neigh_group),
+            _ => diploid(entry, var_idx, paths, coverage, neigh_group),
         }
     }
 
     /// Generates fields for the `GenotypeAnno` to match `VcfWriter` keys.
-    pub fn make_fields(&self, neigh_group: i32) -> Vec<Option<Value>> {
+    pub fn make_fields(&self) -> Vec<Option<Value>> {
         vec![
             Some(Value::Genotype(
                 self.gt.parse().expect("GT string parsing failed"),
@@ -62,7 +64,7 @@ impl GenotypeAnno {
             Some(Value::Integer(self.sq)),
             Some(Value::Integer(self.gq)),
             self.ps.map(|ps| Value::Integer(ps as i32)),
-            Some(Value::Integer(neigh_group)),
+            Some(Value::Integer(self.ne as i32)),
             Some(Value::Integer(self.dp)),
             Some(Value::Array(Array::Integer(self.ad.clone()))),
             Some(Value::Array(Array::Integer(self.ks.clone()))),
@@ -76,6 +78,7 @@ fn diploid(
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
+    neigh_group: u64,
 ) -> GenotypeAnno {
     let handle = match &paths {
         [] => handle_diploid_no_paths(coverage),
@@ -84,11 +87,11 @@ fn diploid(
         _ => panic!("Unexpected number of paths for diploid region"),
     };
 
-    finalize_annotation(entry, handle, paths, coverage)
+    finalize_annotation(entry, handle, paths, coverage, neigh_group)
 }
 
 /// Helper for zero ploidy regions.
-fn zero(entry: RecordBuf, coverage: u64) -> GenotypeAnno {
+fn zero(entry: RecordBuf, coverage: u64, neigh_group: u64) -> GenotypeAnno {
     GenotypeAnno {
         entry,
         gt: "./.".to_string(),
@@ -100,6 +103,7 @@ fn zero(entry: RecordBuf, coverage: u64) -> GenotypeAnno {
         ad: vec![None],
         ks: vec![None],
         gt_state: metrics::GTstate::Non,
+        ne: neigh_group,
     }
 }
 
@@ -110,13 +114,14 @@ fn haploid(
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
+    neigh_group: u64,
 ) -> GenotypeAnno {
     if paths.is_empty() {
         let handle = match coverage {
             0 => (".", metrics::GTstate::Non, 0.0, true),
             _ => ("0", metrics::GTstate::Ref, 0.0, true),
         };
-        return finalize_annotation(entry, handle, paths, coverage);
+        return finalize_annotation(entry, handle, paths, coverage, neigh_group);
     }
 
     let path1 = &paths[0];
@@ -130,7 +135,7 @@ fn haploid(
         false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0, true),
         false => (".", metrics::GTstate::Non, 0.0, true),
     };
-    finalize_annotation(entry, handle, paths, coverage)
+    finalize_annotation(entry, handle, paths, coverage, neigh_group)
 }
 
 /// GT str, GTstate, alt_cov, is_fulltarget
@@ -205,6 +210,7 @@ fn finalize_annotation(
     handle: HandleReturn,
     paths: &[PathScore],
     coverage: u64,
+    neigh_group: u64,
 ) -> GenotypeAnno {
     let (gt_str, gt_path, alt_cov, full_target) = handle;
     let ref_cov = coverage as f64 - alt_cov;
@@ -260,5 +266,6 @@ fn finalize_annotation(
         ad,
         ks,
         gt_state: gt_path,
+        ne: neigh_group,
     }
 }
