@@ -137,6 +137,8 @@ VCF. As a example of kanpig's resource usage with 16 cores available, genotyping
 sample VCF (4.3 million SVs) took 13 minutes with a maximum memory usage of 12GB. Converting the bam to a plup file took
 4 minutes (8GB of memory) and genotyping with this plup file took 3 minutes (12GB memory). 
 
+Note that kanpig is predominantly I/O limited and therefore may not benefit much from more than ~4-8 cores.
+
 While genotyping against a plup file is usually faster, bam to plup conversion is most useful for:
 * genotyping a large VCF or super-high (>50x) coverage bam.
 * a sample that will be genotyped multiple times (e.g. N+1 pipelines) 
