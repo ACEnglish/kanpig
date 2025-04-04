@@ -98,10 +98,10 @@ impl VcfWriter {
         }
     }
 
-    pub fn anno_write(&mut self, mut annot: GenotypeAnno, neigh_id: i32) {
+    pub fn anno_write(&mut self, mut annot: GenotypeAnno) {
         *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
         *annot.entry.samples_mut() =
-            Samples::new(self.keys.clone(), vec![annot.make_fields(neigh_id)]);
+            Samples::new(self.keys.clone(), vec![annot.make_fields()]);
 
         self.buf.clear();
         let mut tmp = vcf::io::Writer::new(&mut self.buf);

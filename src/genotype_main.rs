@@ -50,7 +50,6 @@ fn write_thread(
             .unwrap()
             .progress_chars("・🐷🥫");
 
-    let mut phase_group: i32 = 0;
     let mut completed_variants: u64 = 0;
     loop {
         match result_receiver.recv() {
@@ -62,7 +61,7 @@ fn write_thread(
             Ok(Some(result)) => {
                 let mut rsize: u64 = 0;
                 for entry in result {
-                    m_writer.anno_write(entry, phase_group);
+                    m_writer.anno_write(entry);
                     rsize += 1;
                 }
 
@@ -78,7 +77,6 @@ fn write_thread(
                         pbar = Some(t_bar);
                     }
                 }
-                phase_group += 1;
             }
         }
     }

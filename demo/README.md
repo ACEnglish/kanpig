@@ -1,6 +1,19 @@
 This is a small demo of how to run kanpig.
 This genotypes a handful of variants from GIAB v1.1 on grch38 chr5:15903849-16153359 
 
+Tl;Dr;
+------
+The script `run.sh` will genotype the test files with the command:
+```bash
+../target/release/kanpig \
+    gt \
+    --input hg002.test.vcf.gz \
+    --reads hg002.test.bam \
+    --out result.vcf \
+    --reference small.chr5.fa.gz \
+    --sample HG002_kanpig 
+```
+
 Files
 -----
 - run.sh : script to run 

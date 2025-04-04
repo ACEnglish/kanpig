@@ -86,6 +86,7 @@ impl Haplotype {
                         .iter_mut()
                         .zip(k.1.iter())
                         .for_each(|(x, y)| *x += y);
+                    cur_hap.n += 1;
                 }
                 cur_hap.partial = m_len - i;
                 ret.push(cur_hap);

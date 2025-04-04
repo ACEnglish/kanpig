@@ -124,6 +124,7 @@ pub fn diploid_haplotypes(
         hap2.coverage += hap1.coverage;
         return vec![hap2];
     };
+
     // Need some way to challenge if an outlier is by itself..
     /*if hap1.coverage < 3 {
         hap2.coverage += hap1.coverage;
@@ -141,7 +142,15 @@ pub fn diploid_haplotypes(
             hap2.coverage += hap1.coverage;
             vec![hap2]
         }
-        metrics::GTstate::Hom => vec![hap1, hap2],
+        metrics::GTstate::Hom => {
+            if (hap1.coverage as f32 / (remaining_coverage + applied_coverage) as f32) < params.ab {
+                // the allele balance suggests they're not likely compound het
+                // Assume hap1 is just noise and leave it as reference coverage
+                vec![hap2]
+            } else {
+                vec![hap1, hap2]
+            }
+        }
         _ => panic!("The genotyper can't do this, yet"),
     }
 }

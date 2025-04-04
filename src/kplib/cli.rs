@@ -223,6 +223,14 @@ pub struct KDParams {
     /// (Experimental) Limit homopolymer length (off=0)
     #[arg(long, default_value_t = 0, help_heading = "Scoring / Advanced")]
     pub maxhom: usize,
+
+    /// (Experimental) Prefer simplier paths during scoring
+    #[arg(long, default_value_t = false, help_heading = "Scoring / Advanced")]
+    pub squish: bool,
+
+    /// (Experimental) Minimum allele balance for compound het lower VAF (off=0)
+    #[arg(long, default_value_t = 0.0, help_heading = "Scoring / Advanced")]
+    pub ab: f32,
 }
 
 impl KanpigParams for GTArgs {
@@ -318,6 +326,8 @@ fn validate_bam(file_path: &str) -> bool {
             );
             is_ok = false;
         }
+    } else {
+        is_ok = false;
     }
     is_ok
 }
