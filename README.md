@@ -96,7 +96,7 @@ problematic anyway.
 ### `--hapsim`
 After performing kmedoid clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
 above `hapsim`, they are consolidated into a homozygous allele. This is useful for when input SVs over a certain 
-size/sequence sequence similarity have already been merged (see [truvari collapse](https://github.com/ACEnglish/truvari).
+size/sequence sequence similarity have already been merged (see [truvari collapse](https://github.com/ACEnglish/truvari)).
 
 ### `--threads`
 Number of analysis threads to use. Note that in addition to the analysis threads, kanpig keeps one dedicated IO thread
@@ -108,19 +108,19 @@ The `SAMPLE` column fields populated by kanpig are:
 
 | Field   | Description |
 |---------|-------------|
-| **FT**  | Bit flag for properties of the variant's genotyping. Flags == 0 are considered PASS. |
+| **FT**  | Bit flag for properties of the variant's genotyping |
 | **SQ**  | Phred scaled likelihood variant alternate is present in the sample |
 | **GQ**  | Phred scale difference between most and second-most likely genotypes |
 | **PS**  | Phase set pulled from haplotagged reads for long-range phasing |
 | **NE**  | Neighborhood id of variants evaluated together for short-range phasing |
 | **DP**  | Read coverage over the region |
-| **AD**  | Read coverage supporting the reference and alternate alleles. |
+| **AD**  | Read coverage supporting the reference and alternate alleles |
 | **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
 
 Details of `FT`
 | Flag   | Description |
 |--------|-------------|
-| 0x1    | The genotype observed from variants matching paths is not equal to the genotype observed from measuring the proportions of reads supporting the two alleles. |
+| 0x1    | The genotype observed from variants paths matching is not equal to the genotype observed from measuring the proportions of reads supporting the two alleles. |
 | 0x2    | The genotype quality is less than 5 |
 | 0x4    | The depth (DP) is less than 5 |
 | 0x8    | The sample quality (SQ) is less than 5 (only present on non-ref variants) |
