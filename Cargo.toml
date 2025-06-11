@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 bitflags = { version = "2.6.0" }
 clap = { version = "4.0", features = ["derive"] }
-crossbeam-channel = { version = "0.5.13" }
+crossbeam-channel = { version = "0.5.15" }
 indexmap = { version = "2.7.0" }
 indicatif = { version = "0.17.9" }
 itertools = { version = "0.13.0" }
