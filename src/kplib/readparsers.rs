@@ -11,13 +11,16 @@ use std::path::PathBuf;
 pub type ReadsMap = IndexMap<usize, Vec<usize>>;
 pub type PileupSet = IndexSet<PileupVariant>;
 type HPMap = IndexMap<usize, Option<u8>>;
+
 pub trait ReadParser {
     fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64);
+    fn get_sample(&self) -> String;
 }
 
 pub struct BamParser {
     bam: IndexedReader,
     reference: faidx::Reader,
+    sample: String,
     params: KDParams,
 }
 
@@ -26,6 +29,7 @@ impl BamParser {
         bam_name: PathBuf,
         ref_name: PathBuf,
         reference: faidx::Reader,
+        sample: String,
         params: KDParams,
     ) -> Self {
         let mut bam = IndexedReader::from_path(bam_name).unwrap();
@@ -33,6 +37,7 @@ impl BamParser {
         Self {
             bam,
             reference,
+            sample,
             params,
         }
     }
@@ -103,21 +108,32 @@ impl ReadParser for BamParser {
             coverage,
         )
     }
+
+    fn get_sample(&self) -> String {
+        self.sample.clone()
+    }
 }
 
 pub struct PlupParser {
     tbx: tbx::Reader,
     reference: faidx::Reader,
+    sample: String,
     params: KDParams,
 }
 
 impl PlupParser {
     /// Creates a new `PlupReader` for a given file path.
-    pub fn new(file_path: PathBuf, reference: faidx::Reader, params: KDParams) -> Self {
+    pub fn new(
+        file_path: PathBuf,
+        reference: faidx::Reader,
+        sample: String,
+        params: KDParams,
+    ) -> Self {
         let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
         Self {
             tbx,
             reference,
+            sample,
             params,
         }
     }
@@ -178,6 +194,35 @@ impl ReadParser for PlupParser {
             ),
             coverage,
         )
+    }
+
+    fn get_sample(&self) -> String {
+        self.sample.clone()
+    }
+}
+
+/// Factory function for opening either a bam or a plup
+pub fn open_reads(
+    reads_path: PathBuf,
+    reference_path: PathBuf,
+    sample_name: String,
+    kd: &KDParams,
+) -> Box<dyn ReadParser> {
+    let reference = faidx::Reader::from_path(&reference_path).unwrap();
+    match reads_path.file_name().and_then(|name| name.to_str()) {
+        Some(name) if name.ends_with(".plup.gz") => Box::new(PlupParser::new(
+            reads_path,
+            reference,
+            sample_name,
+            kd.clone(),
+        )),
+        _ => Box::new(BamParser::new(
+            reads_path,
+            reference_path,
+            reference,
+            sample_name,
+            kd.clone(),
+        )),
     }
 }
 

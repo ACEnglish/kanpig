@@ -29,22 +29,8 @@ impl VcfWriter {
     pub fn new(
         out_path: &Option<PathBuf>,
         mut header: vcf::Header,
-        sample: &Option<String>,
+        sample_name: &str,
     ) -> Self {
-        // Ensure sample is correctly set up
-        let sample_name = match sample {
-            Some(name) => name.clone(),
-            None => {
-                if header.sample_names().is_empty() {
-                    error!("--input contains no samples. --sample name must be provided");
-                    std::process::exit(1);
-                }
-                let samp_name = header.sample_names()[0].clone();
-                info!("Setting sample to {}", samp_name);
-                samp_name
-            }
-        };
-
         if !header.sample_names().is_empty() {
             warn!(
                 "Clearing {} sample columns in output",
@@ -52,7 +38,7 @@ impl VcfWriter {
             );
             header.sample_names_mut().clear();
         }
-        header.sample_names_mut().insert(sample_name);
+        header.sample_names_mut().insert(sample_name.to_owned());
 
         // Setup FORMAT header definitions
         let all_formats = header.formats_mut();

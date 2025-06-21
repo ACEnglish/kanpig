@@ -172,7 +172,14 @@ impl Variants {
                     .entry
                     .as_ref()
                     .map(|entry| {
-                        GenotypeAnno::new(entry.clone(), &var_idx, paths, coverage, &Ploidy::Unset, self.start)
+                        GenotypeAnno::new(
+                            entry.clone(),
+                            &var_idx,
+                            paths,
+                            coverage,
+                            &Ploidy::Unset,
+                            self.start,
+                        )
                     })
             })
             .collect::<Vec<GenotypeAnno>>()

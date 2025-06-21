@@ -1,15 +1,14 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
-use rust_htslib::faidx;
 use std::{
     sync::{Arc, Mutex},
     thread::{self, JoinHandle},
 };
 
 use crate::kplib::{
-    build_region_tree, BamParser, GTArgs, GenotypeAnno, IOParams, PathScore, Ploidy, PloidyRegions,
-    PlupParser, ReadParser, Variants, VcfChunker, VcfWriter,
+    build_region_tree, open_reads, GTArgs, GenotypeAnno, IOParams, PathScore, Ploidy,
+    PloidyRegions, Variants, VcfChunker, VcfWriter,
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
@@ -42,7 +41,7 @@ fn write_thread(
     wt_header: vcf::Header,
     wt_num_variants: Arc<Mutex<u64>>,
 ) {
-    let mut m_writer = VcfWriter::new(&wt_io.out, wt_header.clone(), &wt_io.sample);
+    let mut m_writer = VcfWriter::new(&wt_io.out, wt_header.clone(), &wt_io.sample.expect(""));
 
     let mut pbar: Option<ProgressBar> = None;
     let sty =
@@ -92,22 +91,12 @@ fn task_thread(
     m_result_sender: Sender<OutputType>,
     m_ploidy: PloidyRegions,
 ) {
-    let reference = faidx::Reader::from_path(&m_args.io.reference).unwrap();
-    let mut m_reads: Box<dyn ReadParser> =
-        match m_args.io.reads.file_name().and_then(|name| name.to_str()) {
-            Some(name) if name.ends_with(".plup.gz") => Box::new(PlupParser::new(
-                m_args.io.reads,
-                reference,
-                m_args.kd.clone(),
-            )),
-            _ => Box::new(BamParser::new(
-                m_args.io.reads,
-                m_args.io.reference,
-                reference,
-                m_args.kd.clone(),
-            )),
-        };
-
+    let mut m_reads = open_reads(
+        m_args.io.reads,
+        m_args.io.reference,
+        m_args.io.sample.expect("Sample should have been set"),
+        &m_args.kd,
+    );
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
@@ -150,13 +139,25 @@ fn task_thread(
     // This should give a result
 }
 
-pub fn genotype_main(args: GTArgs) {
+pub fn genotype_main(mut args: GTArgs) {
     let mut input_vcf = vcf::io::reader::Builder::default()
         .build_from_path(args.io.input.clone())
         .expect("Unable to parse vcf");
+
     let input_header = input_vcf.read_header().expect("Unable to parse vcf header");
 
+    if args.io.sample.is_none() {
+        if input_header.sample_names().is_empty() {
+            error!("--input contains no samples. --sample name must be provided");
+            std::process::exit(1);
+        }
+        let samp_name = input_header.sample_names()[0].clone();
+        info!("Setting sample to {}", samp_name);
+        args.io.sample = Some(samp_name);
+    }
+
     let m_contigs = input_header.contigs().clone();
+
     let tree = build_region_tree(&m_contigs, &args.io.bed);
 
     let ploidy = PloidyRegions::new(&args.io.ploidy_bed);
