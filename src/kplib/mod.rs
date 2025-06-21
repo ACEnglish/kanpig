@@ -4,13 +4,13 @@ pub use crate::kplib::annotator::GenotypeAnno;
 mod bedparser;
 pub use crate::kplib::bedparser::BedParser;
 
-mod cli;
-pub use crate::kplib::cli::{Cli, Commands, GTArgs, IOParams, KDParams, KanpigParams, PlupArgs};
-
 mod cluster;
 
 mod haplotype;
 pub use crate::kplib::haplotype::Haplotype;
+
+mod kdparams;
+pub use crate::kplib::kdparams::KDParams;
 
 mod kmer;
 pub use crate::kplib::kmer::seq_to_kmer;

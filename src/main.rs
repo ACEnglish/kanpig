@@ -3,14 +3,20 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
-mod genotype_main;
-mod kplib;
-mod plup_main;
-use crate::{genotype_main::genotype_main, plup_main::plup_main};
 use clap::Parser;
-use kplib::{Cli, Commands, KanpigParams};
+use kanpig::commands::{Commands, KanpigCommand};
 
-fn setup_logging(args: &impl KanpigParams) {
+/// Entrypoint for the commands
+#[derive(Parser, Clone, Debug)]
+#[command(name = "kanpig")]
+#[command(about = "Kmer ANalysis of PIleups for Genotyping")]
+#[command(author = "ACEnglish", version)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+fn setup_logging(args: &impl KanpigCommand) {
     let level = if args.debug() {
         log::LevelFilter::Debug
     } else {
@@ -30,15 +36,14 @@ fn setup_logging(args: &impl KanpigParams) {
 
 fn main() {
     let cli = Cli::parse();
-
     match cli.command {
-        Commands::Gt(args) => {
-            setup_logging(&args);
-            genotype_main(args);
+        Commands::Gt(mut cmd) => {
+            setup_logging(&cmd);
+            cmd.run()
         }
-        Commands::Plup(args) => {
-            setup_logging(&args);
-            plup_main(args)
+        Commands::Plup(mut cmd) => {
+            setup_logging(&cmd);
+            cmd.run();
         }
-    };
+    }
 }
