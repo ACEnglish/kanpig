@@ -120,20 +120,16 @@ impl Variants {
 
     // Find the path through this graph that best fits
     // the haplotype push coverage onto the VarNodes
-    pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
+    pub fn apply_haplotype(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
         // if there are no variants in the hap, we don't want to apply the coverage.
         if params.one_to_one || (self.node_indices.len() - 2) > params.maxnodes {
-            let mut ret = get_one_to_one(&self.graph, hap, params)
+            get_one_to_one(&self.graph, hap, params)
                 .iter()
                 .max()
                 .cloned()
-                .unwrap_or_else(PathScore::default);
-            ret.coverage = Some(hap.coverage);
-            ret
+                .unwrap_or_else(PathScore::default)
         } else {
-            let mut ret = brute_force_find_path(&self.graph, hap, params);
-            ret.coverage = Some(hap.coverage);
-            ret
+            brute_force_find_path(&self.graph, hap, params)
         }
     }
 

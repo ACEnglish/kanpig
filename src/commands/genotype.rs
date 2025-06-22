@@ -9,37 +9,16 @@ use std::{
 };
 
 use crate::{
-    file_validators,
     commands::KanpigCommand,
+    file_validators,
     kplib::{
-        build_region_tree, open_reads, GenotypeAnno, KDParams, PathScore, Ploidy, PloidyRegions,
-        Variants, VcfChunker, VcfWriter,
+        build_region_tree, hp_sorter, open_reads, GenotypeAnno, KDParams, PathScore, Ploidy,
+        PloidyRegions, Variants, VcfChunker, VcfWriter,
     },
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
 type OutputType = Option<Vec<GenotypeAnno>>;
-
-fn hp_sorter(a: &Option<u8>, b: &Option<u8>) -> std::cmp::Ordering {
-    match (a, b) {
-        // If both are Some, reverse order
-        (Some(va), Some(vb)) => vb.cmp(va),
-
-        // If one is None and the other is Some(1), None comes first
-        (Some(1), None) => std::cmp::Ordering::Greater,
-        (None, Some(1)) => std::cmp::Ordering::Less,
-
-        // If one is None and the other is Some(2), None comes last
-        (Some(2), None) => std::cmp::Ordering::Less,
-        (None, Some(2)) => std::cmp::Ordering::Greater,
-
-        // If both are None, do nothing
-        (None, None) => std::cmp::Ordering::Equal,
-
-        // Default fallback (not strictly needed with the cases above)
-        _ => std::cmp::Ordering::Equal,
-    }
-}
 
 fn write_thread(
     result_receiver: Receiver<OutputType>,
@@ -47,7 +26,11 @@ fn write_thread(
     wt_header: vcf::Header,
     wt_num_variants: Arc<Mutex<u64>>,
 ) {
-    let mut m_writer = VcfWriter::new(&wt_io.out, wt_header.clone(), &wt_io.sample.expect(""));
+    let mut m_writer = VcfWriter::new(
+        &wt_io.out,
+        wt_header.clone(),
+        &vec![wt_io.sample.expect("")],
+    );
 
     let mut pbar: Option<ProgressBar> = None;
     let sty =
@@ -101,6 +84,7 @@ fn task_thread(
         m_args.io.reads,
         m_args.io.reference,
         m_args.io.sample.expect("Sample should have been set"),
+        0, // First sample is always index 0
         &m_args.kd,
     );
     loop {
@@ -130,10 +114,10 @@ fn task_thread(
 
                 let mut paths: Vec<PathScore> = haps
                     .iter()
-                    .map(|h| m_graph.apply_coverage(h, &m_args.kd))
+                    .map(|h| m_graph.apply_haplotype(h, &m_args.kd))
                     .filter(|p| *p != PathScore::default())
                     .collect();
-                paths.sort_by(|a, b| hp_sorter(&a.hp, &b.hp));
+                paths.sort_by(|a, b| hp_sorter(&a.meta.hp, &b.meta.hp));
 
                 // Sort paths based on their HP if set
                 m_result_sender

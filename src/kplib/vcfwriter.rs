@@ -29,7 +29,7 @@ impl VcfWriter {
     pub fn new(
         out_path: &Option<PathBuf>,
         mut header: vcf::Header,
-        sample_name: &str,
+        sample_names: &Vec<String>,
     ) -> Self {
         if !header.sample_names().is_empty() {
             warn!(
@@ -38,7 +38,9 @@ impl VcfWriter {
             );
             header.sample_names_mut().clear();
         }
-        header.sample_names_mut().insert(sample_name.to_owned());
+        for i in sample_names {
+            header.sample_names_mut().insert(i.to_owned());
+        }
 
         // Setup FORMAT header definitions
         let all_formats = header.formats_mut();

@@ -7,7 +7,7 @@ pub use crate::kplib::bedparser::BedParser;
 mod cluster;
 
 mod haplotype;
-pub use crate::kplib::haplotype::Haplotype;
+pub use crate::kplib::haplotype::{Haplotype, HaplotypeMeta};
 
 mod kdparams;
 pub use crate::kplib::kdparams::KDParams;
@@ -19,6 +19,9 @@ mod metrics;
 
 mod pathscore;
 pub use crate::kplib::pathscore::PathScore;
+
+mod phasetags;
+pub use crate::kplib::phasetags::hp_sorter;
 
 mod pileup;
 pub use crate::kplib::pileup::{PileupVariant, ReadPileup};

@@ -86,7 +86,7 @@ fn diploid(
         [p1, p2] => handle_diploid_two_paths(var_idx, p1, p2, coverage),
         _ => panic!("Unexpected number of paths for diploid region"),
     };
-
+    debug!("{:?}", paths);
     finalize_annotation(entry, handle, paths, coverage, neigh_group)
 }
 
@@ -126,12 +126,7 @@ fn haploid(
 
     let path1 = &paths[0];
     let handle = match path1.path.contains(var_idx) {
-        true => (
-            "1",
-            metrics::GTstate::Hom,
-            path1.coverage.unwrap_or(0) as f64,
-            true,
-        ),
+        true => ("1", metrics::GTstate::Hom, path1.meta.coverage as f64, true),
         false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0, true),
         false => (".", metrics::GTstate::Non, 0.0, true),
     };
@@ -157,11 +152,11 @@ fn handle_diploid_single_path<'a>(
     if !path.path.contains(var_idx) {
         ("0|0", metrics::GTstate::Ref, 0.0, true)
     } else {
-        let alt_cov = path.coverage.unwrap() as f64;
+        let alt_cov = path.meta.coverage as f64;
         let ref_cov = (coverage as f64) - alt_cov;
         let (genotype, state) = match metrics::genotyper(ref_cov, alt_cov) {
             metrics::GTstate::Ref | metrics::GTstate::Het => {
-                let gt = match path.hp {
+                let gt = match path.meta.hp {
                     None => "0|1",
                     Some(1) => "0|1",
                     _ => "1|0",
@@ -185,19 +180,19 @@ fn handle_diploid_two_paths<'a>(
         (true, true) => (
             "1|1",
             metrics::GTstate::Hom,
-            (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+            (path1.meta.coverage + path2.meta.coverage) as f64,
             path1.full_target || path2.full_target,
         ),
         (true, false) => (
             "1|0",
             metrics::GTstate::Het,
-            path1.coverage.unwrap() as f64,
+            path1.meta.coverage as f64,
             path1.full_target,
         ),
         (false, true) => (
             "0|1",
             metrics::GTstate::Het,
-            path2.coverage.unwrap() as f64,
+            path2.meta.coverage as f64,
             path2.full_target,
         ),
         (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0, true),
@@ -220,7 +215,11 @@ fn finalize_annotation(
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
 
-    let ps = if !paths.is_empty() { paths[0].ps } else { None };
+    let ps = if !paths.is_empty() {
+        paths[0].meta.ps
+    } else {
+        None
+    };
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 

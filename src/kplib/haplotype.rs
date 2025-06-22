@@ -6,51 +6,56 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct HaplotypeMeta {
+    pub coverage: u64,
+    pub ps: Option<u32>,
+    pub hp: Option<u8>,
+    pub samples_idx: u8,
+}
+impl HaplotypeMeta {
+    pub fn new(samples_idx: u8) -> Self {
+        HaplotypeMeta {
+            coverage: 1,
+            ps: None,
+            hp: None,
+            samples_idx,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Haplotype {
     pub size: i64,
     pub n: u64,
-    pub coverage: u64,
     pub kfeat: Vec<f32>,
     pub parts: Vec<(i64, Vec<f32>)>,
     pub partial: usize,
-    pub ps: Option<u32>,
-    pub hp: Option<u8>,
+    pub meta: HaplotypeMeta,
 }
 
 impl Haplotype {
-    pub fn new(
-        kfeat: Vec<f32>,
-        size: i64,
-        n: u64,
-        coverage: u64,
-        ps: Option<u32>,
-        hp: Option<u8>,
-    ) -> Self {
+    pub fn new(kfeat: Vec<f32>, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
         Self {
             size,
             n,
-            coverage,
             kfeat: kfeat.clone(),
             parts: vec![(size, kfeat)],
             partial: 0,
-            ps,
-            hp,
+            meta: hap_meta,
         }
     }
 
     // Create an empty haplotype
-    pub fn blank(kmer: u8, coverage: u64) -> Haplotype {
+    pub fn blank(kmer: u8, meta: HaplotypeMeta) -> Haplotype {
         let mk = seq_to_kmer(&[], kmer, false, 0);
         Haplotype {
             size: 0,
             n: 0,
-            coverage,
             kfeat: mk.clone(),
             parts: vec![],
             partial: 0,
-            ps: None,
-            hp: None,
+            meta,
         }
     }
 
@@ -78,7 +83,7 @@ impl Haplotype {
         let lower = if m_len <= max_fns { 1 } else { m_len - max_fns };
         for i in (lower..(m_len + 1)).rev() {
             for j in self.parts.iter().combinations(i) {
-                let mut cur_hap = Haplotype::blank(kmer, self.coverage);
+                let mut cur_hap = Haplotype::blank(kmer, self.meta);
                 for k in j.iter() {
                     cur_hap.size += k.0;
                     cur_hap
@@ -87,6 +92,8 @@ impl Haplotype {
                         .zip(k.1.iter())
                         .for_each(|(x, y)| *x += y);
                     cur_hap.n += 1;
+                    // Partials are temporary, so we don't need to do this
+                    // cur_hap.samples_idx |= k.1.samples_idx | k.0.
                 }
                 cur_hap.partial = m_len - i;
                 ret.push(cur_hap);
@@ -104,7 +111,7 @@ impl PartialOrd for Haplotype {
 
 impl Ord for Haplotype {
     fn cmp(&self, other: &Self) -> Ordering {
-        let coverage_ordering = self.coverage.cmp(&other.coverage);
+        let coverage_ordering = self.meta.coverage.cmp(&other.meta.coverage);
         if coverage_ordering != Ordering::Equal {
             return coverage_ordering;
         }
@@ -135,7 +142,7 @@ impl Ord for Haplotype {
 
 impl PartialEq for Haplotype {
     fn eq(&self, other: &Self) -> bool {
-        self.coverage == other.coverage
+        self.meta.coverage == other.meta.coverage
             && self.size == other.size
             && self.n == other.n
             && self
@@ -161,9 +168,10 @@ impl Debug for Haplotype {
         f.debug_struct("Haplotype")
             .field("size", &self.size)
             .field("n", &self.n)
-            .field("coverage", &self.coverage)
-            .field("ps", &self.ps)
-            .field("hp", &self.hp)
+            .field("coverage", &self.meta.coverage)
+            .field("ps", &self.meta.ps)
+            .field("hp", &self.meta.hp)
+            .field("samp", &self.meta.samples_idx)
             // Exclude kfeat from the debug output
             .finish()
     }
