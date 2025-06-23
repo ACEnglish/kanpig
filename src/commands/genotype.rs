@@ -18,7 +18,7 @@ use crate::{
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
-type OutputType = Option<Vec<GenotypeAnno>>;
+type OutputType = Option<Vec<(vcf::variant::RecordBuf, GenotypeAnno)>>;
 
 fn write_thread(
     result_receiver: Receiver<OutputType>,
@@ -48,8 +48,9 @@ fn write_thread(
             }
             Ok(Some(result)) => {
                 let mut rsize: u64 = 0;
-                for entry in result {
-                    m_writer.anno_write(entry);
+                // annoSS
+                for (entry, anno) in result {
+                    m_writer.anno_write(entry, anno);
                     rsize += 1;
                 }
 

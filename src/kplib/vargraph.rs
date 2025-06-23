@@ -140,7 +140,7 @@ impl Variants {
         paths: &[PathScore],
         coverage: u64,
         ploidy: &Ploidy,
-    ) -> Vec<GenotypeAnno> {
+    ) -> Vec<(RecordBuf, GenotypeAnno)> {
         self.node_indices
             .iter_mut()
             .filter_map(|var_idx| {
@@ -150,34 +150,13 @@ impl Variants {
                     .entry
                     .take()
                     .map(|entry| {
-                        GenotypeAnno::new(entry, var_idx, paths, coverage, ploidy, self.start)
-                    })
-            })
-            .collect::<Vec<GenotypeAnno>>()
-    }
-
-    /// Transform the graph back into annotated variants
-    /// Note that this will clone the entries from the graph's VarNodes
-    pub fn __clone_annotated(&mut self, paths: &[PathScore], coverage: u64) -> Vec<GenotypeAnno> {
-        self.node_indices
-            .iter()
-            .filter_map(|&var_idx| {
-                self.graph
-                    .node_weight(var_idx)
-                    .unwrap()
-                    .entry
-                    .as_ref()
-                    .map(|entry| {
-                        GenotypeAnno::new(
-                            entry.clone(),
-                            &var_idx,
-                            paths,
-                            coverage,
-                            &Ploidy::Unset,
-                            self.start,
+                        // Per-sample I can make a GenotypeAnno
+                        (
+                            entry,
+                            GenotypeAnno::new(var_idx, paths, coverage, ploidy, self.start),
                         )
                     })
             })
-            .collect::<Vec<GenotypeAnno>>()
+            .collect::<Vec<(RecordBuf, GenotypeAnno)>>()
     }
 }

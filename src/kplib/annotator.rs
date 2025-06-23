@@ -1,9 +1,6 @@
 use crate::kplib::{metrics, PathScore, Ploidy};
 use bitflags::bitflags;
-use noodles_vcf::{
-    variant::record_buf::samples::sample::value::{Array, Value},
-    variant::RecordBuf,
-};
+use noodles_vcf::variant::record_buf::samples::sample::value::{Array, Value};
 use petgraph::graph::NodeIndex;
 
 bitflags! {
@@ -24,7 +21,6 @@ type IntG = Vec<Option<i32>>;
 
 /// Struct representing genotype annotations.
 pub struct GenotypeAnno {
-    pub entry: RecordBuf,
     pub gt: String,
     pub filt: FiltFlags,
     pub sq: i32,
@@ -40,7 +36,6 @@ pub struct GenotypeAnno {
 impl GenotypeAnno {
     /// Creates a new `GenotypeAnno` instance based on the provided ploidy and parameters.
     pub fn new(
-        entry: RecordBuf,
         var_idx: &NodeIndex,
         paths: &[PathScore],
         coverage: u64,
@@ -48,9 +43,9 @@ impl GenotypeAnno {
         neigh_group: u64,
     ) -> Self {
         match ploidy {
-            Ploidy::Zero => zero(entry, coverage, neigh_group),
-            Ploidy::Haploid => haploid(entry, var_idx, paths, coverage, neigh_group),
-            _ => diploid(entry, var_idx, paths, coverage, neigh_group),
+            Ploidy::Zero => zero(coverage, neigh_group),
+            Ploidy::Haploid => haploid(var_idx, paths, coverage, neigh_group),
+            _ => diploid(var_idx, paths, coverage, neigh_group),
         }
     }
 
@@ -74,7 +69,6 @@ impl GenotypeAnno {
 
 /// Helper function for a diploid region annotation.
 fn diploid(
-    entry: RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
@@ -86,14 +80,13 @@ fn diploid(
         [p1, p2] => handle_diploid_two_paths(var_idx, p1, p2, coverage),
         _ => panic!("Unexpected number of paths for diploid region"),
     };
-    debug!("{:?}", paths);
-    finalize_annotation(entry, handle, paths, coverage, neigh_group)
+
+    finalize_annotation(handle, paths, coverage, neigh_group)
 }
 
 /// Helper for zero ploidy regions.
-fn zero(entry: RecordBuf, coverage: u64, neigh_group: u64) -> GenotypeAnno {
+fn zero(coverage: u64, neigh_group: u64) -> GenotypeAnno {
     GenotypeAnno {
-        entry,
         gt: "./.".to_string(),
         filt: FiltFlags::PASS,
         sq: 0,
@@ -110,7 +103,6 @@ fn zero(entry: RecordBuf, coverage: u64, neigh_group: u64) -> GenotypeAnno {
 /// Helper for haploid regions.
 /// Assumed to have ≤1 Path
 fn haploid(
-    entry: RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
@@ -121,7 +113,7 @@ fn haploid(
             0 => (".", metrics::GTstate::Non, 0.0, true),
             _ => ("0", metrics::GTstate::Ref, 0.0, true),
         };
-        return finalize_annotation(entry, handle, paths, coverage, neigh_group);
+        return finalize_annotation(handle, paths, coverage, neigh_group);
     }
 
     let path1 = &paths[0];
@@ -130,7 +122,7 @@ fn haploid(
         false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0, true),
         false => (".", metrics::GTstate::Non, 0.0, true),
     };
-    finalize_annotation(entry, handle, paths, coverage, neigh_group)
+    finalize_annotation(handle, paths, coverage, neigh_group)
 }
 
 /// GT str, GTstate, alt_cov, is_fulltarget
@@ -201,7 +193,6 @@ fn handle_diploid_two_paths<'a>(
 }
 
 fn finalize_annotation(
-    entry: RecordBuf,
     handle: HandleReturn,
     paths: &[PathScore],
     coverage: u64,
@@ -255,7 +246,6 @@ fn finalize_annotation(
     }
 
     GenotypeAnno {
-        entry,
         gt: gt_str.to_string(),
         filt,
         sq: sq.round() as i32,
