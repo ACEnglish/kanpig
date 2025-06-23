@@ -15,16 +15,22 @@ pub type PileupSet = IndexSet<PileupVariant>;
 type HPMap = IndexMap<usize, Option<u8>>;
 
 pub trait ReadParser {
+    /// Pull reads and create Haplotype
     fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64);
+    /// Official Sample Name
     fn get_sample_name(&self) -> String;
-    fn get_sample_idx(&self) -> u8;
+    /// Index of the sample - this is for HaplotypeMeta which holds all samples at once in vectors
+    fn get_sample_idx(&self) -> usize;
+    /// Needed for initializing the HaplotypeMeta with the correct array size
+    fn get_sample_count(&self) -> usize;
 }
 
 pub struct BamParser {
     bam: IndexedReader,
     reference: faidx::Reader,
     sample_name: String,
-    sample_idx: u8,
+    sample_idx: usize,
+    sample_count: usize,
     params: KDParams,
 }
 
@@ -34,7 +40,8 @@ impl BamParser {
         ref_name: PathBuf,
         reference: faidx::Reader,
         sample_name: String,
-        sample_idx: u8,
+        sample_idx: usize,
+        sample_count: usize,
         params: KDParams,
     ) -> Self {
         let mut bam = IndexedReader::from_path(bam_name).unwrap();
@@ -44,6 +51,7 @@ impl BamParser {
             reference,
             sample_name,
             sample_idx,
+            sample_count,
             params,
         }
     }
@@ -62,12 +70,14 @@ impl ReadParser for BamParser {
 
         // track the changes made by each read
         let mut reads = ReadsMap::new();
-        let mut hap_meta = HaplotypeMeta::new(self.get_sample_idx());
+        let mut hap_meta = HaplotypeMeta::new(self.get_sample_idx(), self.get_sample_count());
         let mut hps = HPMap::new();
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
         let mut qname = 0;
         let mut record = bam::Record::new();
+        let sample_index = self.get_sample_idx();
+
         while let Some(r) = self.bam.read(&mut record) {
             r.expect("Failed to parse record");
             if !record.seq().is_empty()
@@ -84,8 +94,8 @@ impl ReadParser for BamParser {
                     self.params.sizemax,
                 );
 
-                if hap_meta.ps.is_none() && read.ps.is_some() {
-                    hap_meta.ps = read.ps;
+                if hap_meta.ps[sample_index].is_none() && read.ps.is_some() {
+                    hap_meta.ps[sample_index] = read.ps;
                 }
 
                 if !read.pileups.is_empty() {
@@ -110,6 +120,7 @@ impl ReadParser for BamParser {
                 &self.params,
                 hps,
                 hap_meta,
+                self.get_sample_idx(),
             ),
             coverage,
         )
@@ -118,8 +129,13 @@ impl ReadParser for BamParser {
     fn get_sample_name(&self) -> String {
         self.sample_name.clone()
     }
-    fn get_sample_idx(&self) -> u8 {
+
+    fn get_sample_idx(&self) -> usize {
         self.sample_idx
+    }
+
+    fn get_sample_count(&self) -> usize {
+        self.sample_count
     }
 }
 
@@ -127,7 +143,8 @@ pub struct PlupParser {
     tbx: tbx::Reader,
     reference: faidx::Reader,
     sample_name: String,
-    sample_idx: u8,
+    sample_idx: usize,
+    sample_count: usize,
     params: KDParams,
 }
 
@@ -137,7 +154,8 @@ impl PlupParser {
         file_path: PathBuf,
         reference: faidx::Reader,
         sample_name: String,
-        sample_idx: u8,
+        sample_idx: usize,
+        sample_count: usize,
         params: KDParams,
     ) -> Self {
         let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
@@ -146,6 +164,7 @@ impl PlupParser {
             reference,
             sample_name,
             sample_idx,
+            sample_count,
             params,
         }
     }
@@ -168,9 +187,10 @@ impl ReadParser for PlupParser {
 
         let mut reads = ReadsMap::new();
         let mut hps = HPMap::new();
-        let mut hap_meta = HaplotypeMeta::new(self.get_sample_idx());
+        let mut hap_meta = HaplotypeMeta::new(self.get_sample_idx(), self.get_sample_count());
         let mut p_variants = PileupSet::new();
         let mut coverage = 0;
+        let sample_idx = self.get_sample_idx();
 
         for (qname, line) in self.tbx.records().filter_map(Result::ok).enumerate() {
             if let Some(mut read) =
@@ -178,8 +198,8 @@ impl ReadParser for PlupParser {
             {
                 if read.start < window_start && read.end > window_end {
                     coverage += 1;
-                    if hap_meta.ps.is_none() && read.ps.is_some() {
-                        hap_meta.ps = read.ps;
+                    if hap_meta.ps[sample_idx].is_none() && read.ps.is_some() {
+                        hap_meta.ps[sample_idx] = read.ps;
                     }
                     if !read.pileups.is_empty() {
                         hps.entry(qname).or_insert(read.hp);
@@ -203,6 +223,7 @@ impl ReadParser for PlupParser {
                 &self.params,
                 hps,
                 hap_meta,
+                self.get_sample_idx(),
             ),
             coverage,
         )
@@ -211,8 +232,13 @@ impl ReadParser for PlupParser {
     fn get_sample_name(&self) -> String {
         self.sample_name.clone()
     }
-    fn get_sample_idx(&self) -> u8 {
+
+    fn get_sample_idx(&self) -> usize {
         self.sample_idx
+    }
+
+    fn get_sample_count(&self) -> usize {
+        self.sample_count
     }
 }
 
@@ -221,7 +247,8 @@ pub fn open_reads(
     reads_path: PathBuf,
     reference_path: PathBuf,
     sample_name: String,
-    sample_idx: u8,
+    sample_idx: usize,
+    sample_count: usize,
     kd: &KDParams,
 ) -> Box<dyn ReadParser> {
     let reference = faidx::Reader::from_path(&reference_path).unwrap();
@@ -231,6 +258,7 @@ pub fn open_reads(
             reference,
             sample_name,
             sample_idx,
+            sample_count,
             kd.clone(),
         )),
         _ => Box::new(BamParser::new(
@@ -239,6 +267,7 @@ pub fn open_reads(
             reference,
             sample_name,
             sample_idx,
+            sample_count,
             kd.clone(),
         )),
     }
@@ -289,6 +318,7 @@ pub fn open_reads(
 ///     println!("{:?}", hap);
 /// }
 /// ```
+#[allow(clippy::too_many_arguments)]
 fn pileups_to_haps(
     chrom: &str,
     reads: ReadsMap,
@@ -297,6 +327,7 @@ fn pileups_to_haps(
     params: &KDParams,
     hps: HPMap, // HP tags per-read
     hap_meta: HaplotypeMeta,
+    sample_idx: usize,
 ) -> Vec<Haplotype> {
     let mut hap_parts = Vec::<Haplotype>::with_capacity(plups.len());
     let mut ret = Vec::<Haplotype>::with_capacity(reads.len());
@@ -324,15 +355,15 @@ fn pileups_to_haps(
             ),
             p.size,
             1,
-            hap_meta,
+            hap_meta.clone(),
         );
         hap_parts.push(n_hap);
     }
 
     // qname: [plup_idx, ]
     for (read_idx, read) in reads.into_iter() {
-        let mut cur_hap = Haplotype::blank(params.kmer, hap_meta);
-        cur_hap.meta.hp = *hps.get(&read_idx).expect("hp populated with reads");
+        let mut cur_hap = Haplotype::blank(params.kmer, hap_meta.clone());
+        cur_hap.meta.hp[sample_idx] = *hps.get(&read_idx).expect("hp populated with reads");
         for p in read {
             cur_hap.add(&hap_parts[hap_parts.len() - p - 1]);
         }

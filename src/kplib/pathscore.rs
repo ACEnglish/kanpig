@@ -59,7 +59,7 @@ impl PathScore {
     ) -> Self {
         let mut path_k: Option<Vec<f32>> = None;
         let mut best_path = PathScore {
-            meta: target.meta,
+            meta: target.meta.clone(),
             ..Default::default()
         };
         // Return the partials in order from all to least
@@ -115,7 +115,7 @@ impl PathScore {
                     sizesim,
                     seqsim,
                     full_target: hap_parts.partial == 0,
-                    meta: target.meta,
+                    meta: target.meta.clone(),
                 };
             }
         }

@@ -21,7 +21,7 @@ pub struct VcfChunker<R: BufRead> {
     pub chunk_count: u64,
     pub call_count: u64,
     pub skip_count: u64,
-    result_sender: Sender<Option<Vec<GenotypeAnno>>>,
+    result_sender: Sender<Option<Vec<(RecordBuf, GenotypeAnno)>>>,
 }
 
 impl<R: BufRead> VcfChunker<R> {
@@ -30,7 +30,7 @@ impl<R: BufRead> VcfChunker<R> {
         m_header: vcf::Header,
         regions: Regions,
         params: KDParams,
-        result_sender: Sender<Option<Vec<GenotypeAnno>>>,
+        result_sender: Sender<Option<Vec<(RecordBuf, GenotypeAnno)>>>,
     ) -> Self {
         Self {
             m_vcf,
@@ -112,13 +112,9 @@ impl<R: BufRead> VcfChunker<R> {
                         return Some(entry);
                     } else {
                         self.skip_count += 1;
-                        let _ = self.result_sender.send(Some(vec![GenotypeAnno::new(
+                        let _ = self.result_sender.send(Some(vec![(
                             entry.clone(),
-                            &NodeIndex::new(0),
-                            &[],
-                            0,
-                            &Ploidy::Zero,
-                            0,
+                            GenotypeAnno::new(&NodeIndex::new(0), &[], 0, &Ploidy::Zero, 0, 0),
                         )]));
                     }
                 }

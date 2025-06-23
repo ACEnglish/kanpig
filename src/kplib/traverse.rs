@@ -43,7 +43,7 @@ pub fn brute_force_find_path(
 ) -> PathScore {
     let mut npaths = 0;
     let mut best_path = PathScore {
-        meta: target.meta,
+        meta: target.meta.clone(),
         ..Default::default()
     };
 

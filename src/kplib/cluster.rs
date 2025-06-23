@@ -21,7 +21,7 @@ pub fn haploid_haplotypes(
     let mut g_ps = None;
     let hap_counts: HashMap<Haplotype, usize> =
         haps.drain(..).fold(HashMap::new(), |mut acc, hap| {
-            g_ps = g_ps.or(hap.meta.ps);
+            g_ps = g_ps.or(hap.meta.ps[0]);
             *acc.entry(hap).or_insert(0) += 1;
             acc
         });
@@ -30,8 +30,8 @@ pub fn haploid_haplotypes(
         .into_iter()
         .max_by(|(hap1, count1), (hap2, count2)| count1.cmp(count2).then_with(|| hap1.cmp(hap2)))
         .expect("Must be >1 hap to get here");
-    most_common_hap.meta.coverage = cnt;
-    most_common_hap.meta.ps = g_ps;
+    most_common_hap.meta.coverage[0] = cnt;
+    most_common_hap.meta.ps = vec![g_ps];
 
     vec![most_common_hap]
 }
@@ -61,7 +61,7 @@ pub fn diploid_haplotypes(
             let dist =
                 1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, params.minkfreq as f32));
             // Penalize only if both points have defined, different groups
-            match (haplos[i].meta.hp, haplos[j].meta.hp) {
+            match (haplos[i].meta.hp[0], haplos[j].meta.hp[0]) {
                 (Some(group_i), Some(group_j)) if group_i != group_j => dist + params.hps_weight,
                 _ => dist,
             }
@@ -85,18 +85,18 @@ pub fn diploid_haplotypes(
         .zip(haplos)
         .for_each(|(idx, m_hap)| {
             let k_hap = &mut haps[idx];
-            k_hap.meta.coverage += 1;
-            k_hap.meta.ps = k_hap.meta.ps.or(m_hap.meta.ps);
+            k_hap.meta.coverage[0] += 1;
+            k_hap.meta.ps[0] = k_hap.meta.ps[0].or(m_hap.meta.ps[0]);
 
-            if let Some(hp) = m_hap.meta.hp {
+            if let Some(hp) = m_hap.meta.hp[0] {
                 hps_cnt[idx][hp as usize - 1] += 1;
             }
         });
 
     // HP just takes most common
     for (m_hap, hcnts) in haps.iter_mut().zip(hps_cnt) {
-        m_hap.meta.coverage -= 1; // Correct overcounting above
-        m_hap.meta.hp = if hcnts[0] == 0 && hcnts[1] == 0 {
+        m_hap.meta.coverage[0] -= 1; // Correct overcounting above
+        m_hap.meta.hp[0] = if hcnts[0] == 0 && hcnts[1] == 0 {
             None
         } else if hcnts[0] >= hcnts[1] {
             Some(1)
@@ -112,7 +112,7 @@ pub fn diploid_haplotypes(
     debug!("Hap2 in {:?}", hap2);
 
     // Hap2 is always the higher covered allele
-    if hap2.meta.coverage < hap1.meta.coverage {
+    if hap2.meta.coverage[0] < hap1.meta.coverage[0] {
         std::mem::swap(&mut hap1, &mut hap2);
     }
 
@@ -121,7 +121,7 @@ pub fn diploid_haplotypes(
     if (hap1.size.signum() == hap2.size.signum())
         && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs()) > params.hapsim
     {
-        hap2.meta.coverage += hap1.meta.coverage;
+        hap2.meta.coverage[0] += hap1.meta.coverage[0];
         return vec![hap2];
     };
 
@@ -134,16 +134,16 @@ pub fn diploid_haplotypes(
     // Now we figure out if the we need two alt alleles or not
     // The reason this takes two steps is the above code is just trying to figure out if
     // there's 1 or 2 alts. Now we figure out if its Het/Hom
-    let applied_coverage = (hap1.meta.coverage + hap2.meta.coverage) as f64;
+    let applied_coverage = (hap1.meta.coverage[0] + hap2.meta.coverage[0]) as f64;
     let remaining_coverage = coverage as f64 - applied_coverage;
     match metrics::genotyper(remaining_coverage, applied_coverage) {
         // We need the one higher covered alt
         metrics::GTstate::Ref | metrics::GTstate::Het => {
-            hap2.meta.coverage += hap1.meta.coverage;
+            hap2.meta.coverage[0] += hap1.meta.coverage[0];
             vec![hap2]
         }
         metrics::GTstate::Hom => {
-            if (hap1.meta.coverage as f32 / (remaining_coverage + applied_coverage) as f32)
+            if (hap1.meta.coverage[0] as f32 / (remaining_coverage + applied_coverage) as f32)
                 < params.ab
             {
                 // the allele balance suggests they're not likely compound het

@@ -86,17 +86,17 @@ impl VcfWriter {
         }
     }
 
-    pub fn anno_write(&mut self, mut annot: GenotypeAnno) {
+    pub fn anno_write(&mut self, mut entry: vcf::variant::RecordBuf, annot: GenotypeAnno) {
         *self.gtcounts.entry(annot.gt_state).or_insert(0) += 1;
-        *annot.entry.samples_mut() =
+        *entry.samples_mut() =
             Samples::new(self.keys.clone(), vec![annot.make_fields()]);
 
         self.buf.clear();
         let mut tmp = vcf::io::Writer::new(&mut self.buf);
-        if tmp.write_variant_record(&self.header, &annot.entry).is_err() {
-            let changed = replace_iupac_inplace(annot.entry.reference_bases_mut());
+        if tmp.write_variant_record(&self.header, &entry).is_err() {
+            let changed = replace_iupac_inplace(entry.reference_bases_mut());
             self.iupac_fixed |= changed;
-            if let Err(error) = self.writer.write_variant_record(&self.header, &annot.entry) {
+            if let Err(error) = self.writer.write_variant_record(&self.header, &entry) {
                 panic!("Couldn't write record {:?}", error);
             }
         } else if let Err(error) = self.writer.get_mut().write_all(&self.buf) {

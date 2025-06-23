@@ -18,7 +18,7 @@ use crate::{
 };
 
 type InputType = Option<Vec<vcf::variant::RecordBuf>>;
-type OutputType = Option<Vec<GenotypeAnno>>;
+type OutputType = Option<Vec<(vcf::variant::RecordBuf, GenotypeAnno)>>;
 
 fn write_thread(
     result_receiver: Receiver<OutputType>,
@@ -48,8 +48,9 @@ fn write_thread(
             }
             Ok(Some(result)) => {
                 let mut rsize: u64 = 0;
-                for entry in result {
-                    m_writer.anno_write(entry);
+                // annoSS
+                for (entry, anno) in result {
+                    m_writer.anno_write(entry, anno);
                     rsize += 1;
                 }
 
@@ -84,7 +85,8 @@ fn task_thread(
         m_args.io.reads,
         m_args.io.reference,
         m_args.io.sample.expect("Sample should have been set"),
-        0, // First sample is always index 0
+        0, // First sample is index 0 in the HaplotypeMeta vectros
+        1, // One total sample will be opened (for HaplotypeMeta)
         &m_args.kd,
     );
     loop {
@@ -117,8 +119,10 @@ fn task_thread(
                     .map(|h| m_graph.apply_haplotype(h, &m_args.kd))
                     .filter(|p| *p != PathScore::default())
                     .collect();
-                paths.sort_by(|a, b| hp_sorter(&a.meta.hp, &b.meta.hp));
-
+                paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
+                // Here it'd be subsetting to the paths we care about for each sample
+                // And we'll need a make_annotation(paths_in_sample, coverage of sample, ploidy of
+                // sample
                 // Sort paths based on their HP if set
                 m_result_sender
                     .send(Some(m_graph.take_annotated(&paths, coverage, &ploidy)))

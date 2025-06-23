@@ -132,6 +132,17 @@ impl Variants {
             brute_force_find_path(&self.graph, hap, params)
         }
     }
+    /// This will do the samething as take_annotated. So maybe I don't need to rewrite, just
+    /// alter take_annotated to have a list of coverage/ploidy thats of the same length as the
+    /// expected samples. So it returns Vec<(RecordBuf, Vec<GenotypeAnno>)>
+    /// Then next I'll need GenotypeAnno to handle when sample_idx isn't part of the paths.
+    /// I guess take_annotated can separate the paths by the samples before going into the nodes
+    /// And then we'll loop over the set of paths to make the internal Vec Return
+    /// And if you want to do any special join consideration of the Paths, that can be done
+    /// elsewhere.
+    /// Note that you don't have haplotypes setup to be multiple samples... The meta.coverage isn't
+    /// right... eff..
+    ///pub fn make_annotations(&self, paths: &[PathScore], sample_coverage: [coverage], ploidy: [ploidy]) -> Vec<(RecordBuf
 
     /// Transform the graph back into annotated variants
     /// Note that this will take the entries out of the graph's VarNodes
@@ -140,7 +151,7 @@ impl Variants {
         paths: &[PathScore],
         coverage: u64,
         ploidy: &Ploidy,
-    ) -> Vec<GenotypeAnno> {
+    ) -> Vec<(RecordBuf, GenotypeAnno)> {
         self.node_indices
             .iter_mut()
             .filter_map(|var_idx| {
@@ -150,34 +161,13 @@ impl Variants {
                     .entry
                     .take()
                     .map(|entry| {
-                        GenotypeAnno::new(entry, var_idx, paths, coverage, ploidy, self.start)
-                    })
-            })
-            .collect::<Vec<GenotypeAnno>>()
-    }
-
-    /// Transform the graph back into annotated variants
-    /// Note that this will clone the entries from the graph's VarNodes
-    pub fn __clone_annotated(&mut self, paths: &[PathScore], coverage: u64) -> Vec<GenotypeAnno> {
-        self.node_indices
-            .iter()
-            .filter_map(|&var_idx| {
-                self.graph
-                    .node_weight(var_idx)
-                    .unwrap()
-                    .entry
-                    .as_ref()
-                    .map(|entry| {
-                        GenotypeAnno::new(
-                            entry.clone(),
-                            &var_idx,
-                            paths,
-                            coverage,
-                            &Ploidy::Unset,
-                            self.start,
+                        // Per-sample I can make a GenotypeAnno
+                        (
+                            entry,
+                            GenotypeAnno::new(var_idx, paths, coverage, ploidy, self.start, 0),
                         )
                     })
             })
-            .collect::<Vec<GenotypeAnno>>()
+            .collect::<Vec<(RecordBuf, GenotypeAnno)>>()
     }
 }

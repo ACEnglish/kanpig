@@ -6,20 +6,31 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+/// This holds read information that's eventually passed to PathScore
+/// And then is used by the GenotypeAnno to fill in FORMAT fields
+/// In order to allow reads across samples to talk to one another
+/// we need to use Vectors. For a single sample operation, we will be
+/// accessing everything simply as attribute[0]. For multi-sample, we'll
+/// use e.g. attribute[0] for proband, attribute[1] for mother, etc.
+/// Since reads can consolidate into a single haplotype, we use the
+/// sample_flag as a shortcut to know what samples contributed to the
+/// haplotype. e.g. flag & 1 means this is a proband haplotype
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct HaplotypeMeta {
-    pub coverage: u64,
-    pub ps: Option<u32>,
-    pub hp: Option<u8>,
-    pub samples_idx: u8,
+    pub coverage: Vec<u64>,
+    pub ps: Vec<Option<u32>>,
+    pub hp: Vec<Option<u8>>,
+    pub samples_flag: usize,
 }
 impl HaplotypeMeta {
-    pub fn new(samples_idx: u8) -> Self {
+    pub fn new(sample_idx: usize, num_samples: usize) -> Self {
+        let mut coverage = vec![0u64; num_samples];
+        coverage[sample_idx] += 1;
         HaplotypeMeta {
-            coverage: 1,
-            ps: None,
-            hp: None,
-            samples_idx,
+            coverage,
+            ps: vec![None; num_samples],
+            hp: vec![None; num_samples],
+            samples_flag: 2_usize.pow(sample_idx as u32),
         }
     }
 }
@@ -83,7 +94,7 @@ impl Haplotype {
         let lower = if m_len <= max_fns { 1 } else { m_len - max_fns };
         for i in (lower..(m_len + 1)).rev() {
             for j in self.parts.iter().combinations(i) {
-                let mut cur_hap = Haplotype::blank(kmer, self.meta);
+                let mut cur_hap = Haplotype::blank(kmer, self.meta.clone());
                 for k in j.iter() {
                     cur_hap.size += k.0;
                     cur_hap
@@ -111,7 +122,12 @@ impl PartialOrd for Haplotype {
 
 impl Ord for Haplotype {
     fn cmp(&self, other: &Self) -> Ordering {
-        let coverage_ordering = self.meta.coverage.cmp(&other.meta.coverage);
+        let coverage_ordering = self
+            .meta
+            .coverage
+            .iter()
+            .sum::<u64>()
+            .cmp(&other.meta.coverage.iter().sum::<u64>());
         if coverage_ordering != Ordering::Equal {
             return coverage_ordering;
         }
@@ -142,7 +158,7 @@ impl Ord for Haplotype {
 
 impl PartialEq for Haplotype {
     fn eq(&self, other: &Self) -> bool {
-        self.meta.coverage == other.meta.coverage
+        self.meta.coverage.iter().sum::<u64>() == other.meta.coverage.iter().sum::<u64>()
             && self.size == other.size
             && self.n == other.n
             && self
@@ -171,7 +187,7 @@ impl Debug for Haplotype {
             .field("coverage", &self.meta.coverage)
             .field("ps", &self.meta.ps)
             .field("hp", &self.meta.hp)
-            .field("samp", &self.meta.samples_idx)
+            .field("samp", &self.meta.samples_flag)
             // Exclude kfeat from the debug output
             .finish()
     }
