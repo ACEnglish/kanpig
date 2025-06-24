@@ -15,7 +15,6 @@ use crate::{
         KDParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
     },
 };
-
 fn task_thread(
     m_args: GTCommand,
     m_receiver: Receiver<ChannelInput>,
