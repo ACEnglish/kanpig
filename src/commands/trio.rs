@@ -25,7 +25,7 @@ fn task_thread(
     let mut pro_reads = open_reads(
         m_args.io.proband.clone(),
         m_args.io.reference.clone(),
-        m_args.io.sample.expect("Sample should have been set"),
+        m_args.io.proband_sample.clone(),
         0, // First sample is index 0 in the HaplotypeMeta vectros
         3, // One total sample will be opened (for HaplotypeMeta)
         &m_args.kd,
@@ -33,7 +33,7 @@ fn task_thread(
     let mut mat_reads = open_reads(
         m_args.io.mother.clone(),
         m_args.io.reference.clone(),
-        "Mat".to_string(),
+        m_args.io.mother_sample.clone(),
         1, // First sample is index 0 in the HaplotypeMeta vectros
         3, // One total sample will be opened (for HaplotypeMeta)
         &m_args.kd,
@@ -41,7 +41,7 @@ fn task_thread(
     let mut pat_reads = open_reads(
         m_args.io.father.clone(),
         m_args.io.reference.clone(),
-        "Pat".to_string(),
+        m_args.io.father_sample.clone(),
         2, // First sample is index 0 in the HaplotypeMeta vectros
         3, // One total sample will be opened (for HaplotypeMeta)
         &m_args.kd,
@@ -80,7 +80,7 @@ fn task_thread(
                 //&& m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
                 m_graph.build(true);
 
-                // Haplotype to paths
+                // Haplotypes to PathScores
                 let paths: Vec<PathScore> = pro_haps
                     .into_iter()
                     .chain(mat_haps)
@@ -88,10 +88,6 @@ fn task_thread(
                     .map(|h| m_graph.apply_haplotype(&h, &m_args.kd))
                     .filter(|p| *p != PathScore::default())
                     .collect();
-
-                // This is weird and should maybe be done by apply haplotype?
-                // or maybe in the separation below
-                //paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
 
                 // Separate paths back out to the samples
                 let num_samples = 3;
@@ -104,6 +100,8 @@ fn task_thread(
                     }
                 }
 
+                // I don't like this, maybe refactor take_annotated?
+                //bin.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]);
                 let separated_paths: Vec<&[PathScore]> =
                     separated_paths.iter().map(|bin| bin.as_slice()).collect();
 
@@ -158,10 +156,21 @@ pub struct IOParams {
     #[arg(short, long, default_value_t = 1, help_heading = "I/O")]
     pub threads: usize,
 
-    /// Output VCF sample name
-    #[arg(long, help_heading = "I/O")]
-    pub sample: Option<String>,
+    /// Output VCF proband sample name
+    #[arg(long, default_value = "PRO", help_heading = "I/O")]
+    pub proband_sample: String,
 
+    /// Output VCF maternal sample name
+    #[arg(long, default_value = "MAT", help_heading = "I/O")]
+    pub mother_sample: String,
+
+    /// Output VCF paternal sample name
+    #[arg(long, default_value = "PAT", help_heading = "I/O")]
+    pub father_sample: String,
+
+    // XYploidy_bed
+    // XXploidy_bed
+    // proband_karyotype XY or XX, which will then just point to whatever ploidy bed
     /// Bed file of non-diploid regions
     #[arg(long, help_heading = "I/O")]
     pub ploidy_bed: Option<PathBuf>,
@@ -246,15 +255,10 @@ impl KanpigCommand for TrioCommand {
 
         let input_header = input_vcf.read_header().expect("Unable to parse vcf header");
 
-        if self.io.sample.is_none() {
-            if input_header.sample_names().is_empty() {
-                error!("--input contains no samples. --sample name must be provided");
-                std::process::exit(1);
-            }
-            let samp_name = input_header.sample_names()[0].clone();
-            info!("Setting sample to {}", samp_name);
-            self.io.sample = Some(samp_name);
-        }
+        info!(
+            "Setting samples to {}, {}, {}",
+            self.io.proband_sample, self.io.mother_sample, self.io.father_sample
+        );
 
         let m_contigs = input_header.contigs().clone();
 
@@ -290,12 +294,9 @@ impl KanpigCommand for TrioCommand {
             result_receiver,
             self.io.out.clone(),
             vec![
-                self.io
-                    .sample
-                    .clone()
-                    .expect("Sample should have already been set"),
-                "Mat".to_string(),
-                "Pat".to_string(),
+                self.io.proband_sample.clone(),
+                self.io.mother_sample.clone(),
+                self.io.father_sample.clone(),
             ],
             input_header.clone(),
             num_variants.clone(),
