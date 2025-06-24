@@ -1,6 +1,6 @@
 use crate::kplib::{
-    brute_force_find_path, metrics::overlaps, traverse::get_one_to_one, GenotypeAnno, Haplotype,
-    KDParams, KdpVcf, PathScore, Ploidy,
+    brute_force_find_path, metrics::overlaps, traverse::get_one_to_one, ChannelOutput,
+    GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -132,26 +132,14 @@ impl Variants {
             brute_force_find_path(&self.graph, hap, params)
         }
     }
-    /// This will do the samething as take_annotated. So maybe I don't need to rewrite, just
-    /// alter take_annotated to have a list of coverage/ploidy thats of the same length as the
-    /// expected samples. So it returns Vec<(RecordBuf, Vec<GenotypeAnno>)>
-    /// Then next I'll need GenotypeAnno to handle when sample_idx isn't part of the paths.
-    /// I guess take_annotated can separate the paths by the samples before going into the nodes
-    /// And then we'll loop over the set of paths to make the internal Vec Return
-    /// And if you want to do any special join consideration of the Paths, that can be done
-    /// elsewhere.
-    /// Note that you don't have haplotypes setup to be multiple samples... The meta.coverage isn't
-    /// right... eff..
-    ///pub fn make_annotations(&self, paths: &[PathScore], sample_coverage: [coverage], ploidy: [ploidy]) -> Vec<(RecordBuf
-
     /// Transform the graph back into annotated variants
     /// Note that this will take the entries out of the graph's VarNodes
     pub fn take_annotated(
         &mut self,
-        paths: &[PathScore],
-        coverage: u64,
-        ploidy: &Ploidy,
-    ) -> Vec<(RecordBuf, GenotypeAnno)> {
+        paths: Vec<&[PathScore]>,
+        coverages: Vec<u64>,
+        ploidy: Vec<&Ploidy>,
+    ) -> ChannelOutput {
         self.node_indices
             .iter_mut()
             .filter_map(|var_idx| {
@@ -161,13 +149,15 @@ impl Variants {
                     .entry
                     .take()
                     .map(|entry| {
-                        // Per-sample I can make a GenotypeAnno
-                        (
-                            entry,
-                            GenotypeAnno::new(var_idx, paths, coverage, ploidy, self.start, 0),
-                        )
+                        let mut annos = Vec::with_capacity(coverages.len());
+                        for (i, (&cov, &ploid)) in coverages.iter().zip(ploidy.iter()).enumerate() {
+                            annos.push(GenotypeAnno::new(
+                                var_idx, paths[i], cov, ploid, self.start, i,
+                            ));
+                        }
+                        Some((entry, annos))
                     })
             })
-            .collect::<Vec<(RecordBuf, GenotypeAnno)>>()
+            .collect::<ChannelOutput>()
     }
 }

@@ -9,6 +9,9 @@ mod cluster;
 mod haplotype;
 pub use crate::kplib::haplotype::{Haplotype, HaplotypeMeta};
 
+mod infra;
+pub use crate::kplib::infra::{ChannelInput, ChannelOutput};
+
 mod kdparams;
 pub use crate::kplib::kdparams::KDParams;
 
@@ -48,4 +51,4 @@ mod vcfreader;
 pub use crate::kplib::vcfreader::VcfChunker;
 
 mod vcfwriter;
-pub use crate::kplib::vcfwriter::VcfWriter;
+pub use crate::kplib::vcfwriter::{open_writer_thread, VcfWriter};

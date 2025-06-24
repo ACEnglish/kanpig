@@ -22,6 +22,7 @@ pub struct HaplotypeMeta {
     pub hp: Vec<Option<u8>>,
     pub samples_flag: usize,
 }
+
 impl HaplotypeMeta {
     pub fn new(sample_idx: usize, num_samples: usize) -> Self {
         let mut coverage = vec![0u64; num_samples];

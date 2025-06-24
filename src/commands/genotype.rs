@@ -1,6 +1,5 @@
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use indicatif::{ProgressBar, ProgressStyle};
 use noodles_vcf::{self as vcf};
 use std::{
     path::PathBuf,
@@ -12,73 +11,15 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, hp_sorter, open_reads, GenotypeAnno, KDParams, PathScore, Ploidy,
-        PloidyRegions, Variants, VcfChunker, VcfWriter,
+        build_region_tree, hp_sorter, open_reads, open_writer_thread, ChannelInput, ChannelOutput,
+        KDParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
     },
 };
 
-type InputType = Option<Vec<vcf::variant::RecordBuf>>;
-type OutputType = Option<Vec<(vcf::variant::RecordBuf, GenotypeAnno)>>;
-
-fn write_thread(
-    result_receiver: Receiver<OutputType>,
-    wt_io: IOParams,
-    wt_header: vcf::Header,
-    wt_num_variants: Arc<Mutex<u64>>,
-) {
-    let mut m_writer = VcfWriter::new(
-        &wt_io.out,
-        wt_header.clone(),
-        &vec![wt_io.sample.expect("")],
-    );
-
-    let mut pbar: Option<ProgressBar> = None;
-    let sty =
-        ProgressStyle::with_template(" [{elapsed_precise}] {bar:44.cyan/blue} > {pos} completed")
-            .unwrap()
-            .progress_chars("・🐷🥫");
-
-    let mut completed_variants: u64 = 0;
-    loop {
-        match result_receiver.recv() {
-            Ok(None) | Err(_) => {
-                pbar.expect("I actually shouldn't be expecting the bar")
-                    .finish();
-                break;
-            }
-            Ok(Some(result)) => {
-                let mut rsize: u64 = 0;
-                // annoSS
-                for (entry, anno) in result {
-                    m_writer.anno_write(entry, anno);
-                    rsize += 1;
-                }
-
-                if let Some(ref mut bar) = pbar {
-                    bar.inc(rsize);
-                } else {
-                    completed_variants += rsize;
-                    // check if the reader is finished so we can setup the pbar
-                    let value = *wt_num_variants.lock().unwrap();
-                    if value != 0 {
-                        let t_bar = ProgressBar::new(value).with_style(sty.clone());
-                        t_bar.inc(completed_variants);
-                        pbar = Some(t_bar);
-                    }
-                }
-            }
-        }
-    }
-    if m_writer.iupac_fixed {
-        warn!("Some IUPAC codes in REF sequences have been fixed in output");
-    }
-    info!("genotype counts: {:#?}", m_writer.gtcounts);
-}
-
 fn task_thread(
     m_args: GTCommand,
-    m_receiver: Receiver<InputType>,
-    m_result_sender: Sender<OutputType>,
+    m_receiver: Receiver<ChannelInput>,
+    m_result_sender: Sender<ChannelOutput>,
     m_ploidy: PloidyRegions,
 ) {
     let mut m_reads = open_reads(
@@ -99,7 +40,7 @@ fn task_thread(
                 // For zero, we don't have to waste time going into the bam
                 if ploidy == Ploidy::Zero {
                     m_result_sender
-                        .send(Some(m_graph.take_annotated(&[], 0, &ploidy)))
+                        .send(m_graph.take_annotated(vec![&[]], vec![0], vec![&ploidy]))
                         .unwrap();
                     continue;
                 }
@@ -120,12 +61,8 @@ fn task_thread(
                     .filter(|p| *p != PathScore::default())
                     .collect();
                 paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
-                // Here it'd be subsetting to the paths we care about for each sample
-                // And we'll need a make_annotation(paths_in_sample, coverage of sample, ploidy of
-                // sample
-                // Sort paths based on their HP if set
                 m_result_sender
-                    .send(Some(m_graph.take_annotated(&paths, coverage, &ploidy)))
+                    .send(m_graph.take_annotated(vec![&paths], vec![coverage], vec![&ploidy]))
                     .unwrap();
             }
         }
@@ -266,8 +203,9 @@ impl KanpigCommand for GTCommand {
         let ploidy = PloidyRegions::new(&self.io.ploidy_bed);
 
         // Create channels for communication between threads
-        let (task_sender, task_receiver): (Sender<InputType>, Receiver<InputType>) = unbounded();
-        let (result_sender, result_receiver): (Sender<OutputType>, Receiver<OutputType>) =
+        let (task_sender, task_receiver): (Sender<ChannelInput>, Receiver<ChannelInput>) =
+            unbounded();
+        let (result_sender, result_receiver): (Sender<ChannelOutput>, Receiver<ChannelOutput>) =
             unbounded();
 
         info!("spawning {} threads", self.io.threads);
@@ -288,13 +226,17 @@ impl KanpigCommand for GTCommand {
         // This is the semaphore for the progress bar that communicates between main and writer
         let num_variants = Arc::new(Mutex::new(0));
 
-        let wt_io = self.io.clone();
-        let wt_header = input_header.clone();
-        let wt_num_variants = num_variants.clone();
-
-        let write_handler = thread::spawn(move || {
-            write_thread(result_receiver, wt_io, wt_header.clone(), wt_num_variants);
-        });
+        let write_handler = open_writer_thread(
+            result_receiver,
+            self.io.out.clone(),
+            vec![self
+                .io
+                .sample
+                .clone()
+                .expect("Sample should have already been set")],
+            input_header.clone(),
+            num_variants.clone(),
+        );
 
         info!("building variant graphs");
         let mut m_input = VcfChunker::new(
