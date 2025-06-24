@@ -45,5 +45,9 @@ fn main() {
             setup_logging(&cmd);
             cmd.run();
         }
+        Commands::Trio(mut cmd) => {
+            setup_logging(&cmd);
+            cmd.run();
+        }
     }
 }

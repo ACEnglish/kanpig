@@ -11,24 +11,42 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, hp_sorter, open_reads, open_writer_thread, ChannelInput, ChannelOutput,
-        KDParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
+        build_region_tree, open_reads, open_writer_thread, ChannelInput, ChannelOutput, KDParams,
+        PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
     },
 };
+
 fn task_thread(
-    m_args: GTCommand,
+    m_args: TrioCommand,
     m_receiver: Receiver<ChannelInput>,
     m_result_sender: Sender<ChannelOutput>,
     m_ploidy: PloidyRegions,
 ) {
-    let mut m_reads = open_reads(
-        m_args.io.reads,
-        m_args.io.reference,
+    let mut pro_reads = open_reads(
+        m_args.io.proband.clone(),
+        m_args.io.reference.clone(),
         m_args.io.sample.expect("Sample should have been set"),
         0, // First sample is index 0 in the HaplotypeMeta vectros
-        1, // One total sample will be opened (for HaplotypeMeta)
+        3, // One total sample will be opened (for HaplotypeMeta)
         &m_args.kd,
     );
+    let mut mat_reads = open_reads(
+        m_args.io.mother.clone(),
+        m_args.io.reference.clone(),
+        "Mat".to_string(),
+        1, // First sample is index 0 in the HaplotypeMeta vectros
+        3, // One total sample will be opened (for HaplotypeMeta)
+        &m_args.kd,
+    );
+    let mut pat_reads = open_reads(
+        m_args.io.father.clone(),
+        m_args.io.reference.clone(),
+        "Pat".to_string(),
+        2, // First sample is index 0 in the HaplotypeMeta vectros
+        3, // One total sample will be opened (for HaplotypeMeta)
+        &m_args.kd,
+    );
+
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
@@ -44,24 +62,57 @@ fn task_thread(
                     continue;
                 }
 
-                let (haps, coverage) =
-                    m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                let haps = ploidy.cluster(haps, coverage, 0, &m_args.kd);
+                let (pro_haps, pro_coverage) =
+                    pro_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+                let pro_haps = ploidy.cluster(pro_haps, pro_coverage, 0, &m_args.kd);
+
+                let (mat_haps, mat_coverage) =
+                    mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+                let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 1, &m_args.kd);
+
+                let (pat_haps, pat_coverage) =
+                    pat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+                let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 2, &m_args.kd);
 
                 // Only need to build the full graph sometimes
-                let should_build = !haps.is_empty()
-                    && !m_args.kd.one_to_one
-                    && m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
-                m_graph.build(should_build);
+                //let should_build = !pro_haps.is_empty()
+                //&& !m_args.kd.one_to_one
+                //&& m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
+                m_graph.build(true);
 
-                let mut paths: Vec<PathScore> = haps
-                    .iter()
-                    .map(|h| m_graph.apply_haplotype(h, &m_args.kd))
+                // Haplotype to paths
+                let paths: Vec<PathScore> = pro_haps
+                    .into_iter()
+                    .chain(mat_haps)
+                    .chain(pat_haps)
+                    .map(|h| m_graph.apply_haplotype(&h, &m_args.kd))
                     .filter(|p| *p != PathScore::default())
                     .collect();
-                paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
+
+                // This is weird and should maybe be done by apply haplotype?
+                // or maybe in the separation below
+                //paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
+
+                // Separate paths back out to the samples
+                let num_samples = 3;
+                let mut separated_paths: Vec<Vec<PathScore>> = vec![Vec::new(); num_samples];
+                for path in paths {
+                    for (bit, s_paths) in separated_paths.iter_mut().enumerate().take(num_samples) {
+                        if (path.meta.samples_flag & (1 << bit)) != 0 {
+                            s_paths.push(path.clone());
+                        }
+                    }
+                }
+
+                let separated_paths: Vec<&[PathScore]> =
+                    separated_paths.iter().map(|bin| bin.as_slice()).collect();
+
                 m_result_sender
-                    .send(m_graph.take_annotated(vec![&paths], vec![coverage], vec![&ploidy]))
+                    .send(m_graph.take_annotated(
+                        separated_paths,
+                        vec![pro_coverage, mat_coverage, pat_coverage],
+                        vec![&ploidy, &ploidy, &ploidy],
+                    ))
                     .unwrap();
             }
         }
@@ -69,7 +120,7 @@ fn task_thread(
     // This should give a result
 }
 #[derive(Parser, Debug, Clone)]
-pub struct GTCommand {
+pub struct TrioCommand {
     #[command(flatten)]
     pub io: IOParams,
 
@@ -83,9 +134,17 @@ pub struct IOParams {
     #[arg(short, long, help_heading = "I/O")]
     pub input: PathBuf,
 
-    /// Reads to genotype (indexed .bam, .cram, or .plup.gz)
-    #[arg(short, long, help_heading = "I/O")]
-    pub reads: PathBuf,
+    /// Proband reads to genotype (indexed .bam, .cram, or .plup.gz)
+    #[arg(long, help_heading = "I/O")]
+    pub proband: PathBuf,
+
+    /// Maternal reads to genotype (indexed .bam, .cram, or .plup.gz)
+    #[arg(long, help_heading = "I/O")]
+    pub mother: PathBuf,
+
+    /// Paternal reads to genotype (indexed .bam, .cram, or .plup.gz)
+    #[arg(long, help_heading = "I/O")]
+    pub father: PathBuf,
 
     /// Reference genome
     #[arg(short = 'f', long, help_heading = "I/O")]
@@ -116,7 +175,7 @@ pub struct IOParams {
     pub debug: bool,
 }
 
-impl KanpigCommand for GTCommand {
+impl KanpigCommand for TrioCommand {
     fn debug(&self) -> bool {
         self.io.debug
     }
@@ -125,7 +184,9 @@ impl KanpigCommand for GTCommand {
         let mut is_ok = true;
 
         is_ok &= file_validators::validate_file(&self.io.input, "--input");
-        is_ok &= file_validators::validate_reads(&self.io.reads, &self.kd);
+        is_ok &= file_validators::validate_reads(&self.io.proband, &self.kd);
+        is_ok &= file_validators::validate_reads(&self.io.mother, &self.kd);
+        is_ok &= file_validators::validate_reads(&self.io.father, &self.kd);
         is_ok &= file_validators::validate_reference(&self.io.reference);
 
         if let Some(bed_file) = &self.io.bed {
@@ -228,11 +289,14 @@ impl KanpigCommand for GTCommand {
         let write_handler = open_writer_thread(
             result_receiver,
             self.io.out.clone(),
-            vec![self
-                .io
-                .sample
-                .clone()
-                .expect("Sample should have already been set")],
+            vec![
+                self.io
+                    .sample
+                    .clone()
+                    .expect("Sample should have already been set"),
+                "Mat".to_string(),
+                "Pat".to_string(),
+            ],
             input_header.clone(),
             num_variants.clone(),
         );

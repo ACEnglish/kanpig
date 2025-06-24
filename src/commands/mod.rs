@@ -13,7 +13,8 @@ use crate::commands::genotype::GTCommand;
 pub mod plup;
 use crate::commands::plup::PlupCommand;
 
-//pub mod trio_main;
+pub mod trio;
+use crate::commands::trio::TrioCommand;
 
 /// Set of commands
 #[derive(Subcommand, Debug, Clone)]
@@ -23,4 +24,7 @@ pub enum Commands {
 
     #[command(about = "BAM/CRAM to Pileup Index")]
     Plup(PlupCommand),
+
+    #[command(about = "Trio Genotyping")]
+    Trio(TrioCommand),
 }
