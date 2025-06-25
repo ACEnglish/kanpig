@@ -34,6 +34,26 @@ impl HaplotypeMeta {
             samples_flag: 2_usize.pow(sample_idx as u32),
         }
     }
+
+    pub fn combine(&mut self, other: &HaplotypeMeta) {
+        for (self_cov, other_cov) in self.coverage.iter_mut().zip(&other.coverage) {
+            *self_cov += other_cov;
+        }
+
+        for (self_ps, other_ps) in self.ps.iter_mut().zip(&other.ps) {
+            if self_ps.is_none() {
+                *self_ps = *other_ps;
+            }
+        }
+
+        for (self_hp, other_hp) in self.hp.iter_mut().zip(&other.hp) {
+            if self_hp.is_none() {
+                *self_hp = *other_hp;
+            }
+        }
+
+        self.samples_flag |= other.samples_flag;
+    }
 }
 
 #[derive(Clone)]

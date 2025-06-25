@@ -1,6 +1,8 @@
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use ndarray::Array2;
 use noodles_vcf::{self as vcf};
+use rand::SeedableRng;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -11,10 +13,76 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, open_reads, open_writer_thread, ChannelInput, ChannelOutput, KDParams,
-        PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
+        build_region_tree, metrics, open_reads, open_writer_thread, ChannelInput, ChannelOutput,
+        Haplotype, KDParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
     },
 };
+
+fn select_k_by_ratio(losses: &[(usize, f32, f64)]) -> usize {
+    if losses.len() < 3 {
+        return losses.first().map(|(k, _, _)| *k).unwrap_or(1);
+    }
+
+    let mut ratios = Vec::new();
+    for i in 1..losses.len() {
+        let prev = losses[i - 1].1;
+        let curr = losses[i].1;
+        ratios.push(prev / curr);
+    }
+
+    for i in 1..ratios.len() {
+        if ratios[i - 1] / ratios[i] > 2.0 {
+            // Ratio dropped significantly (tune the 2.0 threshold if needed)
+            return losses[i].0;
+        }
+    }
+
+    // Fall back: choose last K
+    losses.last().unwrap().0
+}
+
+// Input: Vec<(k: usize, loss: f64, silhouette: f64)>
+fn select_optimal_k(metrics: &[(usize, f32, f64)]) -> usize {
+    if metrics.len() < 3 {
+        return metrics.first().map(|(k, _, _)| *k).unwrap_or(1);
+    }
+
+    // Compute loss deltas and silhouette differences
+    let mut loss_deltas = Vec::new();
+    for i in 1..metrics.len() {
+        let delta = metrics[i - 1].1 - metrics[i].1;
+        loss_deltas.push(delta);
+    }
+
+    // Normalize loss deltas (to detect where diminishing returns begin)
+    let max_delta = loss_deltas[0];
+    let elbow_k = loss_deltas
+        .iter()
+        .enumerate()
+        .find(|(_, delta)| **delta < 0.25 * max_delta) // 25% cutoff
+        .map(|(i, _)| metrics[i + 1].0) // i+1 because delta is from i to i+1
+        .unwrap_or(metrics.last().unwrap().0);
+
+    // Also find the max silhouette score's K
+    let max_sil_k = metrics
+        .iter()
+        .max_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
+        .map(|(k, _, _)| *k)
+        .unwrap_or(elbow_k);
+
+    // Combine: pick the smaller of elbow and max silhouette to avoid overfitting
+    elbow_k.min(max_sil_k)
+}
+
+fn is_valid_k(
+    counts: &std::collections::HashMap<usize, usize>,
+    total: usize,
+    min_reads: usize,
+) -> (bool, usize) {
+    //let min_allowed = (total as f32 * min_frac).ceil() as usize;
+    let num_small_clusters = counts.values().filter(|&&v| v < min_reads).count();
+    (num_small_clusters == 0, num_small_clusters)
+}
 
 fn task_thread(
     m_args: TrioCommand,
@@ -64,16 +132,71 @@ fn task_thread(
 
                 let (pro_haps, pro_coverage) =
                     pro_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                let pro_haps = ploidy.cluster(pro_haps, pro_coverage, 0, &m_args.kd);
+                //let pro_haps = ploidy.cluster(pro_haps, pro_coverage, 0, &m_args.kd);
 
                 let (mat_haps, mat_coverage) =
                     mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 1, &m_args.kd);
+                //let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 1, &m_args.kd);
 
                 let (pat_haps, pat_coverage) =
                     pat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 2, &m_args.kd);
+                //let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 2, &m_args.kd);
 
+                let haplos: Vec<Haplotype> = pro_haps
+                    .into_iter()
+                    .chain(mat_haps)
+                    .chain(pat_haps)
+                    .collect();
+
+                let dist: Array2<f32> =
+                    Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
+                        1.0 - (metrics::seqsim(
+                            &haplos[i].kfeat,
+                            &haplos[j].kfeat,
+                            m_args.kd.minkfreq as f32,
+                        ))
+                    });
+
+                let results: Vec<(usize, f32, f64)> = (1..(6.min(haplos.len())))
+                    .map(|i| {
+                        let k = i as usize;
+                        let mut medoids = kmedoids::random_initialization(
+                            haplos.len(),
+                            k,
+                            &mut rand::rngs::StdRng::seed_from_u64(21),
+                        );
+
+                        let (loss, assignments, _, _): (f32, _, _, _) =
+                            kmedoids::fasterpam(&dist.view(), &mut medoids, 100);
+                        let (sil2, _): (f64, _) =
+                            kmedoids::medoid_silhouette(&dist, &medoids, false);
+                        let (sil, _): (f64, _) = kmedoids::silhouette(&dist, &assignments, false);
+
+                        let mut counts = std::collections::HashMap::<usize, usize>::new();
+                        for item in assignments {
+                            *counts.entry(item).or_insert(0) += 1;
+                        }
+
+                        let (is_valid, num_small_clusters) = is_valid_k(&counts, haplos.len(), 3);
+                        debug!(
+                            "K {}: Loss = {}, Sil = {}, Sil2 = {}, Small = {} {}",
+                            k, loss, sil, sil2, is_valid, num_small_clusters
+                        );
+                        debug!("Assign: {:#?}", counts);
+
+                        // TODO: This is good for this example, but we could just have a spurious
+                        // read.. So you got to come up with another way to look at this
+                        //let penalty = num_small_clusters as f64 / haplos.len as f64;
+                        //let adjusted_silhouette = sil * (1.0 - penalty);
+                        (k, loss, sil)
+                    })
+                    .collect();
+
+                let opt = select_optimal_k(results.as_slice());
+                let rbe = select_k_by_ratio(results.as_slice());
+                debug!("Selected {} from optimal {} from RBE", opt, rbe);
+                continue;
+                //let pat_haps = ploidy.cluster(all_haps, pat_coverage, 2, &m_args.kd);
                 // Only need to build the full graph sometimes
                 //let should_build = !pro_haps.is_empty()
                 //&& !m_args.kd.one_to_one
@@ -117,6 +240,7 @@ fn task_thread(
     }
     // This should give a result
 }
+
 #[derive(Parser, Debug, Clone)]
 pub struct TrioCommand {
     #[command(flatten)]

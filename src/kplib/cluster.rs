@@ -56,18 +56,16 @@ pub fn diploid_haplotypes(
         return vec![hap];
     }
 
-    // Create a distance matrix
-    let distance_matrix: Array2<f32> =
-        Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
-            // Convert similarity to distance
-            let dist =
-                1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, params.minkfreq as f32));
-            // Penalize only if both points have defined, different groups
-            match (haplos[i].meta.hp[sample_idx], haplos[j].meta.hp[sample_idx]) {
-                (Some(group_i), Some(group_j)) if group_i != group_j => dist + params.hps_weight,
-                _ => dist,
-            }
-        });
+    let distances: Array2<f32> = Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
+        // Convert similarity to distance
+        let dist =
+            1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, params.minkfreq as f32));
+        // Penalize only if both points have defined, different groups
+        match (haplos[i].meta.hp[sample_idx], haplos[j].meta.hp[sample_idx]) {
+            (Some(group_i), Some(group_j)) if group_i != group_j => dist + params.hps_weight,
+            _ => dist,
+        }
+    });
 
     let mut medoids = kmedoids::random_initialization(
         haplos.len(),
@@ -76,7 +74,7 @@ pub fn diploid_haplotypes(
     );
 
     let (loss, assignments, _, _): (f32, _, _, _) =
-        kmedoids::fasterpam(&distance_matrix.view(), &mut medoids, 100);
+        kmedoids::fasterpam(&distances.view(), &mut medoids, 100);
     debug!("Loss: {}", loss);
 
     let mut haps = vec![haplos[medoids[0]].clone(), haplos[medoids[1]].clone()];

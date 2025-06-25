@@ -18,7 +18,7 @@ pub use crate::kplib::kdparams::KDParams;
 mod kmer;
 pub use crate::kplib::kmer::seq_to_kmer;
 
-mod metrics;
+pub mod metrics;
 
 mod pathscore;
 pub use crate::kplib::pathscore::PathScore;
