@@ -46,7 +46,7 @@ impl GenotypeAnno {
         sample_idx: usize, // For pulling the correct coverage from the PathScore.HaplotypeMeta
     ) -> Self {
         match ploidy {
-            Ploidy::Zero => zero(coverage, neigh_group),
+            Ploidy::Zero => zero(coverage),
             Ploidy::Haploid => haploid(var_idx, paths, coverage, neigh_group, sample_idx),
             _ => diploid(var_idx, paths, coverage, neigh_group, sample_idx),
         }
@@ -98,14 +98,14 @@ fn diploid(
         [] => handle_diploid_no_paths(coverage),
         [p] => handle_diploid_single_path(var_idx, p, coverage, sample_idx),
         [p1, p2] => handle_diploid_two_paths(var_idx, p1, p2, coverage, sample_idx),
-        _ => panic!("Unexpected number of paths for diploid region"),
+        p => panic!("Unexpected number of paths for diploid region {:?}", p),
     };
 
     finalize_annotation(handle, paths, coverage, neigh_group, sample_idx)
 }
 
 /// Helper for zero ploidy regions.
-fn zero(coverage: u64, neigh_group: u64) -> GenotypeAnno {
+fn zero(coverage: u64) -> GenotypeAnno {
     GenotypeAnno {
         gt: "./.".to_string(),
         filt: FiltFlags::PASS,
@@ -236,7 +236,7 @@ fn finalize_annotation(
 
     // Either use haplotagging PS or NE
     let ps = paths
-        .get(0)
+        .first()
         .and_then(|p| p.meta.ps.get(sample_idx).copied())
         .unwrap_or(Some(neigh_group as u32));
 
