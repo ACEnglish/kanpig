@@ -48,20 +48,7 @@ impl VcfWriter {
         // Setup FORMAT header definitions
         let all_formats = header.formats_mut();
         all_formats.clear();
-        let num1 = format::Number::Count(1);
-        // Edits to these must be sync'd with GenotypeAnno::make_fields
-        #[rustfmt::skip]
-        let format_definitions = vec![
-            ("GT", num1, format::Type::String, "Kanpig genotype"),
-            ("FT", num1, format::Type::Integer, "Kanpig filter"),
-            ("SQ", num1, format::Type::Integer, "Phred quality of being non-ref"),
-            ("GQ", num1, format::Type::Integer, "Phred quality of genotype"),
-            ("PS", num1, format::Type::Integer, "PhaseSet tag from reads"),
-            ("NE", num1, format::Type::Integer, "Neighborhood phase set of entries"),
-            ("DP", num1, format::Type::Integer, "Coverage over region"),
-            ("AD", format::Number::ReferenceAlternateBases, format::Type::Integer, "Ref/Alt coverage"),
-            ("KS", format::Number::Unknown, format::Type::Integer, "Kanpig score"),
-        ];
+        let format_definitions = GenotypeAnno::make_format();
         let new_fmts: Vec<String> = format_definitions
             .iter()
             .map(|x| String::from(x.0))

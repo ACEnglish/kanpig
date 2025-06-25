@@ -1,6 +1,9 @@
 use crate::kplib::{metrics, PathScore, Ploidy};
 use bitflags::bitflags;
-use noodles_vcf::variant::record_buf::samples::sample::value::{Array, Value};
+use noodles_vcf::{
+    header::record::value::map::format,
+    variant::record_buf::samples::sample::value::{Array, Value},
+};
 use petgraph::graph::NodeIndex;
 
 bitflags! {
@@ -30,7 +33,6 @@ pub struct GenotypeAnno {
     pub ad: IntG,
     pub ks: IntG,
     pub gt_state: metrics::GTstate,
-    pub ne: u64,
 }
 
 impl GenotypeAnno {
@@ -50,7 +52,8 @@ impl GenotypeAnno {
         }
     }
 
-    /// Generates fields for the `GenotypeAnno` to match `VcfWriter` keys.
+    /// Generates fields for the `GenotypeAnno` used by `VcfWriter`.
+    /// Edits to these must be sync'd with make_fmt_definitions
     pub fn make_fields(&self) -> Vec<Option<Value>> {
         vec![
             Some(Value::Genotype(
@@ -60,10 +63,25 @@ impl GenotypeAnno {
             Some(Value::Integer(self.sq)),
             Some(Value::Integer(self.gq)),
             self.ps.map(|ps| Value::Integer(ps as i32)),
-            Some(Value::Integer(self.ne as i32)),
             Some(Value::Integer(self.dp)),
             Some(Value::Array(Array::Integer(self.ad.clone()))),
             Some(Value::Array(Array::Integer(self.ks.clone()))),
+        ]
+    }
+
+    // Edits to these must be sync'd with make_fields
+    #[rustfmt::skip]
+    pub fn make_format() -> Vec<(&'static str, format::Number, format::Type, &'static str)> {
+        let num1 = format::Number::Count(1);
+        vec![
+            ("GT", num1, format::Type::String, "Kanpig genotype"),
+            ("FT", num1, format::Type::Integer, "Kanpig filter"),
+            ("SQ", num1, format::Type::Integer, "Phred quality of being non-ref"),
+            ("GQ", num1, format::Type::Integer, "Phred quality of genotype"),
+            ("PS", num1, format::Type::Integer, "PhaseSet tag from reads"),
+            ("DP", num1, format::Type::Integer, "Coverage over region"),
+            ("AD", format::Number::ReferenceAlternateBases, format::Type::Integer, "Ref/Alt coverage"),
+            ("KS", format::Number::Unknown, format::Type::Integer, "Kanpig score"),
         ]
     }
 }
@@ -98,7 +116,6 @@ fn zero(coverage: u64, neigh_group: u64) -> GenotypeAnno {
         ad: vec![None],
         ks: vec![None],
         gt_state: metrics::GTstate::Non,
-        ne: neigh_group,
     }
 }
 
@@ -217,11 +234,11 @@ fn finalize_annotation(
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
 
-    let ps = if !paths.is_empty() {
-        paths[0].meta.ps[sample_idx]
-    } else {
-        None
-    };
+    // Either use haplotagging PS or NE
+    let ps = paths
+        .get(0)
+        .and_then(|p| p.meta.ps.get(sample_idx).copied())
+        .unwrap_or(Some(neigh_group as u32));
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 
@@ -266,6 +283,5 @@ fn finalize_annotation(
         ad,
         ks,
         gt_state: gt_path,
-        ne: neigh_group,
     }
 }
