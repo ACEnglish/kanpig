@@ -149,6 +149,9 @@ fn task_thread(
                     pat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
                 //let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 2, &m_args.kd);
 
+                // TODO: is_empty checks on the input haplotypes.
+                // if a parent is missing, we update the maxk to 3
+
                 let haplos: Vec<Haplotype> = pro_haps
                     .into_iter()
                     .chain(mat_haps)
@@ -198,8 +201,7 @@ fn task_thread(
                         let (sil, _): (f64, _) = kmedoids::silhouette(&dist, &assignments, false);
 
                         // cluster : read count
-                        // This was for debugging when I wanted to prevent spurious (1 read)
-                        // clusters
+                        // Disallow clusters with fewer than 3 reads
                         let mut counts = std::collections::HashMap::<usize, usize>::new();
 
                         // sample_flag : cluster_count
@@ -215,9 +217,8 @@ fn task_thread(
 
                         kassignments.push((assignments, medoids));
 
-                        // These were for debugging on the cluster sizes
-                        // TODO: minimum 3 reads in a cluster
-                        let (is_valid, num_small_clusters) = is_valid_k(&counts, haplos.len(), 3);
+                        let (is_valid, num_small_clusters) =
+                            is_valid_k(&counts, haplos.len(), m_args.minreads);
 
                         // Disallow clusterings that give any sample > 2 paths
                         let pres_valid = samp_pres.iter().all(|v| v.len() <= 2);
@@ -262,6 +263,7 @@ fn task_thread(
                     },
                 );
 
+                // HP tag for GT order
                 for (i, m_hap) in haps.iter_mut().enumerate().take(opt) {
                     for j in 0..3 {
                         if m_hap.meta.hp[j].is_some() {
@@ -279,19 +281,16 @@ fn task_thread(
                         }
                     }
                 }
-                // TODO: Grab this back - but for now, I think
-                // we're guaranteed to have haps because there isn't any filtering
-                // Only need to build the full graph sometimes. Though I'm not doing any
-                // is_empty checks on the input haplotypes.
-                //let should_build = !pro_haps.is_empty()
-                //&& !m_args.kd.one_to_one
-                //&& m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
                 debug!(
                     "Coverages: {} {} {}",
                     pro_coverage, mat_coverage, pat_coverage
                 );
                 debug!("HERE HAPS: {} => {:#?}", haps.len(), haps);
-                m_graph.build(true);
+
+                let should_build = !haps.is_empty()
+                    && !m_args.kd.one_to_one
+                    && m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
+                m_graph.build(should_build);
 
                 // Haplotypes to PathScores
                 let paths: Vec<PathScore> = haps
@@ -307,16 +306,12 @@ fn task_thread(
                     for (bit, s_paths) in separated_paths.iter_mut().enumerate().take(num_samples) {
                         if (path.meta.samples_flag & (1 << bit)) != 0 {
                             let mut p = path.clone();
-                            // I have to either set samples_flag back to the sample it represents
-                            // Or I have to have a new metadata attribute e.g. sample_idx
-                            // All for hp_sorter
                             p.meta.samples_flag = bit;
                             s_paths.push(p);
                         }
                     }
                 }
 
-                // I don't like this, maybe refactor take_annotated?
                 let separated_paths: Vec<&[PathScore]> = separated_paths
                     .iter_mut()
                     .map(|bin| {
@@ -350,6 +345,10 @@ pub struct TrioCommand {
 
     #[command(flatten)]
     pub kd: KDParams,
+
+    /// Minimum number of reads in a cluster
+    #[arg(long, default_value_t = 3, help_heading = "Trio")]
+    pub minreads: usize,
 }
 
 #[derive(clap::Args, Clone, Debug)]
