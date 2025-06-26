@@ -168,3 +168,17 @@ In loci where reads cluster into a potentially compound heterozygous site, the p
 haplotype with lower coverage must have at least `--ab` fraction of the reads. Otherwise, we assume that the
 lower-covered haplotype is a mapping/sequencing anaomaly and treat its reads as supporting the reference. This parameter
 at 0.20 boosts specificity and genotype concordance at the cost of (a little bit less) recall.
+
+# 👪 Trio Mode
+
+A proband along with its mother and father can be joint genotyped simultaneously with `kanpig trio`. This command is
+currently in development and therefore should be used with caution. The goal of a separate module is to increase
+genotyping accuracy in the proband as well as consistently applying shared haplotypes to the same paths through the
+variant graph, thus decreasing mendelian errors and more precisely identifying de novo SVs. 
+
+Instead of running kmedoid clustering on a set value of K, multiple are attempted (1 through 4) in order to find the
+optimal clustering of alternate haplotypes. In order to prevent spurious clusters, at least 3 reads must be present in
+all clusters for a K to be considered valid. Additionally, reads from a sample can only be found in up to two clusters.
+
+Missing features which should eventually be added include inheritance pattern probabilities in genotypes, leveraging 
+ploidy beds, `--hapsim` simplification, `--ab` enforcement.
