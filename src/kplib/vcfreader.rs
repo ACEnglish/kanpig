@@ -1,7 +1,6 @@
-use crate::kplib::{GenotypeAnno, KDParams, KdpVcf, Ploidy, Regions};
+use crate::kplib::{ChannelOutput, KDParams, KdpVcf, Regions};
 use crossbeam_channel::Sender;
 use noodles_vcf::{self as vcf, variant::RecordBuf};
-use petgraph::graph::NodeIndex;
 use std::io::BufRead;
 
 /// Takes a vcf and filtering parameters to create in iterable which will
@@ -21,7 +20,7 @@ pub struct VcfChunker<R: BufRead> {
     pub chunk_count: u64,
     pub call_count: u64,
     pub skip_count: u64,
-    result_sender: Sender<Option<Vec<GenotypeAnno>>>,
+    result_sender: Sender<ChannelOutput>,
 }
 
 impl<R: BufRead> VcfChunker<R> {
@@ -30,7 +29,7 @@ impl<R: BufRead> VcfChunker<R> {
         m_header: vcf::Header,
         regions: Regions,
         params: KDParams,
-        result_sender: Sender<Option<Vec<GenotypeAnno>>>,
+        result_sender: Sender<ChannelOutput>,
     ) -> Self {
         Self {
             m_vcf,
@@ -112,14 +111,7 @@ impl<R: BufRead> VcfChunker<R> {
                         return Some(entry);
                     } else {
                         self.skip_count += 1;
-                        let _ = self.result_sender.send(Some(vec![GenotypeAnno::new(
-                            entry.clone(),
-                            &NodeIndex::new(0),
-                            &[],
-                            0,
-                            &Ploidy::Zero,
-                            0,
-                        )]));
+                        let _ = self.result_sender.send(Some(vec![(entry.clone(), vec![])]));
                     }
                 }
             }

@@ -6,51 +6,88 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+/// This holds read information that's eventually passed to PathScore
+/// And then is used by the GenotypeAnno to fill in FORMAT fields
+/// In order to allow reads across samples to talk to one another
+/// we need to use Vectors. For a single sample operation, we will be
+/// accessing everything simply as attribute[0]. For multi-sample, we'll
+/// use e.g. attribute[0] for proband, attribute[1] for mother, etc.
+/// Since reads can consolidate into a single haplotype, we use the
+/// sample_flag as a shortcut to know what samples contributed to the
+/// haplotype. e.g. flag & 1 means this is a proband haplotype
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct HaplotypeMeta {
+    pub coverage: Vec<u64>,
+    pub ps: Vec<Option<u32>>,
+    pub hp: Vec<Option<u8>>,
+    pub samples_flag: usize,
+}
+
+impl HaplotypeMeta {
+    pub fn new(sample_idx: usize, num_samples: usize) -> Self {
+        let mut coverage = vec![0u64; num_samples];
+        coverage[sample_idx] += 1;
+        HaplotypeMeta {
+            coverage,
+            ps: vec![None; num_samples],
+            hp: vec![None; num_samples],
+            samples_flag: 2_usize.pow(sample_idx as u32),
+        }
+    }
+
+    pub fn combine(&mut self, other: &HaplotypeMeta) {
+        for (self_cov, other_cov) in self.coverage.iter_mut().zip(&other.coverage) {
+            *self_cov += other_cov;
+        }
+
+        for (self_ps, other_ps) in self.ps.iter_mut().zip(&other.ps) {
+            if self_ps.is_none() {
+                *self_ps = *other_ps;
+            }
+        }
+
+        for (self_hp, other_hp) in self.hp.iter_mut().zip(&other.hp) {
+            if self_hp.is_none() {
+                *self_hp = *other_hp;
+            }
+        }
+
+        self.samples_flag |= other.samples_flag;
+    }
+}
+
 #[derive(Clone)]
 pub struct Haplotype {
     pub size: i64,
     pub n: u64,
-    pub coverage: u64,
     pub kfeat: Vec<f32>,
     pub parts: Vec<(i64, Vec<f32>)>,
     pub partial: usize,
-    pub ps: Option<u32>,
-    pub hp: Option<u8>,
+    pub meta: HaplotypeMeta,
 }
 
 impl Haplotype {
-    pub fn new(
-        kfeat: Vec<f32>,
-        size: i64,
-        n: u64,
-        coverage: u64,
-        ps: Option<u32>,
-        hp: Option<u8>,
-    ) -> Self {
+    pub fn new(kfeat: Vec<f32>, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
         Self {
             size,
             n,
-            coverage,
             kfeat: kfeat.clone(),
             parts: vec![(size, kfeat)],
             partial: 0,
-            ps,
-            hp,
+            meta: hap_meta,
         }
     }
 
     // Create an empty haplotype
-    pub fn blank(kmer: u8, coverage: u64) -> Haplotype {
+    pub fn blank(kmer: u8, meta: HaplotypeMeta) -> Haplotype {
         let mk = seq_to_kmer(&[], kmer, false, 0);
         Haplotype {
             size: 0,
             n: 0,
-            coverage,
             kfeat: mk.clone(),
             parts: vec![],
             partial: 0,
-            ps: None,
-            hp: None,
+            meta,
         }
     }
 
@@ -78,7 +115,7 @@ impl Haplotype {
         let lower = if m_len <= max_fns { 1 } else { m_len - max_fns };
         for i in (lower..(m_len + 1)).rev() {
             for j in self.parts.iter().combinations(i) {
-                let mut cur_hap = Haplotype::blank(kmer, self.coverage);
+                let mut cur_hap = Haplotype::blank(kmer, self.meta.clone());
                 for k in j.iter() {
                     cur_hap.size += k.0;
                     cur_hap
@@ -87,6 +124,8 @@ impl Haplotype {
                         .zip(k.1.iter())
                         .for_each(|(x, y)| *x += y);
                     cur_hap.n += 1;
+                    // Partials are temporary, so we don't need to do this
+                    // cur_hap.samples_idx |= k.1.samples_idx | k.0.
                 }
                 cur_hap.partial = m_len - i;
                 ret.push(cur_hap);
@@ -104,7 +143,12 @@ impl PartialOrd for Haplotype {
 
 impl Ord for Haplotype {
     fn cmp(&self, other: &Self) -> Ordering {
-        let coverage_ordering = self.coverage.cmp(&other.coverage);
+        let coverage_ordering = self
+            .meta
+            .coverage
+            .iter()
+            .sum::<u64>()
+            .cmp(&other.meta.coverage.iter().sum::<u64>());
         if coverage_ordering != Ordering::Equal {
             return coverage_ordering;
         }
@@ -135,7 +179,7 @@ impl Ord for Haplotype {
 
 impl PartialEq for Haplotype {
     fn eq(&self, other: &Self) -> bool {
-        self.coverage == other.coverage
+        self.meta.coverage.iter().sum::<u64>() == other.meta.coverage.iter().sum::<u64>()
             && self.size == other.size
             && self.n == other.n
             && self
@@ -161,9 +205,10 @@ impl Debug for Haplotype {
         f.debug_struct("Haplotype")
             .field("size", &self.size)
             .field("n", &self.n)
-            .field("coverage", &self.coverage)
-            .field("ps", &self.ps)
-            .field("hp", &self.hp)
+            .field("coverage", &self.meta.coverage)
+            .field("ps", &self.meta.ps)
+            .field("hp", &self.meta.hp)
+            .field("samp", &self.meta.samples_flag)
             // Exclude kfeat from the debug output
             .finish()
     }

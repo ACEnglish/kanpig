@@ -42,7 +42,11 @@ pub fn brute_force_find_path(
     params: &KDParams,
 ) -> PathScore {
     let mut npaths = 0;
-    let mut best_path = PathScore::default();
+    let mut best_path = PathScore {
+        meta: target.meta.clone(),
+        ..Default::default()
+    };
+
     let snk_node = NodeIndex::new(graph.node_count() - 1);
     let partial_haps = target.partial_haplotypes(params.kmer, params.fnmax, params.pileupmax);
 

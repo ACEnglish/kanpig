@@ -1,6 +1,6 @@
 use crate::kplib::{
-    brute_force_find_path, metrics::overlaps, traverse::get_one_to_one, GenotypeAnno, Haplotype,
-    KDParams, KdpVcf, PathScore, Ploidy,
+    brute_force_find_path, metrics::overlaps, traverse::get_one_to_one, ChannelOutput,
+    GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -120,31 +120,26 @@ impl Variants {
 
     // Find the path through this graph that best fits
     // the haplotype push coverage onto the VarNodes
-    pub fn apply_coverage(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
+    pub fn apply_haplotype(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
         // if there are no variants in the hap, we don't want to apply the coverage.
         if params.one_to_one || (self.node_indices.len() - 2) > params.maxnodes {
-            let mut ret = get_one_to_one(&self.graph, hap, params)
+            get_one_to_one(&self.graph, hap, params)
                 .iter()
                 .max()
                 .cloned()
-                .unwrap_or_else(PathScore::default);
-            ret.coverage = Some(hap.coverage);
-            ret
+                .unwrap_or_else(PathScore::default)
         } else {
-            let mut ret = brute_force_find_path(&self.graph, hap, params);
-            ret.coverage = Some(hap.coverage);
-            ret
+            brute_force_find_path(&self.graph, hap, params)
         }
     }
-
     /// Transform the graph back into annotated variants
     /// Note that this will take the entries out of the graph's VarNodes
     pub fn take_annotated(
         &mut self,
-        paths: &[PathScore],
-        coverage: u64,
-        ploidy: &Ploidy,
-    ) -> Vec<GenotypeAnno> {
+        paths: Vec<&[PathScore]>,
+        coverages: Vec<u64>,
+        ploidy: Vec<&Ploidy>,
+    ) -> ChannelOutput {
         self.node_indices
             .iter_mut()
             .filter_map(|var_idx| {
@@ -154,27 +149,15 @@ impl Variants {
                     .entry
                     .take()
                     .map(|entry| {
-                        GenotypeAnno::new(entry, var_idx, paths, coverage, ploidy, self.start)
+                        let mut annos = Vec::with_capacity(coverages.len());
+                        for (i, (&cov, &ploid)) in coverages.iter().zip(ploidy.iter()).enumerate() {
+                            annos.push(GenotypeAnno::new(
+                                var_idx, paths[i], cov, ploid, self.start, i,
+                            ));
+                        }
+                        Some((entry, annos))
                     })
             })
-            .collect::<Vec<GenotypeAnno>>()
-    }
-
-    /// Transform the graph back into annotated variants
-    /// Note that this will clone the entries from the graph's VarNodes
-    pub fn __clone_annotated(&mut self, paths: &[PathScore], coverage: u64) -> Vec<GenotypeAnno> {
-        self.node_indices
-            .iter()
-            .filter_map(|&var_idx| {
-                self.graph
-                    .node_weight(var_idx)
-                    .unwrap()
-                    .entry
-                    .as_ref()
-                    .map(|entry| {
-                        GenotypeAnno::new(entry.clone(), &var_idx, paths, coverage, &Ploidy::Unset, self.start)
-                    })
-            })
-            .collect::<Vec<GenotypeAnno>>()
+            .collect::<ChannelOutput>()
     }
 }

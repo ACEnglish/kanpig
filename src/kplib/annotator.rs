@@ -1,8 +1,8 @@
 use crate::kplib::{metrics, PathScore, Ploidy};
 use bitflags::bitflags;
 use noodles_vcf::{
+    header::record::value::map::format,
     variant::record_buf::samples::sample::value::{Array, Value},
-    variant::RecordBuf,
 };
 use petgraph::graph::NodeIndex;
 
@@ -24,7 +24,6 @@ type IntG = Vec<Option<i32>>;
 
 /// Struct representing genotype annotations.
 pub struct GenotypeAnno {
-    pub entry: RecordBuf,
     pub gt: String,
     pub filt: FiltFlags,
     pub sq: i32,
@@ -34,27 +33,27 @@ pub struct GenotypeAnno {
     pub ad: IntG,
     pub ks: IntG,
     pub gt_state: metrics::GTstate,
-    pub ne: u64,
 }
 
 impl GenotypeAnno {
     /// Creates a new `GenotypeAnno` instance based on the provided ploidy and parameters.
     pub fn new(
-        entry: RecordBuf,
         var_idx: &NodeIndex,
         paths: &[PathScore],
         coverage: u64,
         ploidy: &Ploidy,
         neigh_group: u64,
+        sample_idx: usize, // For pulling the correct coverage from the PathScore.HaplotypeMeta
     ) -> Self {
         match ploidy {
-            Ploidy::Zero => zero(entry, coverage, neigh_group),
-            Ploidy::Haploid => haploid(entry, var_idx, paths, coverage, neigh_group),
-            _ => diploid(entry, var_idx, paths, coverage, neigh_group),
+            Ploidy::Zero => zero(coverage),
+            Ploidy::Haploid => haploid(var_idx, paths, coverage, neigh_group, sample_idx),
+            _ => diploid(var_idx, paths, coverage, neigh_group, sample_idx),
         }
     }
 
-    /// Generates fields for the `GenotypeAnno` to match `VcfWriter` keys.
+    /// Generates fields for the `GenotypeAnno` used by `VcfWriter`.
+    /// Edits to these must be sync'd with make_fmt_definitions
     pub fn make_fields(&self) -> Vec<Option<Value>> {
         vec![
             Some(Value::Genotype(
@@ -64,36 +63,50 @@ impl GenotypeAnno {
             Some(Value::Integer(self.sq)),
             Some(Value::Integer(self.gq)),
             self.ps.map(|ps| Value::Integer(ps as i32)),
-            Some(Value::Integer(self.ne as i32)),
             Some(Value::Integer(self.dp)),
             Some(Value::Array(Array::Integer(self.ad.clone()))),
             Some(Value::Array(Array::Integer(self.ks.clone()))),
+        ]
+    }
+
+    // Edits to these must be sync'd with make_fields
+    #[rustfmt::skip]
+    pub fn make_format() -> Vec<(&'static str, format::Number, format::Type, &'static str)> {
+        let num1 = format::Number::Count(1);
+        vec![
+            ("GT", num1, format::Type::String, "Kanpig genotype"),
+            ("FT", num1, format::Type::Integer, "Kanpig filter"),
+            ("SQ", num1, format::Type::Integer, "Phred quality of being non-ref"),
+            ("GQ", num1, format::Type::Integer, "Phred quality of genotype"),
+            ("PS", num1, format::Type::Integer, "PhaseSet tag from reads"),
+            ("DP", num1, format::Type::Integer, "Coverage over region"),
+            ("AD", format::Number::ReferenceAlternateBases, format::Type::Integer, "Ref/Alt coverage"),
+            ("KS", format::Number::Unknown, format::Type::Integer, "Kanpig score"),
         ]
     }
 }
 
 /// Helper function for a diploid region annotation.
 fn diploid(
-    entry: RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
     neigh_group: u64,
+    sample_idx: usize,
 ) -> GenotypeAnno {
     let handle = match &paths {
         [] => handle_diploid_no_paths(coverage),
-        [p] => handle_diploid_single_path(var_idx, p, coverage),
-        [p1, p2] => handle_diploid_two_paths(var_idx, p1, p2, coverage),
-        _ => panic!("Unexpected number of paths for diploid region"),
+        [p] => handle_diploid_single_path(var_idx, p, coverage, sample_idx),
+        [p1, p2] => handle_diploid_two_paths(var_idx, p1, p2, coverage, sample_idx),
+        p => panic!("Unexpected number of paths for diploid region {:?}", p),
     };
 
-    finalize_annotation(entry, handle, paths, coverage, neigh_group)
+    finalize_annotation(handle, paths, coverage, neigh_group, sample_idx)
 }
 
 /// Helper for zero ploidy regions.
-fn zero(entry: RecordBuf, coverage: u64, neigh_group: u64) -> GenotypeAnno {
+fn zero(coverage: u64) -> GenotypeAnno {
     GenotypeAnno {
-        entry,
         gt: "./.".to_string(),
         filt: FiltFlags::PASS,
         sq: 0,
@@ -103,25 +116,24 @@ fn zero(entry: RecordBuf, coverage: u64, neigh_group: u64) -> GenotypeAnno {
         ad: vec![None],
         ks: vec![None],
         gt_state: metrics::GTstate::Non,
-        ne: neigh_group,
     }
 }
 
 /// Helper for haploid regions.
 /// Assumed to have ≤1 Path
 fn haploid(
-    entry: RecordBuf,
     var_idx: &NodeIndex,
     paths: &[PathScore],
     coverage: u64,
     neigh_group: u64,
+    sample_idx: usize,
 ) -> GenotypeAnno {
     if paths.is_empty() {
         let handle = match coverage {
             0 => (".", metrics::GTstate::Non, 0.0, true),
             _ => ("0", metrics::GTstate::Ref, 0.0, true),
         };
-        return finalize_annotation(entry, handle, paths, coverage, neigh_group);
+        return finalize_annotation(handle, paths, coverage, neigh_group, sample_idx);
     }
 
     let path1 = &paths[0];
@@ -129,13 +141,13 @@ fn haploid(
         true => (
             "1",
             metrics::GTstate::Hom,
-            path1.coverage.unwrap_or(0) as f64,
+            path1.meta.coverage[sample_idx] as f64,
             true,
         ),
         false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0, true),
         false => (".", metrics::GTstate::Non, 0.0, true),
     };
-    finalize_annotation(entry, handle, paths, coverage, neigh_group)
+    finalize_annotation(handle, paths, coverage, neigh_group, sample_idx)
 }
 
 /// GT str, GTstate, alt_cov, is_fulltarget
@@ -153,15 +165,16 @@ fn handle_diploid_single_path<'a>(
     var_idx: &NodeIndex,
     path: &PathScore,
     coverage: u64,
+    sample_idx: usize,
 ) -> HandleReturn<'a> {
     if !path.path.contains(var_idx) {
         ("0|0", metrics::GTstate::Ref, 0.0, true)
     } else {
-        let alt_cov = path.coverage.unwrap() as f64;
+        let alt_cov = path.meta.coverage[sample_idx] as f64;
         let ref_cov = (coverage as f64) - alt_cov;
         let (genotype, state) = match metrics::genotyper(ref_cov, alt_cov) {
             metrics::GTstate::Ref | metrics::GTstate::Het => {
-                let gt = match path.hp {
+                let gt = match path.meta.hp[sample_idx] {
                     None => "0|1",
                     Some(1) => "0|1",
                     _ => "1|0",
@@ -180,24 +193,25 @@ fn handle_diploid_two_paths<'a>(
     path1: &PathScore,
     path2: &PathScore,
     coverage: u64,
+    sample_idx: usize,
 ) -> HandleReturn<'a> {
     match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
         (true, true) => (
             "1|1",
             metrics::GTstate::Hom,
-            (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+            (path1.meta.coverage[sample_idx] + path2.meta.coverage[sample_idx]) as f64,
             path1.full_target || path2.full_target,
         ),
         (true, false) => (
             "1|0",
             metrics::GTstate::Het,
-            path1.coverage.unwrap() as f64,
+            path1.meta.coverage[sample_idx] as f64,
             path1.full_target,
         ),
         (false, true) => (
             "0|1",
             metrics::GTstate::Het,
-            path2.coverage.unwrap() as f64,
+            path2.meta.coverage[sample_idx] as f64,
             path2.full_target,
         ),
         (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0, true),
@@ -206,11 +220,11 @@ fn handle_diploid_two_paths<'a>(
 }
 
 fn finalize_annotation(
-    entry: RecordBuf,
     handle: HandleReturn,
     paths: &[PathScore],
     coverage: u64,
     neigh_group: u64,
+    sample_idx: usize,
 ) -> GenotypeAnno {
     let (gt_str, gt_path, alt_cov, full_target) = handle;
     let ref_cov = coverage as f64 - alt_cov;
@@ -220,7 +234,11 @@ fn finalize_annotation(
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
 
-    let ps = if !paths.is_empty() { paths[0].ps } else { None };
+    // Either use haplotagging PS or NE
+    let ps = paths
+        .first()
+        .and_then(|p| p.meta.ps.get(sample_idx).copied())
+        .unwrap_or(Some(neigh_group as u32));
 
     let ad = vec![Some(ref_cov as i32), Some(alt_cov as i32)];
 
@@ -256,7 +274,6 @@ fn finalize_annotation(
     }
 
     GenotypeAnno {
-        entry,
         gt: gt_str.to_string(),
         filt,
         sq: sq.round() as i32,
@@ -266,6 +283,5 @@ fn finalize_annotation(
         ad,
         ks,
         gt_state: gt_path,
-        ne: neigh_group,
     }
 }

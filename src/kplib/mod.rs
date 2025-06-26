@@ -4,21 +4,27 @@ pub use crate::kplib::annotator::GenotypeAnno;
 mod bedparser;
 pub use crate::kplib::bedparser::BedParser;
 
-mod cli;
-pub use crate::kplib::cli::{Cli, Commands, GTArgs, IOParams, KDParams, KanpigParams, PlupArgs};
-
 mod cluster;
 
 mod haplotype;
-pub use crate::kplib::haplotype::Haplotype;
+pub use crate::kplib::haplotype::{Haplotype, HaplotypeMeta};
+
+mod infra;
+pub use crate::kplib::infra::{ChannelInput, ChannelOutput};
+
+mod kdparams;
+pub use crate::kplib::kdparams::KDParams;
 
 mod kmer;
 pub use crate::kplib::kmer::seq_to_kmer;
 
-mod metrics;
+pub mod metrics;
 
 mod pathscore;
 pub use crate::kplib::pathscore::PathScore;
+
+mod phasetags;
+pub use crate::kplib::phasetags::hp_sorter;
 
 mod pileup;
 pub use crate::kplib::pileup::{PileupVariant, ReadPileup};
@@ -27,7 +33,7 @@ mod ploidy;
 pub use crate::kplib::ploidy::{Ploidy, PloidyRegions};
 
 mod readparsers;
-pub use crate::kplib::readparsers::{BamParser, PlupParser, ReadParser};
+pub use crate::kplib::readparsers::open_reads;
 
 mod regions;
 pub use crate::kplib::regions::{build_region_tree, Regions};
@@ -45,4 +51,4 @@ mod vcfreader;
 pub use crate::kplib::vcfreader::VcfChunker;
 
 mod vcfwriter;
-pub use crate::kplib::vcfwriter::VcfWriter;
+pub use crate::kplib::vcfwriter::{open_writer_thread, VcfWriter};
