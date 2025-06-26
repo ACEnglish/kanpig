@@ -81,7 +81,7 @@ impl GenotypeAnno {
             ("PS", num1, format::Type::Integer, "PhaseSet tag from reads"),
             ("DP", num1, format::Type::Integer, "Coverage over region"),
             ("AD", format::Number::ReferenceAlternateBases, format::Type::Integer, "Ref/Alt coverage"),
-            ("KS", format::Number::Unknown, format::Type::Integer, "Kanpig score"),
+            ("KS", format::Number::Unknown, format::Type::Integer, "Kanpig score"), // TODO: Extreme values sometimes
         ]
     }
 }

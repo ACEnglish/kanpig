@@ -105,20 +105,22 @@ fn task_thread(
         3, // One total sample will be opened (for HaplotypeMeta)
         &m_args.kd,
     );
-    let mut mat_reads = open_reads(
-        m_args.io.mother.clone(),
-        m_args.io.reference.clone(),
-        m_args.io.mother_sample.clone(),
-        1, // First sample is index 0 in the HaplotypeMeta vectros
-        3, // One total sample will be opened (for HaplotypeMeta)
-        &m_args.kd,
-    );
+
     let mut pat_reads = open_reads(
         m_args.io.father.clone(),
         m_args.io.reference.clone(),
         m_args.io.father_sample.clone(),
-        2, // First sample is index 0 in the HaplotypeMeta vectros
-        3, // One total sample will be opened (for HaplotypeMeta)
+        1,
+        3,
+        &m_args.kd,
+    );
+
+    let mut mat_reads = open_reads(
+        m_args.io.mother.clone(),
+        m_args.io.reference.clone(),
+        m_args.io.mother_sample.clone(),
+        2,
+        3,
         &m_args.kd,
     );
 
@@ -141,22 +143,25 @@ fn task_thread(
                     pro_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
                 //let pro_haps = ploidy.cluster(pro_haps, pro_coverage, 0, &m_args.kd);
 
-                let (mat_haps, mat_coverage) =
-                    mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                //let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 1, &m_args.kd);
-
                 let (pat_haps, pat_coverage) =
                     pat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                //let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 2, &m_args.kd);
+                //let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 1, &m_args.kd);
 
-                // TODO: is_empty checks on the input haplotypes.
-                // if a parent is missing, we update the maxk to 3
+                let (mat_haps, mat_coverage) =
+                    mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+                //let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 2, &m_args.kd);
 
                 let haplos: Vec<Haplotype> = pro_haps
                     .into_iter()
-                    .chain(mat_haps)
                     .chain(pat_haps)
+                    .chain(mat_haps)
                     .collect();
+
+                // TODO: is_empty checks on the input haplotypes.
+                // if a parent is missing, we update the maxk to 3
+                if haplos.len() <= 1 {
+                    continue;
+                }
 
                 let dist: Array2<f32> =
                     Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
@@ -234,7 +239,10 @@ fn task_thread(
 
                 let opt = select_optimal_k(results.as_slice());
                 debug!("Selected {} from optimal", opt);
-
+                if opt - 1 >= kassignments.len() {
+                    // TODO: I don't know how this happens, but it does and we gotta fix it
+                    continue;
+                }
                 // Pick Medoids
                 let (assignments, medoids) = kassignments.swap_remove(opt - 1);
                 let mut haps: Vec<Haplotype> = medoids
@@ -283,7 +291,7 @@ fn task_thread(
                 }
                 debug!(
                     "Coverages: {} {} {}",
-                    pro_coverage, mat_coverage, pat_coverage
+                    pro_coverage, pat_coverage, mat_coverage,
                 );
                 debug!("HERE HAPS: {} => {:#?}", haps.len(), haps);
 
@@ -328,8 +336,8 @@ fn task_thread(
                 m_result_sender
                     .send(m_graph.take_annotated(
                         separated_paths,
-                        vec![pro_coverage, mat_coverage, pat_coverage],
-                        vec![&ploidy, &ploidy, &ploidy],
+                        vec![pro_coverage, pat_coverage, mat_coverage],
+                        vec![&ploidy, &ploidy, &ploidy], // TODO: set this up for each
                     ))
                     .unwrap();
             }
@@ -361,13 +369,13 @@ pub struct IOParams {
     #[arg(long, help_heading = "I/O")]
     pub proband: PathBuf,
 
-    /// Maternal reads to genotype (indexed .bam, .cram, or .plup.gz)
-    #[arg(long, help_heading = "I/O")]
-    pub mother: PathBuf,
-
     /// Paternal reads to genotype (indexed .bam, .cram, or .plup.gz)
     #[arg(long, help_heading = "I/O")]
     pub father: PathBuf,
+
+    /// Maternal reads to genotype (indexed .bam, .cram, or .plup.gz)
+    #[arg(long, help_heading = "I/O")]
+    pub mother: PathBuf,
 
     /// Reference genome
     #[arg(short = 'f', long, help_heading = "I/O")]
@@ -385,15 +393,15 @@ pub struct IOParams {
     #[arg(long, default_value = "PRO", help_heading = "I/O")]
     pub proband_sample: String,
 
-    /// Output VCF maternal sample name
-    #[arg(long, default_value = "MAT", help_heading = "I/O")]
-    pub mother_sample: String,
-
     /// Output VCF paternal sample name
     #[arg(long, default_value = "PAT", help_heading = "I/O")]
     pub father_sample: String,
 
-    // XYploidy_bed
+    /// Output VCF maternal sample name
+    #[arg(long, default_value = "MAT", help_heading = "I/O")]
+    pub mother_sample: String,
+
+    // TODO: XYploidy_bed
     // XXploidy_bed
     // proband_karyotype XY or XX, which will then just point to whatever ploidy bed
     /// Bed file of non-diploid regions
@@ -482,7 +490,7 @@ impl KanpigCommand for TrioCommand {
 
         info!(
             "Setting samples to {}, {}, {}",
-            self.io.proband_sample, self.io.mother_sample, self.io.father_sample
+            self.io.proband_sample, self.io.father_sample, self.io.mother_sample
         );
 
         let m_contigs = input_header.contigs().clone();
@@ -520,8 +528,8 @@ impl KanpigCommand for TrioCommand {
             self.io.out.clone(),
             vec![
                 self.io.proband_sample.clone(),
-                self.io.mother_sample.clone(),
                 self.io.father_sample.clone(),
+                self.io.mother_sample.clone(),
             ],
             input_header.clone(),
             num_variants.clone(),
