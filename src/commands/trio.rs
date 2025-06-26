@@ -1,6 +1,6 @@
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use ndarray::Array2;
+use ndarray::{Array, Array2};
 use noodles_vcf::{self as vcf};
 use rand::SeedableRng;
 use std::{
@@ -13,8 +13,8 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, metrics, open_reads, open_writer_thread, ChannelInput, ChannelOutput,
-        Haplotype, KDParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
+        build_region_tree, hp_sorter, metrics, open_reads, open_writer_thread, ChannelInput,
+        ChannelOutput, Haplotype, KDParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
     },
 };
 
@@ -157,14 +157,31 @@ fn task_thread(
 
                 let dist: Array2<f32> =
                     Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
-                        1.0 - (metrics::seqsim(
-                            &haplos[i].kfeat,
-                            &haplos[j].kfeat,
-                            m_args.kd.minkfreq as f32,
-                        ))
+                        let dist = 1.0
+                            - (metrics::seqsim(
+                                &haplos[i].kfeat,
+                                &haplos[j].kfeat,
+                                m_args.kd.minkfreq as f32,
+                            ));
                         // if same sample and different hp, hps_weight penalty
+                        let i_samp = haplos[i].meta.samples_flag;
+                        let j_samp = haplos[j].meta.samples_flag;
+                        if i_samp == j_samp {
+                            match (
+                                haplos[i].meta.hp[i_samp.trailing_zeros() as usize],
+                                haplos[j].meta.hp[j_samp.trailing_zeros() as usize],
+                            ) {
+                                (Some(group_i), Some(group_j)) if group_i != group_j => {
+                                    dist + m_args.kd.hps_weight
+                                }
+                                _ => dist,
+                            }
+                        } else {
+                            dist
+                        }
                     });
-                // assignments, medoids
+
+                // track assignments, medoids so we can take the best one
                 let mut kassignments: Vec<(Vec<usize>, Vec<usize>)> = Vec::new();
                 let results: Vec<(usize, f32, f64, bool)> = (1..(5.min(haplos.len())))
                     .map(|k| {
@@ -181,25 +198,28 @@ fn task_thread(
                         let (sil, _): (f64, _) = kmedoids::silhouette(&dist, &assignments, false);
 
                         // cluster : read count
+                        // This was for debugging when I wanted to prevent spurious (1 read)
+                        // clusters
                         let mut counts = std::collections::HashMap::<usize, usize>::new();
 
                         // sample_flag : cluster_count
-                        // disallow clusterings that give any sample > 2 paths
+                        // Disallow clusterings that give any sample > 2 paths
                         let mut samp_pres: Vec<std::collections::HashSet<usize>> =
                             (0..3).map(|_| std::collections::HashSet::new()).collect();
-                        //for (idx, item) in assignments.enumerate() {
+
                         for (idx, item) in assignments.iter().enumerate() {
                             *counts.entry(*item).or_insert(0) += 1;
                             samp_pres[haplos[idx].meta.samples_flag.trailing_zeros() as usize]
                                 .insert(*item);
-                            //samp_pres.entry(item).or_insert(0) |= haplos[idx];
                         }
+
                         kassignments.push((assignments, medoids));
-                        // Child not shared by parent is penalized
-                        // Parent not shared by child is okay if child is.. something
-                        //
+
+                        // These were for debugging on the cluster sizes
+                        // TODO: minimum 3 reads in a cluster
                         let (is_valid, num_small_clusters) = is_valid_k(&counts, haplos.len(), 3);
-                        // disallow clusterings that give any sample > 2 paths
+
+                        // Disallow clusterings that give any sample > 2 paths
                         let pres_valid = samp_pres.iter().all(|v| v.len() <= 2);
                         debug!(
                             "K {}: pv={} {:?}: Loss = {}, Sil = {}, Sil2 = {}, Small = {} {}",
@@ -207,18 +227,14 @@ fn task_thread(
                         );
                         debug!("Assign: {:#?}", counts);
 
-                        // TODO: This is good for this example, but we could just have a spurious
-                        // read.. So you got to come up with another way to look at this
-                        //let penalty = num_small_clusters as f64 / haplos.len as f64;
-                        //let adjusted_silhouette = sil * (1.0 - penalty);
-                        (k, loss, sil, pres_valid)
+                        (k, loss, sil, pres_valid & is_valid)
                     })
                     .collect();
 
                 let opt = select_optimal_k(results.as_slice());
-                //let rbe = select_k_by_ratio(results.as_slice());
                 debug!("Selected {} from optimal", opt);
-                // Collapse Haplotypes
+
+                // Pick Medoids
                 let (assignments, medoids) = kassignments.swap_remove(opt - 1);
                 let mut haps: Vec<Haplotype> = medoids
                     .clone()
@@ -226,26 +242,47 @@ fn task_thread(
                     .map(|i| haplos[i].clone())
                     .collect();
 
+                let mut hp_cnt = Array::<u16, _>::zeros((opt, 3, 2));
+
+                // Collapse Haplotypes
                 assignments.into_iter().zip(haplos).enumerate().for_each(
                     |(assign_idx, (cluster_idx, m_hap))| {
+                        // Sample index inside the HaplotypeMeta
+                        let idx = m_hap.meta.samples_flag.trailing_zeros() as usize;
                         if !medoids.contains(&assign_idx) {
                             let k_hap = &mut haps[cluster_idx];
-                            let other_sample_idx =
-                                m_hap.meta.samples_flag.trailing_zeros() as usize;
-                            k_hap.meta.coverage[other_sample_idx] += 1;
-                            k_hap.meta.ps[other_sample_idx] =
-                                k_hap.meta.ps[other_sample_idx].or(m_hap.meta.ps[other_sample_idx]);
+                            k_hap.meta.coverage[idx] += 1;
+                            k_hap.meta.ps[idx] = k_hap.meta.ps[idx].or(m_hap.meta.ps[idx]);
+                            k_hap.meta.hp[idx] = k_hap.meta.hp[idx].or(m_hap.meta.hp[idx]);
                             k_hap.meta.samples_flag |= m_hap.meta.samples_flag;
                         }
-                        // TODO: get hp back in
-                        //if let Some(hp) = m_hap.meta.hp[other_sample_idx] {
-                        //hps_cnt[idx][hp as usize - 1] += 1;
-                        //}
+                        if let Some(val) = m_hap.meta.hp[idx] {
+                            hp_cnt[[cluster_idx, idx, val as usize - 1]] += 1;
+                        }
                     },
                 );
-                // TODO: coverage correction
-                //let pat_haps = ploidy.cluster(all_haps, pat_coverage, 2, &m_args.kd);
-                // Only need to build the full graph sometimes
+
+                for (i, m_hap) in haps.iter_mut().enumerate().take(opt) {
+                    for j in 0..3 {
+                        if m_hap.meta.hp[j].is_some() {
+                            let max_idx: u8 = hp_cnt
+                                .slice(ndarray::s![i, j, ..])
+                                .iter()
+                                .cloned()
+                                .enumerate()
+                                .max_by_key(|&(_, val)| val)
+                                .map(|(idx, _)| idx)
+                                .unwrap_or(1)
+                                .try_into()
+                                .unwrap();
+                            m_hap.meta.hp[j] = Some(max_idx + 1);
+                        }
+                    }
+                }
+                // TODO: Grab this back - but for now, I think
+                // we're guaranteed to have haps because there isn't any filtering
+                // Only need to build the full graph sometimes. Though I'm not doing any
+                // is_empty checks on the input haplotypes.
                 //let should_build = !pro_haps.is_empty()
                 //&& !m_args.kd.one_to_one
                 //&& m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
@@ -253,7 +290,7 @@ fn task_thread(
                     "Coverages: {} {} {}",
                     pro_coverage, mat_coverage, pat_coverage
                 );
-                debug!("HERE HAPS: {:#?}", haps);
+                debug!("HERE HAPS: {} => {:#?}", haps.len(), haps);
                 m_graph.build(true);
 
                 // Haplotypes to PathScores
@@ -269,15 +306,29 @@ fn task_thread(
                 for path in paths {
                     for (bit, s_paths) in separated_paths.iter_mut().enumerate().take(num_samples) {
                         if (path.meta.samples_flag & (1 << bit)) != 0 {
-                            s_paths.push(path.clone());
+                            let mut p = path.clone();
+                            // I have to either set samples_flag back to the sample it represents
+                            // Or I have to have a new metadata attribute e.g. sample_idx
+                            // All for hp_sorter
+                            p.meta.samples_flag = bit;
+                            s_paths.push(p);
                         }
                     }
                 }
 
                 // I don't like this, maybe refactor take_annotated?
-                //bin.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]);
-                let separated_paths: Vec<&[PathScore]> =
-                    separated_paths.iter().map(|bin| bin.as_slice()).collect();
+                let separated_paths: Vec<&[PathScore]> = separated_paths
+                    .iter_mut()
+                    .map(|bin| {
+                        bin.sort_by(|a, b| {
+                            hp_sorter(
+                                &a.meta.hp[a.meta.samples_flag],
+                                &b.meta.hp[b.meta.samples_flag],
+                            )
+                        });
+                        bin.as_slice()
+                    })
+                    .collect();
 
                 m_result_sender
                     .send(m_graph.take_annotated(
