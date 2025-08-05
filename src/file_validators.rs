@@ -18,7 +18,7 @@ pub fn validate_file(path: &Path, label: &str) -> bool {
 pub fn validate_bam(file_path: &str) -> bool {
     let mut is_ok = true;
     if file_path.ends_with(".bam") || file_path.ends_with(".cram") {
-        let index_extensions = [".bai", ".crai"];
+        let index_extensions = [".bai", ".crai", ".csi"];
         let index_exists = index_extensions.iter().any(|ext| {
             let index_path = format!("{}{}", file_path, ext);
             let p = Path::new(&index_path);
