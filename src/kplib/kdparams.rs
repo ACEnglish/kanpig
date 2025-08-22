@@ -88,3 +88,32 @@ pub struct KDParams {
     #[arg(long, default_value_t = 0, help_heading = "Scoring / Advanced")]
     pub maxhom: usize,
 }
+
+impl Default for KDParams {
+    fn default() -> Self {
+        Self {
+            passonly: false,
+            neighdist: 1000,
+            sizemin: 50,
+            sizemax: 10000,
+            mapq: 5,
+            mapflag: 3840,
+            hps_weight: 1.0,
+            seqsim: 0.90,
+            sizesim: 0.90,
+            hapsim: 1.0,
+            gpenalty: 0.02,
+            fpenalty: 0.10,
+            kmer: 4,
+            minkfreq: 2,
+            maxnodes: 5000,
+            maxpaths: 5000,
+            pileupmax: 100,
+            fnmax: 3,
+            ab: 0.0,
+            squish: false,
+            one_to_one: false,
+            maxhom: 0,
+        }
+    }
+}

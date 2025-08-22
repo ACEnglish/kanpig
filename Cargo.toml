@@ -19,11 +19,24 @@ ordered-float = { version = "4.0", default-features = false }
 page_size = { version = "0.6.0" }
 petgraph = { version = "0.6.5" }
 pretty_env_logger = { version = "0.5.0" }
+pyo3 = { version = "0.15.1", features = ["extension-module"]}
 rand = "0.8.5"
 rust-htslib = { version = "0.46.0" }
 rust-lapper = { version = "1.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
+
+[lib]
+name = "kanpig"
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "kanpig"
+path = "src/main.rs"
+
+[features]
+default = []
+python = ["pyo3/extension-module"]
 
 [profile.release]
 opt-level = 3
