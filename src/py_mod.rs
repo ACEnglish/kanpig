@@ -1,12 +1,21 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 use pyo3::types::PyBytes;
 
 use rust_htslib::faidx;
-use rust_htslib::tbx::{self};
 
 use crate::kplib::ReadParser;
 use crate::kplib::{Haplotype, HaplotypeMeta};
+
+#[pyfunction]
+pub fn cansim(a: &PyAny, b: &PyAny, mink: f32) -> PyResult<f32> {
+    let vec_a: Vec<f32> = a.extract()?;
+    let vec_b: Vec<f32> = b.extract()?;
+
+    Ok(crate::kplib::metrics::seqsim(&vec_a, &vec_b, mink))
+}
+
 
 /// Wrap the Rust function for Python.
 /// Input: `sequence: bytes`, `kmer: int`, `negative: bool`, `maxhom: int`
@@ -14,7 +23,7 @@ use crate::kplib::{Haplotype, HaplotypeMeta};
 #[pyfunction]
 fn seq_to_kmer(
     py: Python<'_>,
-    sequence: &PyBytes,
+    sequence: String,
     kmer: u8,
     negative: bool,
     maxhom: usize,
@@ -324,6 +333,7 @@ impl PyHaplotypeMeta {
 #[pymodule]
 fn kanpig(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(seq_to_kmer, m)?)?;
+    m.add_function(wrap_pyfunction!(cansim, m)?)?;
     // m.add_class::<PyKDParams>()?; Too much overhead to bind
     m.add_class::<PyPlupParser>()?;
     m.add_class::<PyHaplotypeMeta>()?;
