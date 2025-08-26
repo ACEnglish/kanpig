@@ -187,7 +187,7 @@ When performing MeanShift clustering, the `min_bin_freq` controls the minimum nu
 
 ### `--hps-weight` & `--len-weight`
 When building the distance matrix for kmedoid clustering, reads with different haplotagging HPs or in different
-MeanShift clusters will have the distance increased by `*= weight`.
+MeanShift clusters will have the distance increased by `*= 1+weight`.
 
 ### `--lengthonly`
 Only cluster haplotypes based on lengths with MeanShift. This is ~3x faster, but comes at a cost to genotyping accuracy
