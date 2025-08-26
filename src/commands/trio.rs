@@ -103,7 +103,7 @@ fn task_thread(
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = Variants::new(chunk, m_args.graph.kmer, m_args.graph.maxhom);
+                let mut m_graph = Variants::new(chunk, m_args.graph.kmer);
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam
@@ -228,6 +228,7 @@ fn task_thread(
                     });
 
                 // HP tag for GT order
+                // Set HP tag to the most common seen in the cluster
                 for (i, m_hap) in clustered_haps.iter_mut().enumerate() {
                     for j in 0..3 {
                         if m_hap.meta.hp[j].is_some() {

@@ -16,10 +16,10 @@ pub struct VarNode {
 }
 
 impl VarNode {
-    pub fn new(entry: RecordBuf, kmer: u8, maxhom: usize) -> Self {
+    pub fn new(entry: RecordBuf, kmer: u8) -> Self {
         // Want to make a hash for these names for debugging, I think.
         let (start, end) = entry.boundaries();
-        let (kfeat, size) = entry.to_kfeat(kmer, maxhom);
+        let (kfeat, size) = entry.to_kfeat(kmer);
         Self {
             start,
             end,
@@ -55,7 +55,7 @@ pub struct Variants {
 /// The graph has an upstream 'src' node that point to every variant node
 /// The graph has a dnstream 'snk' node that is pointed to by every variant node and 'src'
 impl Variants {
-    pub fn new(mut variants: Vec<RecordBuf>, kmer: u8, maxhom: usize) -> Self {
+    pub fn new(mut variants: Vec<RecordBuf>, kmer: u8) -> Self {
         if variants.is_empty() {
             panic!("Cannot create a graph from no variants");
         }
@@ -69,7 +69,7 @@ impl Variants {
         node_indices.append(
             &mut variants
                 .drain(..) // drain lets us move the entry without a clone
-                .map(|entry| graph.add_node(VarNode::new(entry, kmer, maxhom)))
+                .map(|entry| graph.add_node(VarNode::new(entry, kmer)))
                 .collect(),
         );
 

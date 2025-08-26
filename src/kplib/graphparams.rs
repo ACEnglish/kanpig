@@ -28,56 +28,52 @@ pub struct GraphParams {
     pub mapflag: u16,
 
     /// Minimum sequence similarity for paths
-    #[arg(long, default_value_t = 0.90, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 0.90, help_heading = "Graph")]
     pub seqsim: f32,
 
     /// Minimum size similarity for paths
-    #[arg(long, default_value_t = 0.90, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 0.90, help_heading = "Graph")]
     pub sizesim: f32,
 
     /// Scoring penalty for gaps
-    #[arg(long, default_value_t = 0.02, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 0.02, help_heading = "Graph")]
     pub gpenalty: f32,
 
     /// Scoring penalty for FNs
-    #[arg(long, default_value_t = 0.10, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 0.10, help_heading = "Graph")]
     pub fpenalty: f32,
 
     /// Kmer size for featurization
-    #[arg(long, default_value_t = 4, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 4, help_heading = "Graph")]
     pub kmer: u8,
 
     /// Minimum frequency of kmers
-    #[arg(long, default_value_t = 2, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 2, help_heading = "Graph")]
     pub minkfreq: u64,
 
     /// Maximum graph size to search; otherwise perform 1-to-1
-    #[arg(long, default_value_t = 5000, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 5000, help_heading = "Graph")]
     pub maxnodes: usize,
 
     /// Maximum paths to traverse per graph
-    #[arg(long, default_value_t = 5000, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 5000, help_heading = "Graph")]
     pub maxpaths: u64,
 
     /// Maximum pileups allowed for partials matching
-    #[arg(long, default_value_t = 100, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 100, help_heading = "Graph")]
     pub pileupmax: usize,
 
     /// Maximum FNs allowed in a path
-    #[arg(long, default_value_t = 3, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = 3, help_heading = "Graph")]
     pub fnmax: usize,
 
     /// Prefer simplier paths during scoring
-    #[arg(long, default_value_t = false, help_heading = "Scoring / Advanced")]
+    #[arg(long, default_value_t = false, help_heading = "Graph")]
     pub squish: bool,
 
-    /// (Experimental) Restrict to 1-to-1 haplotype/node matching
-    #[arg(long, default_value_t = false, help_heading = "Scoring / Advanced")]
+    /// Restrict to 1-to-1 haplotype/node matching
+    #[arg(long, default_value_t = false, help_heading = "Graph")]
     pub one_to_one: bool,
-
-    /// (Experimental) Limit homopolymer length (off=0)
-    #[arg(long, default_value_t = 0, help_heading = "Scoring / Advanced")]
-    pub maxhom: usize,
 }
 
 impl Default for GraphParams {
@@ -101,7 +97,6 @@ impl Default for GraphParams {
             fnmax: 3,
             squish: false,
             one_to_one: false,
-            maxhom: 0,
         }
     }
 }

@@ -91,7 +91,7 @@ impl Haplotype {
 
     // Create an empty haplotype
     pub fn blank(kmer: u8, meta: HaplotypeMeta) -> Haplotype {
-        let mk = seq_to_kmer(&[], kmer, false, 0);
+        let mk = seq_to_kmer(&[], kmer, false);
         Haplotype {
             size: 0,
             n: 0,

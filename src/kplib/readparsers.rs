@@ -282,7 +282,6 @@ pub fn open_reads(
 /// - `reference`: A reference to a `faidx::Reader` for querying the reference genome.
 /// - `params`: A reference to a `GraphParams` struct containing user-defined parameters, including:
 ///     - `kmer`: The k-mer size for generating haplotype sequences.
-///     - `maxhom`: The maximum homopolymer length for k-mer generation.
 ///
 /// # Returns
 /// - `(Vec<Haplotype>, u64)`: A tuple containing:
@@ -311,7 +310,7 @@ pub fn open_reads(
 /// let reads: ReadsMap = HashMap::new(); // Populate with actual read-pileup mappings
 /// let plups: PileupSet = Vec::new(); // Populate with pileups
 /// let reference = Reader::from_path("reference.fa").unwrap();
-/// let params = GraphParams { kmer: 31, maxhom: 5 };
+/// let params = GraphParams { kmer: 31 };
 ///
 /// let haplotypes = pileups_to_haps(chrom, reads, plups, &reference, &params);
 /// for hap in haplotypes {
@@ -347,12 +346,7 @@ fn pileups_to_haps(
         };
 
         let n_hap = Haplotype::new(
-            seq_to_kmer(
-                &sequence,
-                params.kmer,
-                p.indel == Svtype::Del,
-                params.maxhom,
-            ),
+            seq_to_kmer(&sequence, params.kmer, p.indel == Svtype::Del),
             p.size,
             1,
             hap_meta.clone(),

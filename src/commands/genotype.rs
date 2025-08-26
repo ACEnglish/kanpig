@@ -33,7 +33,7 @@ fn task_thread(
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = Variants::new(chunk, m_args.graph.kmer, m_args.graph.maxhom);
+                let mut m_graph = Variants::new(chunk, m_args.graph.kmer);
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam

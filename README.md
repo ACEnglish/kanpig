@@ -35,6 +35,48 @@ tabix -p bed alignments.plup.gz
 * Kanpig only looks at read pileups and does not consider split or soft-clipped alignment information. This means
   variants above ~10kbp should be skipped with the `--sizemax` parameter.
 
+# 📝 Annotations
+
+The `SAMPLE` column fields populated by kanpig are:
+
+| Field   | Description |
+|---------|-------------|
+| **FT**  | Bit flag for properties of the variant's genotyping |
+| **SQ**  | Phred scaled likelihood variant alternate is present in the sample |
+| **GQ**  | Phred scale difference between most and second-most likely genotypes |
+| **PS**  | Phase set pulled from haplotagged reads for long-range phasing or Neighborhood id of variants evaluated together for short-range phasing |
+| **DP**  | Read coverage over the region |
+| **AD**  | Read coverage supporting the reference and alternate alleles |
+| **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
+
+Details of `FT`
+| Flag   | Description |
+|--------|-------------|
+| 0x1    | The genotype observed from variants paths matching is not equal to the genotype observed from measuring the proportions of reads supporting the two alleles. |
+| 0x2    | The genotype quality is less than 5 |
+| 0x4    | The depth (DP) is less than 5 |
+| 0x8    | The sample quality (SQ) is less than 5 (only present on non-ref variants) |
+| 0x16   | The number of reads supporting the alternate allele less than 5 (only present on non-ref variants) |
+| 0x32   | The best scoring path through the variant graph only used part of the haplotype. This may be indicative of a false-negative in the variant graph. |
+
+# 🔌 Compute Resources
+
+Kanpig is highly parallelized and will fully utilize all threads it is given. However, hyperthreading doesn't seem to
+help and therefore the number of threads should probably be limited to the number of physical processors available. For
+memory, giving kanpig 2GB per-core is usually more than enough.
+
+The actual runtime and memory usage of kanpig run will depend on the read coverage and the number of SVs in the input
+VCF. As a example of kanpig's resource usage with 16 cores available, genotyping a 30x long-read bam against a 2,199
+sample VCF (4.3 million SVs) took 13 minutes with a maximum memory usage of 12GB. Converting the bam to a plup file took
+4 minutes (8GB of memory) and genotyping with this plup file took 3 minutes (12GB memory). 
+
+Note that kanpig `gt` is predominantly I/O limited and may not benefit more than ~4-8 cores.
+
+While genotyping against a plup file is usually faster, bam to plup conversion is most useful for:
+* genotyping a large VCF or super-high (>50x) coverage bam.
+* a sample that will be genotyped multiple times (e.g. N+1 pipelines) 
+* long-term access to reads (a plup file is up to ~2,000x smaller than a bam)
+
 # 🔧 Core Parameter Details
 
 The default parameters are tuned to work generally well for genotyping a single sample's VCF, meaning the variants are
@@ -93,71 +135,12 @@ will turn off path-finding in favor of `--one-to-one` haplotype to variant compa
 below), reducing runtime and memory usage. This may reduce recall in regions with many SVs, but these regions are
 problematic anyway.
 
-### `--hapsim`
-After performing kmedoid clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
-above `hapsim`, they are consolidated into a homozygous allele. This is useful for when input SVs over a certain 
-size/sequence sequence similarity have already been merged (see [truvari collapse](https://github.com/ACEnglish/truvari)).
-
-### `--threads`
-Number of analysis threads to use. Note that in addition to the analysis threads, kanpig keeps one dedicated IO thread
-for VCF reading and writing.
-
-# 📝 Annotations
-
-The `SAMPLE` column fields populated by kanpig are:
-
-| Field   | Description |
-|---------|-------------|
-| **FT**  | Bit flag for properties of the variant's genotyping |
-| **SQ**  | Phred scaled likelihood variant alternate is present in the sample |
-| **GQ**  | Phred scale difference between most and second-most likely genotypes |
-| **PS**  | Phase set pulled from haplotagged reads for long-range phasing or Neighborhood id of variants evaluated together for short-range phasing |
-| **DP**  | Read coverage over the region |
-| **AD**  | Read coverage supporting the reference and alternate alleles |
-| **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
-
-Details of `FT`
-| Flag   | Description |
-|--------|-------------|
-| 0x1    | The genotype observed from variants paths matching is not equal to the genotype observed from measuring the proportions of reads supporting the two alleles. |
-| 0x2    | The genotype quality is less than 5 |
-| 0x4    | The depth (DP) is less than 5 |
-| 0x8    | The sample quality (SQ) is less than 5 (only present on non-ref variants) |
-| 0x16   | The number of reads supporting the alternate allele less than 5 (only present on non-ref variants) |
-| 0x32   | The best scoring path through the variant graph only used part of the haplotype. This may be indicative of a false-negative in the variant graph. |
-
-# 🔌 Compute Resources
-
-Kanpig is highly parallelized and will fully utilize all threads it is given. However, hyperthreading doesn't seem to
-help and therefore the number of threads should probably be limited to the number of physical processors available. For
-memory, giving kanpig 2GB per-core is usually more than enough.
-
-The actual runtime and memory usage of kanpig run will depend on the read coverage and the number of SVs in the input
-VCF. As a example of kanpig's resource usage with 16 cores available, genotyping a 30x long-read bam against a 2,199
-sample VCF (4.3 million SVs) took 13 minutes with a maximum memory usage of 12GB. Converting the bam to a plup file took
-4 minutes (8GB of memory) and genotyping with this plup file took 3 minutes (12GB memory). 
-
-Note that kanpig `gt` is predominantly I/O limited and may not benefit more than ~4-8 cores.
-
-While genotyping against a plup file is usually faster, bam to plup conversion is most useful for:
-* genotyping a large VCF or super-high (>50x) coverage bam.
-* a sample that will be genotyped multiple times (e.g. N+1 pipelines) 
-* long-term access to reads (a plup file is up to ~2,000x smaller than a bam)
-
-# 🔬 Experimental Parameter Details
-
-These parameters have a varying effect on the results and are not guaranteed to be stable across releases. 
-
 ### `--one-to-one`
 Instead of performing the path-finding algorithm to apply a haplotype to the variant graph, perform a 1-to-1 
 comparison of the haplotype to each node in the variant graph. If a single node matches above `sizesim` and `seqsim`, 
 the haplotype is applied to it. 
 
 This parameter will boost the specificity, increase speed, and lower memory usage of kanpig at the cost of recall.
-
-### `--maxhom`
-When performing kmer-featurization of sequences (from reads or variants), homopolymer runs above `maxhom` are trimmed
-to `maxhom`. For example, `--maxhom 5` will only count two four-mers in homopolymer runs above 5bp.
 
 ### `--squish`
 By default, the `--gpenalty` is applied to the scoring function as the difference between a path's node count and a 
@@ -166,11 +149,24 @@ with fewer nodes are preferred over paths with a consistent representation to th
 for multi-sample VCFs where consistency between variants' genotypes is more important than preserving the exact set of
 variants that best reflect those described by the alignments.
 
+# 🧬 Genotyping Mode
+
+These parameters have a varying effect on the results and are not guaranteed to be stable across releases. 
+
+### `--hapsim`
+After performing kmedoid clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
+above `hapsim`, they are consolidated into a homozygous allele. This is useful for when input SVs over a certain 
+size/sequence sequence similarity have already been merged (see [truvari collapse](https://github.com/ACEnglish/truvari)).
+
 ### `--ab`
 In loci where reads cluster into a potentially compound heterozygous site, the proportion of reads supporting the
 haplotype with lower coverage must have at least `--ab` fraction of the reads. Otherwise, we assume that the
 lower-covered haplotype is a mapping/sequencing anaomaly and treat its reads as supporting the reference. This parameter
 at 0.20 boosts specificity and genotype concordance at the cost of (a little bit less) recall.
+
+### `--hps-weight`
+Informatin from haplotagged reads (PS and HP tags) can be used to improve clustering. The weight serves to make reads
+from different HPs have a higher distance inside the matrix sent to kmedoid clustering.
 
 # 👪 Trio Mode
 
@@ -185,6 +181,17 @@ all clusters for a K to be considered valid. Additionally, reads from a sample c
 
 Missing features which should eventually be added include leveraging ploidy beds, `--hapsim` simplification, `--ab`
 enforcement.
+
+### `--msmin`
+When performing MeanShift clustering, the `min_bin_freq` controls the minimum number of reads to create a bin.
+
+### `--hps-weight` & `--len-weight`
+When building the distance matrix for kmedoid clustering, reads with different haplotagging HPs or in different
+MeanShift clusters will have the distance increased by `*= weight`.
+
+### `--lengthonly`
+Only cluster haplotypes based on lengths with MeanShift. This is ~3x faster, but comes at a cost to genotyping accuracy
+and mendelian consistency rate.
 
 # 🐍 Python bindings
 Minimal python bindings are available for plup parsing. These can be installed via `maturin develop --features python`
