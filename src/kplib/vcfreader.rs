@@ -1,4 +1,4 @@
-use crate::kplib::{ChannelOutput, KDParams, KdpVcf, Regions};
+use crate::kplib::{ChannelOutput, GraphParams, KdpVcf, Regions};
 use crossbeam_channel::Sender;
 use noodles_vcf::{self as vcf, variant::RecordBuf};
 use std::io::BufRead;
@@ -9,7 +9,7 @@ pub struct VcfChunker<R: BufRead> {
     pub m_vcf: vcf::io::Reader<R>,
     pub m_header: vcf::Header,
     regions: Regions,
-    params: KDParams,
+    params: GraphParams,
     // Variables for tracking chunks
     cur_chrom: String,
     cur_end: u64,
@@ -28,7 +28,7 @@ impl<R: BufRead> VcfChunker<R> {
         m_vcf: vcf::io::Reader<R>,
         m_header: vcf::Header,
         regions: Regions,
-        params: KDParams,
+        params: GraphParams,
         result_sender: Sender<ChannelOutput>,
     ) -> Self {
         Self {

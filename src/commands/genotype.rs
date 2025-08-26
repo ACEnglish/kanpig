@@ -12,7 +12,7 @@ use crate::{
     file_validators,
     kplib::{
         build_region_tree, hp_sorter, open_reads, open_writer_thread, ChannelInput, ChannelOutput,
-        KDParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
+        GraphParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
     },
 };
 fn task_thread(
@@ -27,13 +27,13 @@ fn task_thread(
         m_args.io.sample.expect("Sample should have been set"),
         0, // First sample is index 0 in the HaplotypeMeta vectros
         1, // One total sample will be opened (for HaplotypeMeta)
-        &m_args.kd,
+        &m_args.graph,
     );
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
+                let mut m_graph = Variants::new(chunk, m_args.graph.kmer, m_args.graph.maxhom);
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam
@@ -46,17 +46,25 @@ fn task_thread(
 
                 let (haps, coverage) =
                     m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                let haps = ploidy.cluster(haps, coverage, 0, &m_args.kd);
+                let haps = ploidy.cluster(
+                    haps,
+                    coverage,
+                    0,
+                    m_args.hps_weight,
+                    m_args.hapsim,
+                    m_args.ab,
+                    &m_args.graph,
+                );
 
                 // Only need to build the full graph sometimes
                 let should_build = !haps.is_empty()
-                    && !m_args.kd.one_to_one
-                    && m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
+                    && !m_args.graph.one_to_one
+                    && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
                 m_graph.build(should_build);
 
                 let mut paths: Vec<PathScore> = haps
                     .iter()
-                    .map(|h| m_graph.apply_haplotype(h, &m_args.kd))
+                    .map(|h| m_graph.apply_haplotype(h, &m_args.graph))
                     .filter(|p| *p != PathScore::default())
                     .collect();
                 paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
@@ -74,7 +82,19 @@ pub struct GTCommand {
     pub io: IOParams,
 
     #[command(flatten)]
-    pub kd: KDParams,
+    pub graph: GraphParams,
+
+    /// Clustering weight for haplotagged reads (off=0.0, full=1.0)
+    #[arg(long, default_value_t = 1.0, help_heading = "Genotyping")]
+    pub hps_weight: f32,
+
+    /// Collapse haplotypes of similar size (off=1)
+    #[arg(long, default_value_t = 1.0, help_heading = "Genotyping")]
+    pub hapsim: f32,
+
+    /// Minimum allele balance for compound het lower VAF (off=0)
+    #[arg(long, default_value_t = 0.0, help_heading = "Genotyping")]
+    pub ab: f32,
 }
 
 #[derive(clap::Args, Clone, Debug)]
@@ -125,47 +145,47 @@ impl KanpigCommand for GTCommand {
         let mut is_ok = true;
 
         is_ok &= file_validators::validate_file(&self.io.input, "--input");
-        is_ok &= file_validators::validate_reads(&self.io.reads, &self.kd);
+        is_ok &= file_validators::validate_reads(&self.io.reads, &self.graph);
         is_ok &= file_validators::validate_reference(&self.io.reference);
 
         if let Some(bed_file) = &self.io.bed {
             is_ok &= file_validators::validate_file(bed_file, "--bed");
         }
 
-        if self.kd.sizemin < 10 {
+        if self.graph.sizemin < 10 {
             warn!("--sizemin is recommended to be at least 10");
         }
 
-        if self.kd.kmer >= 8 {
+        if self.graph.kmer >= 8 {
             warn!("--kmer above 8 becomes memory intensive");
         }
 
-        if self.kd.kmer < 1 {
+        if self.graph.kmer < 1 {
             error!("--kmer must be at least 1");
             is_ok = false;
         }
 
-        if self.kd.sizemin < self.kd.kmer.into() {
+        if self.graph.sizemin < self.graph.kmer.into() {
             error!("--sizemin must be ≥ --kmer");
             is_ok = false;
         }
 
-        if self.kd.sizesim < 0.0 || self.kd.sizesim > 1.0 {
+        if self.graph.sizesim < 0.0 || self.graph.sizesim > 1.0 {
             error!("--sizesim must be between 0.0 and 1.0");
             is_ok = false;
         }
 
-        if self.kd.seqsim < 0.0 || self.kd.seqsim > 1.0 {
+        if self.graph.seqsim < 0.0 || self.graph.seqsim > 1.0 {
             error!("--seqsim must be between 0.0 and 1.0");
             is_ok = false;
         }
 
-        if self.kd.hapsim < 0.0 || self.kd.hapsim > 1.0 {
+        if self.hapsim < 0.0 || self.hapsim > 1.0 {
             error!("--hapsim must be between 0.0 and 1.0");
             is_ok = false;
         }
 
-        if self.kd.maxpaths < 1 {
+        if self.graph.maxpaths < 1 {
             error!("--maxpaths must be at least 1");
             is_ok = false;
         }
@@ -242,7 +262,7 @@ impl KanpigCommand for GTCommand {
             input_vcf,
             input_header.clone(),
             tree,
-            self.kd.clone(),
+            self.graph.clone(),
             result_sender.clone(),
         );
 

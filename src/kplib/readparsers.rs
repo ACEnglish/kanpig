@@ -1,5 +1,5 @@
 use crate::kplib::{
-    seq_to_kmer, Haplotype, HaplotypeMeta, KDParams, PileupVariant, ReadPileup, Svtype,
+    seq_to_kmer, GraphParams, Haplotype, HaplotypeMeta, PileupVariant, ReadPileup, Svtype,
 };
 use indexmap::{IndexMap, IndexSet};
 use rust_htslib::faidx;
@@ -31,7 +31,7 @@ pub struct BamParser {
     sample_name: String,
     sample_idx: usize,
     sample_count: usize,
-    params: KDParams,
+    params: GraphParams,
 }
 
 impl BamParser {
@@ -42,7 +42,7 @@ impl BamParser {
         sample_name: String,
         sample_idx: usize,
         sample_count: usize,
-        params: KDParams,
+        params: GraphParams,
     ) -> Self {
         let mut bam = IndexedReader::from_path(bam_name).unwrap();
         let _ = bam.set_reference(ref_name.clone());
@@ -145,7 +145,7 @@ pub struct PlupParser {
     sample_name: String,
     sample_idx: usize,
     sample_count: usize,
-    params: KDParams,
+    params: GraphParams,
 }
 
 impl PlupParser {
@@ -156,7 +156,7 @@ impl PlupParser {
         sample_name: String,
         sample_idx: usize,
         sample_count: usize,
-        params: KDParams,
+        params: GraphParams,
     ) -> Self {
         let tbx = tbx::Reader::from_path(&file_path).expect("Failed to open TBX file");
         Self {
@@ -249,7 +249,7 @@ pub fn open_reads(
     sample_name: String,
     sample_idx: usize,
     sample_count: usize,
-    kd: &KDParams,
+    params: &GraphParams,
 ) -> Box<dyn ReadParser> {
     let reference = faidx::Reader::from_path(&reference_path).unwrap();
     match reads_path.file_name().and_then(|name| name.to_str()) {
@@ -259,7 +259,7 @@ pub fn open_reads(
             sample_name,
             sample_idx,
             sample_count,
-            kd.clone(),
+            params.clone(),
         )),
         _ => Box::new(BamParser::new(
             reads_path,
@@ -268,7 +268,7 @@ pub fn open_reads(
             sample_name,
             sample_idx,
             sample_count,
-            kd.clone(),
+            params.clone(),
         )),
     }
 }
@@ -280,7 +280,7 @@ pub fn open_reads(
 /// - `reads`: A `ReadsMap` mapping read identifiers to a list of pileup indices.
 /// - `plups`: A `PileupSet` representing the pileups to process.
 /// - `reference`: A reference to a `faidx::Reader` for querying the reference genome.
-/// - `params`: A reference to a `KDParams` struct containing user-defined parameters, including:
+/// - `params`: A reference to a `GraphParams` struct containing user-defined parameters, including:
 ///     - `kmer`: The k-mer size for generating haplotype sequences.
 ///     - `maxhom`: The maximum homopolymer length for k-mer generation.
 ///
@@ -311,7 +311,7 @@ pub fn open_reads(
 /// let reads: ReadsMap = HashMap::new(); // Populate with actual read-pileup mappings
 /// let plups: PileupSet = Vec::new(); // Populate with pileups
 /// let reference = Reader::from_path("reference.fa").unwrap();
-/// let params = KDParams { kmer: 31, maxhom: 5 };
+/// let params = GraphParams { kmer: 31, maxhom: 5 };
 ///
 /// let haplotypes = pileups_to_haps(chrom, reads, plups, &reference, &params);
 /// for hap in haplotypes {
@@ -324,7 +324,7 @@ fn pileups_to_haps(
     reads: ReadsMap,
     mut plups: PileupSet,
     reference: &faidx::Reader,
-    params: &KDParams,
+    params: &GraphParams,
     hps: HPMap, // HP tags per-read
     hap_meta: HaplotypeMeta,
     sample_idx: usize,

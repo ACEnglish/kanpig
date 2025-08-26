@@ -1,4 +1,4 @@
-use crate::kplib::{metrics, Haplotype, HaplotypeMeta, KDParams, VarNode};
+use crate::kplib::{metrics, GraphParams, Haplotype, HaplotypeMeta, VarNode};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::cmp::Ordering;
 
@@ -54,7 +54,7 @@ impl PathScore {
         path: Vec<NodeIndex>,
         path_size: i64,
         targets: &[Haplotype],
-        params: &KDParams,
+        params: &GraphParams,
         target: &Haplotype,
     ) -> Self {
         let mut path_k: Option<Vec<f32>> = None;

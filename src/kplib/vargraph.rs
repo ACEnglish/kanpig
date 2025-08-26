@@ -1,6 +1,6 @@
 use crate::kplib::{
     brute_force_find_path, metrics::overlaps, traverse::get_one_to_one, ChannelOutput,
-    GenotypeAnno, Haplotype, KDParams, KdpVcf, PathScore, Ploidy,
+    GenotypeAnno, GraphParams, Haplotype, KdpVcf, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -120,7 +120,7 @@ impl Variants {
 
     // Find the path through this graph that best fits
     // the haplotype push coverage onto the VarNodes
-    pub fn apply_haplotype(&self, hap: &Haplotype, params: &KDParams) -> PathScore {
+    pub fn apply_haplotype(&self, hap: &Haplotype, params: &GraphParams) -> PathScore {
         // if there are no variants in the hap, we don't want to apply the coverage.
         if params.one_to_one || (self.node_indices.len() - 2) > params.maxnodes {
             get_one_to_one(&self.graph, hap, params)

@@ -1,5 +1,8 @@
+///
+/// Parameters relevant for variants, reads, and graph that are used by (most) commands
+///
 #[derive(clap::Args, Clone, Debug)]
-pub struct KDParams {
+pub struct GraphParams {
     /// Only analyze variants with PASS FILTER
     #[arg(long, default_value_t = false, help_heading = "Variants & Reads")]
     pub passonly: bool,
@@ -24,10 +27,6 @@ pub struct KDParams {
     #[arg(long, default_value_t = 3840, help_heading = "Variants & Reads")]
     pub mapflag: u16,
 
-    /// Clustering weight for haplotagged reads (off=0.0, full=1.0)
-    #[arg(long, default_value_t = 1.0, help_heading = "Variants & Reads")]
-    pub hps_weight: f32,
-
     /// Minimum sequence similarity for paths
     #[arg(long, default_value_t = 0.90, help_heading = "Scoring / Advanced")]
     pub seqsim: f32,
@@ -35,10 +34,6 @@ pub struct KDParams {
     /// Minimum size similarity for paths
     #[arg(long, default_value_t = 0.90, help_heading = "Scoring / Advanced")]
     pub sizesim: f32,
-
-    /// Collapse haplotypes of similar size (off=1)
-    #[arg(long, default_value_t = 1.0, help_heading = "Scoring / Advanced")]
-    pub hapsim: f32,
 
     /// Scoring penalty for gaps
     #[arg(long, default_value_t = 0.02, help_heading = "Scoring / Advanced")]
@@ -72,10 +67,6 @@ pub struct KDParams {
     #[arg(long, default_value_t = 3, help_heading = "Scoring / Advanced")]
     pub fnmax: usize,
 
-    /// Minimum allele balance for compound het lower VAF (off=0)
-    #[arg(long, default_value_t = 0.0, help_heading = "Scoring / Advanced")]
-    pub ab: f32,
-
     /// Prefer simplier paths during scoring
     #[arg(long, default_value_t = false, help_heading = "Scoring / Advanced")]
     pub squish: bool,
@@ -89,7 +80,7 @@ pub struct KDParams {
     pub maxhom: usize,
 }
 
-impl Default for KDParams {
+impl Default for GraphParams {
     fn default() -> Self {
         Self {
             passonly: false,
@@ -98,10 +89,8 @@ impl Default for KDParams {
             sizemax: 10000,
             mapq: 5,
             mapflag: 3840,
-            hps_weight: 1.0,
             seqsim: 0.90,
             sizesim: 0.90,
-            hapsim: 1.0,
             gpenalty: 0.02,
             fpenalty: 0.10,
             kmer: 4,
@@ -110,7 +99,6 @@ impl Default for KDParams {
             maxpaths: 5000,
             pileupmax: 100,
             fnmax: 3,
-            ab: 0.0,
             squish: false,
             one_to_one: false,
             maxhom: 0,

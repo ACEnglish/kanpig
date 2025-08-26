@@ -13,7 +13,7 @@ use crate::{
     file_validators,
     kplib::{
         build_region_tree, hp_sorter, metrics, open_reads, open_writer_thread, trio_genotyper,
-        ChannelInput, ChannelOutput, Haplotype, KDParams, MeanShift, PathScore, Ploidy,
+        ChannelInput, ChannelOutput, GraphParams, Haplotype, MeanShift, PathScore, Ploidy,
         PloidyRegions, Variants, VcfChunker,
     },
 };
@@ -48,7 +48,12 @@ fn cluster_quality(k: usize, quality_scores: &[f64], labels: &[usize]) -> Vec<f6
 }
 
 /// Count reads in each cluster
-fn count_reads(k: usize, ref_coverage: &[usize; 3], assignments: &[usize], haplos: &[Haplotype]) -> Array2<usize> {
+fn count_reads(
+    k: usize,
+    ref_coverage: &[usize; 3],
+    assignments: &[usize],
+    haplos: &[Haplotype],
+) -> Array2<usize> {
     let mut read_counts = Array::<usize, _>::zeros((k + 1, 3));
     read_counts[[0, 0]] = ref_coverage[0];
     read_counts[[0, 1]] = ref_coverage[1];
@@ -73,7 +78,7 @@ fn task_thread(
         m_args.io.proband_sample.clone(),
         0, // First sample is index 0 in the HaplotypeMeta vectros
         3, // One total sample will be opened (for HaplotypeMeta)
-        &m_args.kd,
+        &m_args.graph,
     );
 
     let mut pat_reads = open_reads(
@@ -82,7 +87,7 @@ fn task_thread(
         m_args.io.father_sample.clone(),
         1,
         3,
-        &m_args.kd,
+        &m_args.graph,
     );
 
     let mut mat_reads = open_reads(
@@ -91,14 +96,14 @@ fn task_thread(
         m_args.io.mother_sample.clone(),
         2,
         3,
-        &m_args.kd,
+        &m_args.graph,
     );
 
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = Variants::new(chunk, m_args.kd.kmer, m_args.kd.maxhom);
+                let mut m_graph = Variants::new(chunk, m_args.graph.kmer, m_args.graph.maxhom);
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam
@@ -111,15 +116,15 @@ fn task_thread(
 
                 let (pro_haps, pro_coverage) =
                     pro_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                //let pro_haps = ploidy.cluster(pro_haps, pro_coverage, 0, &m_args.kd);
+                //let pro_haps = ploidy.cluster(pro_haps, pro_coverage, 0, &m_args.graph);
 
                 let (pat_haps, pat_coverage) =
                     pat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                //let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 1, &m_args.kd);
+                //let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 1, &m_args.graph);
 
                 let (mat_haps, mat_coverage) =
                     mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                //let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 2, &m_args.kd);
+                //let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 2, &m_args.graph);
 
                 let ref_coverage = [
                     pro_coverage as usize - pro_haps.len(),
@@ -140,8 +145,7 @@ fn task_thread(
 
                 // MeanShift to determine K
                 let sizes: Vec<f64> = haplos.iter().map(|x| x.size as f64).collect();
-                // TODO PARAM and dynamic figure this out
-                let mut ms = MeanShift::new().min_size(m_args.minreads);
+                let mut ms = MeanShift::new().min_size(m_args.msmin);
                 let ms_result = ms.fit(&sizes);
 
                 // KMedoid Clustering
@@ -160,7 +164,7 @@ fn task_thread(
                                 - (metrics::seqsim(
                                     &haplos[i].kfeat,
                                     &haplos[j].kfeat,
-                                    m_args.kd.minkfreq as f32,
+                                    m_args.graph.minkfreq as f32,
                                 ));
                             // if same sample and different hp, hps_weight penalty
                             let i_samp = haplos[i].meta.samples_flag;
@@ -171,15 +175,13 @@ fn task_thread(
                                     haplos[j].meta.hp[j_samp.trailing_zeros() as usize],
                                 ) {
                                     (Some(group_i), Some(group_j)) if group_i != group_j => {
-                                        //TODO PARAM
-                                        dist *= 1.25;
+                                        dist *= 1.0 + m_args.hps_weight;
                                     }
                                     _ => (),
                                 }
                             }
                             if ms_result.labels[i] != ms_result.labels[j] {
-                                //TODO PARAM
-                                dist *= 1.25;
+                                dist *= 1.0 + m_args.len_weight;
                             }
                             dist
                         });
@@ -245,14 +247,14 @@ fn task_thread(
                 }
 
                 let should_build = !clustered_haps.is_empty()
-                    && !m_args.kd.one_to_one
-                    && m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
+                    && !m_args.graph.one_to_one
+                    && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
                 m_graph.build(should_build);
 
                 // Haplotypes to PathScores
                 let paths: Vec<PathScore> = clustered_haps
                     .into_iter()
-                    .map(|h| m_graph.apply_haplotype(&h, &m_args.kd))
+                    .map(|h| m_graph.apply_haplotype(&h, &m_args.graph))
                     .filter(|p| *p != PathScore::default())
                     .collect();
 
@@ -301,15 +303,23 @@ pub struct TrioCommand {
     pub io: IOParams,
 
     #[command(flatten)]
-    pub kd: KDParams,
-
-    /// Only cluster on haplotype lengths
-    #[arg(long, default_value_t = false, help_heading = "Trio")]
-    pub lengthonly: bool,
+    pub graph: GraphParams,
 
     /// Minimum number of reads in a cluster
-    #[arg(long, default_value_t = 3, help_heading = "Trio")]
-    pub minreads: usize,
+    #[arg(long, default_value_t = 3, help_heading = "Genotyping")]
+    pub msmin: usize,
+
+    /// Clustering weight for haplotagged reads (off=0.0, full=1.0)
+    #[arg(long, default_value_t = 0.25, help_heading = "Genotyping")]
+    pub hps_weight: f32,
+
+    /// Clustering weight for haplotype lengths (off=0.0, full=1.0)
+    #[arg(long, default_value_t = 0.25, help_heading = "Genotyping")]
+    pub len_weight: f32,
+
+    /// Only cluster on haplotype lengths
+    #[arg(long, default_value_t = false, help_heading = "Genotyping")]
+    pub lengthonly: bool,
 }
 
 #[derive(clap::Args, Clone, Debug)]
@@ -379,49 +389,44 @@ impl KanpigCommand for TrioCommand {
         let mut is_ok = true;
 
         is_ok &= file_validators::validate_file(&self.io.input, "--input");
-        is_ok &= file_validators::validate_reads(&self.io.proband, &self.kd);
-        is_ok &= file_validators::validate_reads(&self.io.mother, &self.kd);
-        is_ok &= file_validators::validate_reads(&self.io.father, &self.kd);
+        is_ok &= file_validators::validate_reads(&self.io.proband, &self.graph);
+        is_ok &= file_validators::validate_reads(&self.io.mother, &self.graph);
+        is_ok &= file_validators::validate_reads(&self.io.father, &self.graph);
         is_ok &= file_validators::validate_reference(&self.io.reference);
 
         if let Some(bed_file) = &self.io.bed {
             is_ok &= file_validators::validate_file(bed_file, "--bed");
         }
 
-        if self.kd.sizemin < 10 {
+        if self.graph.sizemin < 10 {
             warn!("--sizemin is recommended to be at least 10");
         }
 
-        if self.kd.kmer >= 8 {
+        if self.graph.kmer >= 8 {
             warn!("--kmer above 8 becomes memory intensive");
         }
 
-        if self.kd.kmer < 1 {
+        if self.graph.kmer < 1 {
             error!("--kmer must be at least 1");
             is_ok = false;
         }
 
-        if self.kd.sizemin < self.kd.kmer.into() {
+        if self.graph.sizemin < self.graph.kmer.into() {
             error!("--sizemin must be ≥ --kmer");
             is_ok = false;
         }
 
-        if self.kd.sizesim < 0.0 || self.kd.sizesim > 1.0 {
+        if self.graph.sizesim < 0.0 || self.graph.sizesim > 1.0 {
             error!("--sizesim must be between 0.0 and 1.0");
             is_ok = false;
         }
 
-        if self.kd.seqsim < 0.0 || self.kd.seqsim > 1.0 {
+        if self.graph.seqsim < 0.0 || self.graph.seqsim > 1.0 {
             error!("--seqsim must be between 0.0 and 1.0");
             is_ok = false;
         }
 
-        if self.kd.hapsim < 0.0 || self.kd.hapsim > 1.0 {
-            error!("--hapsim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
-
-        if self.kd.maxpaths < 1 {
+        if self.graph.maxpaths < 1 {
             error!("--maxpaths must be at least 1");
             is_ok = false;
         }
@@ -493,7 +498,7 @@ impl KanpigCommand for TrioCommand {
             input_vcf,
             input_header.clone(),
             tree,
-            self.kd.clone(),
+            self.graph.clone(),
             result_sender.clone(),
         );
 

@@ -1,4 +1,4 @@
-use crate::kplib::{metrics, Haplotype, KDParams};
+use crate::kplib::{metrics, GraphParams, Haplotype};
 use ndarray::Array2;
 use rand::SeedableRng;
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ pub fn haploid_haplotypes(
     mut haps: Vec<Haplotype>,
     coverage: u64,
     sample_idx: usize,
-    _params: &KDParams,
+    _params: &GraphParams,
 ) -> Vec<Haplotype> {
     if coverage == 0 || haps.is_empty() {
         return vec![];
@@ -44,7 +44,10 @@ pub fn diploid_haplotypes(
     mut haplos: Vec<Haplotype>,
     coverage: u64,
     sample_idx: usize,
-    params: &KDParams,
+    hps_weight: f32,
+    hapsim: f32,
+    ab: f32,
+    params: &GraphParams,
 ) -> Vec<Haplotype> {
     if coverage == 0 || haplos.is_empty() {
         return vec![];
@@ -62,7 +65,7 @@ pub fn diploid_haplotypes(
             1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, params.minkfreq as f32));
         // Penalize only if both points have defined, different groups
         match (haplos[i].meta.hp[sample_idx], haplos[j].meta.hp[sample_idx]) {
-            (Some(group_i), Some(group_j)) if group_i != group_j => dist + params.hps_weight,
+            (Some(group_i), Some(group_j)) if group_i != group_j => dist + hps_weight,
             _ => dist,
         }
     });
@@ -119,7 +122,7 @@ pub fn diploid_haplotypes(
     // First we establish the two possible alt alleles
     // This is a dedup step for when the alt paths are highly similar
     if (hap1.size.signum() == hap2.size.signum())
-        && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs()) > params.hapsim
+        && metrics::sizesim(hap1.size.unsigned_abs(), hap2.size.unsigned_abs()) > hapsim
     {
         hap2.meta.coverage[sample_idx] += hap1.meta.coverage[sample_idx];
         return vec![hap2];
@@ -145,7 +148,7 @@ pub fn diploid_haplotypes(
         metrics::GTstate::Hom => {
             if (hap1.meta.coverage[sample_idx] as f32
                 / (remaining_coverage + applied_coverage) as f32)
-                < params.ab
+                < ab
             {
                 // the allele balance suggests they're not likely compound het
                 // Assume hap1 is just noise and leave it as reference coverage

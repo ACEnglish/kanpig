@@ -12,8 +12,8 @@ pub use crate::kplib::haplotype::{Haplotype, HaplotypeMeta};
 mod infra;
 pub use crate::kplib::infra::{ChannelInput, ChannelOutput};
 
-mod kdparams;
-pub use crate::kplib::kdparams::KDParams;
+mod graphparams;
+pub use crate::kplib::graphparams::GraphParams;
 
 mod kmer;
 pub use crate::kplib::kmer::seq_to_kmer;

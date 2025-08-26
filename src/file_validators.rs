@@ -1,4 +1,4 @@
-use crate::{commands::plup::PlupCommand, kplib::KDParams};
+use crate::{commands::plup::PlupCommand, kplib::GraphParams};
 use rust_htslib::tbx::{self, Read as TbxRead};
 use std::path::Path;
 
@@ -38,7 +38,7 @@ pub fn validate_bam(file_path: &str) -> bool {
     is_ok
 }
 
-pub fn validate_plup(file_path: &str, params: &KDParams) -> bool {
+pub fn validate_plup(file_path: &str, params: &GraphParams) -> bool {
     let mut is_ok = true;
     if !file_path.ends_with(".plup.gz") {
         is_ok = false;
@@ -95,7 +95,7 @@ pub fn validate_plup(file_path: &str, params: &KDParams) -> bool {
     is_ok
 }
 /// Helper function to validate reads (.bam, .cram, or .plup.gz)
-pub fn validate_reads(reads: &Path, params: &KDParams) -> bool {
+pub fn validate_reads(reads: &Path, params: &GraphParams) -> bool {
     let mut is_ok = validate_file(reads, "--reads");
     let file_path = reads.to_str().unwrap_or_default();
     let bam_ok = validate_bam(file_path);
