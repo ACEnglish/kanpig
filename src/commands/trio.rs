@@ -307,7 +307,7 @@ pub struct TrioCommand {
     pub graph: GraphParams,
 
     /// Minimum number of reads in a cluster
-    #[arg(long, default_value_t = 3, help_heading = "Genotyping")]
+    #[arg(long, default_value_t = 5, help_heading = "Genotyping")]
     pub msmin: usize,
 
     /// Clustering weight for haplotagged reads (off=0.0, full=1.0)
