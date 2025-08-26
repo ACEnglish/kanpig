@@ -196,3 +196,7 @@ potentially compound heterozygous site, the proportion of reads supporting the h
 at least `--ab` fraction of the reads. Otherwise, we assume that the lower-covered haplotype is a mapping/sequencing 
 anaomaly and treat its reads as supporting the reference. This parameter at 0.20 boosts specificity and genotype 
 concordance at the cost of (a little bit less) recall.
+
+# 🐍 Python bindings
+Minimal python bindings are available for plup parsing. These can be installed via `maturin develop --features python`
+and used from python with `import kanpig`.
