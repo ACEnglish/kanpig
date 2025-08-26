@@ -1,7 +1,7 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyList;
 use pyo3::types::PyBytes;
+use pyo3::types::PyList;
 
 use rust_htslib::faidx;
 
@@ -15,7 +15,6 @@ pub fn cansim(a: &PyAny, b: &PyAny, mink: f32) -> PyResult<f32> {
 
     Ok(crate::kplib::metrics::seqsim(&vec_a, &vec_b, mink))
 }
-
 
 /// Wrap the Rust function for Python.
 /// Input: `sequence: bytes`, `kmer: int`, `negative: bool`, `maxhom: int`

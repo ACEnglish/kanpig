@@ -35,6 +35,17 @@ impl HaplotypeMeta {
         }
     }
 
+    /// New HaplotypeMetadata that doesn't belong to anyone
+    pub fn new_blank(num_samples: usize) -> Self {
+        let coverage = vec![0u64; num_samples];
+        HaplotypeMeta {
+            coverage,
+            ps: vec![None; num_samples],
+            hp: vec![None; num_samples],
+            samples_flag: 0,
+        }
+    }
+
     pub fn combine(&mut self, other: &HaplotypeMeta) {
         for (self_cov, other_cov) in self.coverage.iter_mut().zip(&other.coverage) {
             *self_cov += other_cov;
@@ -91,7 +102,15 @@ impl Haplotype {
         }
     }
 
-    // Add another variant to a Haplotype
+    /// Clear the Metadata and return a clone
+    pub fn clear_clone(&self) -> Haplotype {
+        let mut ret = self.clone();
+        let n_meta = HaplotypeMeta::new_blank(self.meta.coverage.len());
+        ret.meta = n_meta;
+        ret
+    }
+
+    /// Add another variant to a Haplotype
     pub fn add(&mut self, other: &Haplotype) {
         if !self.kfeat.len() == other.kfeat.len() {
             panic!("Cannot add haplotypes of different kmer size");

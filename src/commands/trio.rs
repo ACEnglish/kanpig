@@ -1,8 +1,7 @@
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use ndarray::{Array, Array2};
+use ndarray::{Array, Array2, Axis};
 use noodles_vcf::{self as vcf};
-use rand::SeedableRng;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -13,82 +12,45 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, hp_sorter, metrics, open_reads, open_writer_thread, ChannelInput,
-        ChannelOutput, Haplotype, KDParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
+        build_region_tree, hp_sorter, metrics, open_reads, open_writer_thread, trio_genotyper,
+        ChannelInput, ChannelOutput, Haplotype, KDParams, MeanShift, PathScore, Ploidy,
+        PloidyRegions, Variants, VcfChunker,
     },
 };
 
-fn _select_k_by_ratio(losses: &[(usize, f32, f64)]) -> usize {
-    if losses.len() < 3 {
-        return losses.first().map(|(k, _, _)| *k).unwrap_or(1);
-    }
+fn cluster_quality(k: usize, quality_scores: &[f64], labels: &[usize]) -> Vec<f64> {
+    // Find the maximum label to determine the size needed
+    let mut scores = vec![0.0; k + 1]; // +2 because we need indices 0 through max_label+1
 
-    let mut ratios = Vec::new();
-    for i in 1..losses.len() {
-        let prev = losses[i - 1].1;
-        let curr = losses[i].1;
-        ratios.push(prev / curr);
-    }
+    // Reference cluster is always 0 and quality of 1
+    scores[0] = 1.0;
 
-    for i in 1..ratios.len() {
-        if ratios[i - 1] / ratios[i] > 2.0 {
-            // Ratio dropped significantly (tune the 2.0 threshold if needed)
-            return losses[i].0;
+    // Get unique labels and calculate mean for each cluster
+    let mut unique_labels: Vec<usize> = labels.to_vec();
+    unique_labels.sort_unstable();
+    unique_labels.dedup();
+
+    for cluster in unique_labels {
+        let cluster_scores: Vec<f64> = quality_scores
+            .iter()
+            .zip(labels.iter())
+            .filter(|(_, &label)| label == cluster)
+            .map(|(&score, _)| score)
+            .collect();
+
+        if !cluster_scores.is_empty() {
+            let mean = cluster_scores.iter().sum::<f64>() / cluster_scores.len() as f64;
+            scores[cluster + 1] = mean;
         }
     }
 
-    // Fall back: choose last K
-    losses.last().unwrap().0
+    scores
 }
 
-// Input: Vec<(k: usize, loss: f64, silhouette: f64, valid: bool)>
-fn select_optimal_k(metrics: &[(usize, f32, f64, bool)]) -> usize {
-    // Filter only valid clusterings
-    let valid_metrics: Vec<_> = metrics.iter().cloned().filter(|m| m.3).collect();
-
-    if valid_metrics.len() < 2 {
-        return valid_metrics
-            .first()
-            .or_else(|| metrics.first())
-            .map(|(k, _, _, _)| *k)
-            .unwrap_or(1);
-    }
-
-    // Compute loss deltas
-    let mut loss_deltas = Vec::new();
-    for i in 1..valid_metrics.len() {
-        let delta = valid_metrics[i - 1].1 - valid_metrics[i].1;
-        loss_deltas.push(delta);
-    }
-
-    // Normalize loss deltas (elbow detection)
-    let max_delta = loss_deltas[0];
-    let elbow_k = loss_deltas
-        .iter()
-        .enumerate()
-        .find(|(_, delta)| **delta < 0.25 * max_delta)
-        .map(|(i, _)| valid_metrics[i + 1].0)
-        .unwrap_or(valid_metrics.last().unwrap().0);
-
-    // Find the max silhouette among valid clusterings
-    let max_sil_k = valid_metrics
-        .iter()
-        .max_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
-        .map(|(k, _, _, _)| *k)
-        .unwrap_or(elbow_k);
-
-    // Return the more conservative K
-    elbow_k.min(max_sil_k)
-}
-
-fn is_valid_k(
-    counts: &std::collections::HashMap<usize, usize>,
-    _total: usize,
-    min_reads: usize,
-) -> (bool, usize) {
-    //let min_allowed = (total as f32 * min_frac).ceil() as usize;
-    let num_small_clusters = counts.values().filter(|&&v| v < min_reads).count();
-    (num_small_clusters == 0, num_small_clusters)
+/// If the mean shift already has at most 2 alts per-sample, we might not need kmedoid
+fn _meanshift_satisfiy(arr: &Array2<usize>) -> bool {
+    arr.axis_iter(Axis(1)) // Iterate over columns
+        .all(|col| col.iter().filter(|&&x| x != 0).count() <= 2)
 }
 
 fn task_thread(
@@ -151,6 +113,12 @@ fn task_thread(
                     mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
                 //let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 2, &m_args.kd);
 
+                let ref_coverage = [
+                    pro_coverage as usize - pro_haps.len(),
+                    pat_coverage as usize - pat_haps.len(),
+                    mat_coverage as usize - mat_haps.len(),
+                ];
+
                 let haplos: Vec<Haplotype> = pro_haps
                     .into_iter()
                     .chain(pat_haps)
@@ -158,121 +126,116 @@ fn task_thread(
                     .collect();
 
                 // TODO: is_empty checks on the input haplotypes.
-                // if a parent is missing, we update the maxk to 3
                 if haplos.len() <= 1 {
                     continue;
                 }
 
-                let dist: Array2<f32> =
-                    Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
-                        let dist = 1.0
-                            - (metrics::seqsim(
-                                &haplos[i].kfeat,
-                                &haplos[j].kfeat,
-                                m_args.kd.minkfreq as f32,
-                            ));
-                        // if same sample and different hp, hps_weight penalty
-                        let i_samp = haplos[i].meta.samples_flag;
-                        let j_samp = haplos[j].meta.samples_flag;
-                        if i_samp == j_samp {
-                            match (
-                                haplos[i].meta.hp[i_samp.trailing_zeros() as usize],
-                                haplos[j].meta.hp[j_samp.trailing_zeros() as usize],
-                            ) {
-                                (Some(group_i), Some(group_j)) if group_i != group_j => {
-                                    dist + m_args.kd.hps_weight
+                // MeanShift to determine K
+                let sizes: Vec<f64> = haplos.iter().map(|x| x.size as f64).collect();
+                // TODO PARAM and dynamic figure this out
+                let mut ms = MeanShift::new().min_size(m_args.minreads);
+                let ms_result = ms.fit(&sizes);
+
+                // KMedoid Clustering
+                let k = ms_result.cluster_centers.len();
+                debug!("Setting K to {:?}", k);
+                debug!("{:?}", sizes);
+                // Use MeanShift centers to start the medoids
+                let mut medoids = ms_result.medoids.clone();
+
+                let (assignments, quality) = if !m_args.meanshift {
+                    // Kmedoid Clustering
+                    let dist: Array2<f32> =
+                        Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
+                            let mut dist: f32 = 1.0
+                                - (metrics::seqsim(
+                                    &haplos[i].kfeat,
+                                    &haplos[j].kfeat,
+                                    m_args.kd.minkfreq as f32,
+                                ));
+                            // if same sample and different hp, hps_weight penalty
+                            let i_samp = haplos[i].meta.samples_flag;
+                            let j_samp = haplos[j].meta.samples_flag;
+                            if i_samp == j_samp {
+                                match (
+                                    haplos[i].meta.hp[i_samp.trailing_zeros() as usize],
+                                    haplos[j].meta.hp[j_samp.trailing_zeros() as usize],
+                                ) {
+                                    (Some(group_i), Some(group_j)) if group_i != group_j => {
+                                        //TODO PARAM
+                                        dist *= 1.25;
+                                    }
+                                    _ => (),
                                 }
-                                _ => dist,
                             }
-                        } else {
+                            if ms_result.labels[i] != ms_result.labels[j] {
+                                //TODO PARAM
+                                dist *= 1.25;
+                            }
                             dist
-                        }
-                    });
+                        });
 
-                // track assignments, medoids so we can take the best one
-                let mut kassignments: Vec<(Vec<usize>, Vec<usize>)> = Vec::new();
-                let results: Vec<(usize, f32, f64, bool)> = (1..(5.min(haplos.len())))
-                    .map(|k| {
-                        let mut medoids = kmedoids::random_initialization(
-                            haplos.len(),
-                            k,
-                            &mut rand::rngs::StdRng::seed_from_u64(21),
-                        );
+                    let (_loss, assignments, _, _): (f32, _, _, _) =
+                        kmedoids::fasterpam(&dist.view(), &mut medoids, 300);
+                    let (_, quality): (f64, Vec<f64>) =
+                        kmedoids::medoid_silhouette(&dist, &medoids, true);
+                    let quality = cluster_quality(k, &quality, &assignments);
+                    (assignments, quality)
+                } else {
+                    (ms_result.labels, vec![1.0; k + 1])
+                };
 
-                        let (loss, assignments, _, _): (f32, _, _, _) =
-                            kmedoids::fasterpam(&dist.view(), &mut medoids, 100);
-                        let (sil2, _): (f64, _) =
-                            kmedoids::medoid_silhouette(&dist, &medoids, false);
-                        let (sil, _): (f64, _) = kmedoids::silhouette(&dist, &assignments, false);
+                // Set Reference allele coverage
+                let mut read_counts = Array::<usize, _>::zeros((k + 1, 3));
+                read_counts[[0, 0]] = ref_coverage[0];
+                read_counts[[0, 1]] = ref_coverage[1];
+                read_counts[[0, 2]] = ref_coverage[2];
 
-                        // cluster : read count
-                        // Disallow clusters with fewer than 3 reads
-                        let mut counts = std::collections::HashMap::<usize, usize>::new();
-
-                        // sample_flag : cluster_count
-                        // Disallow clusterings that give any sample > 2 paths
-                        let mut samp_pres: Vec<std::collections::HashSet<usize>> =
-                            (0..3).map(|_| std::collections::HashSet::new()).collect();
-
-                        for (idx, item) in assignments.iter().enumerate() {
-                            *counts.entry(*item).or_insert(0) += 1;
-                            samp_pres[haplos[idx].meta.samples_flag.trailing_zeros() as usize]
-                                .insert(*item);
-                        }
-
-                        kassignments.push((assignments, medoids));
-
-                        let (is_valid, num_small_clusters) =
-                            is_valid_k(&counts, haplos.len(), m_args.minreads);
-
-                        // Disallow clusterings that give any sample > 2 paths
-                        let pres_valid = samp_pres.iter().all(|v| v.len() <= 2);
-                        debug!(
-                            "K {}: pv={} {:?}: Loss = {}, Sil = {}, Sil2 = {}, Small = {} {}",
-                            k, pres_valid, samp_pres, loss, sil, sil2, is_valid, num_small_clusters
-                        );
-                        debug!("Assign: {:#?}", counts);
-
-                        (k, loss, sil, pres_valid & is_valid)
-                    })
-                    .collect();
-
-                let opt = select_optimal_k(results.as_slice());
-                debug!("Selected {} from optimal", opt);
-                if opt - 1 >= kassignments.len() {
-                    // TODO: I don't know how this happens, but it does and we gotta fix it
-                    continue;
+                // Set Alternate allele coverage
+                for (&label, hap) in assignments.iter().zip(haplos.iter()) {
+                    let cluster_idx = label + 1;
+                    let sample_idx = hap.meta.samples_flag.trailing_zeros() as usize;
+                    read_counts[[cluster_idx, sample_idx]] += 1;
                 }
-                // Pick Medoids
-                let (assignments, medoids) = kassignments.swap_remove(opt - 1);
-                let mut haps: Vec<Haplotype> = medoids
-                    .clone()
-                    .into_iter()
-                    .map(|i| haplos[i].clone())
-                    .collect();
 
-                let mut hp_cnt = Array::<u16, _>::zeros((opt, 3, 2));
+                debug!("Read Counts:\n {:?}", read_counts);
+                // Run the TrioGenotyper to figure out what clusters we're using (maybe not all of
+                // them)
+                let (gts, gqs) = trio_genotyper(&read_counts, &quality);
+
+                debug!("GT: {:?}", gts);
+                debug!("GQ: {:?}", gqs);
+
+                let mut clustered_haps: Vec<Haplotype> =
+                    medoids.iter().map(|i| haplos[*i].clear_clone()).collect();
+
+                debug!("Picking {:?}", clustered_haps);
+                let mut hp_cnt = Array::<u16, _>::zeros((k, 3, 2));
 
                 // Collapse Haplotypes
-                assignments.into_iter().zip(haplos).enumerate().for_each(
-                    |(assign_idx, (cluster_idx, m_hap))| {
+                assignments
+                    .into_iter()
+                    .zip(haplos)
+                    .for_each(|(cluster_idx, m_hap)| {
                         // Sample index inside the HaplotypeMeta
                         let idx = m_hap.meta.samples_flag.trailing_zeros() as usize;
-                        if !medoids.contains(&assign_idx) {
-                            let k_hap = &mut haps[cluster_idx];
+                        // Only apply reads to the clustered_hap if it goes together
+                        if gts[idx].contains(&(cluster_idx + 1)) {
+                            let k_hap = &mut clustered_haps[cluster_idx];
                             k_hap.meta.coverage[idx] += 1;
                             k_hap.meta.ps[idx] = k_hap.meta.ps[idx].or(m_hap.meta.ps[idx]);
                             k_hap.meta.hp[idx] = k_hap.meta.hp[idx].or(m_hap.meta.hp[idx]);
                             k_hap.meta.samples_flag |= m_hap.meta.samples_flag;
-                        }
-                        if let Some(val) = m_hap.meta.hp[idx] {
-                            hp_cnt[[cluster_idx, idx, val as usize - 1]] += 1;
-                        }
-                    },
-                );
 
+                            if let Some(val) = m_hap.meta.hp[idx] {
+                                hp_cnt[[cluster_idx, idx, val as usize - 1]] += 1;
+                            }
+                        }
+                    });
+
+                debug!("Updated {:?}", clustered_haps);
                 // HP tag for GT order
-                for (i, m_hap) in haps.iter_mut().enumerate().take(opt) {
+                for (i, m_hap) in clustered_haps.iter_mut().enumerate() {
                     for j in 0..3 {
                         if m_hap.meta.hp[j].is_some() {
                             let max_idx: u8 = hp_cnt
@@ -293,15 +256,14 @@ fn task_thread(
                     "Coverages: {} {} {}",
                     pro_coverage, pat_coverage, mat_coverage,
                 );
-                debug!("HERE HAPS: {} => {:#?}", haps.len(), haps);
 
-                let should_build = !haps.is_empty()
+                let should_build = !clustered_haps.is_empty()
                     && !m_args.kd.one_to_one
                     && m_graph.node_indices.len() <= (m_args.kd.maxnodes + 2);
                 m_graph.build(should_build);
 
                 // Haplotypes to PathScores
-                let paths: Vec<PathScore> = haps
+                let paths: Vec<PathScore> = clustered_haps
                     .into_iter()
                     .map(|h| m_graph.apply_haplotype(&h, &m_args.kd))
                     .filter(|p| *p != PathScore::default())
@@ -353,6 +315,10 @@ pub struct TrioCommand {
 
     #[command(flatten)]
     pub kd: KDParams,
+
+    /// Allow early clustering exit at MeanShift
+    #[arg(long, default_value_t = false, help_heading = "Trio")]
+    pub meanshift: bool,
 
     /// Minimum number of reads in a cluster
     #[arg(long, default_value_t = 3, help_heading = "Trio")]

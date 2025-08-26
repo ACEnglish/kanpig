@@ -18,6 +18,9 @@ pub use crate::kplib::kdparams::KDParams;
 mod kmer;
 pub use crate::kplib::kmer::seq_to_kmer;
 
+pub mod meanshift;
+pub use crate::kplib::meanshift::{MeanShift, MeanShiftResult};
+
 pub mod metrics;
 
 mod pathscore;
@@ -40,6 +43,9 @@ pub use crate::kplib::regions::{build_region_tree, Regions};
 
 mod traverse;
 pub use crate::kplib::traverse::brute_force_find_path;
+
+mod trio_genotyper;
+pub use crate::kplib::trio_genotyper::trio_genotyper;
 
 mod vargraph;
 pub use crate::kplib::vargraph::{VarNode, Variants};
