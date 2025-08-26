@@ -1,6 +1,6 @@
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use ndarray::{Array, Array2, Axis};
+use ndarray::{Array, Array2};
 use noodles_vcf::{self as vcf};
 use std::{
     path::PathBuf,
@@ -47,10 +47,18 @@ fn cluster_quality(k: usize, quality_scores: &[f64], labels: &[usize]) -> Vec<f6
     scores
 }
 
-/// If the mean shift already has at most 2 alts per-sample, we might not need kmedoid
-fn _meanshift_satisfiy(arr: &Array2<usize>) -> bool {
-    arr.axis_iter(Axis(1)) // Iterate over columns
-        .all(|col| col.iter().filter(|&&x| x != 0).count() <= 2)
+/// Count reads in each cluster
+fn count_reads(k: usize, ref_coverage: &[usize; 3], assignments: &[usize], haplos: &[Haplotype]) -> Array2<usize> {
+    let mut read_counts = Array::<usize, _>::zeros((k + 1, 3));
+    read_counts[[0, 0]] = ref_coverage[0];
+    read_counts[[0, 1]] = ref_coverage[1];
+    read_counts[[0, 2]] = ref_coverage[2];
+    for (&label, hap) in assignments.iter().zip(haplos.iter()) {
+        let cluster_idx = label + 1;
+        let sample_idx = hap.meta.samples_flag.trailing_zeros() as usize;
+        read_counts[[cluster_idx, sample_idx]] += 1;
+    }
+    read_counts
 }
 
 fn task_thread(
@@ -139,11 +147,12 @@ fn task_thread(
                 // KMedoid Clustering
                 let k = ms_result.cluster_centers.len();
                 debug!("Setting K to {:?}", k);
-                debug!("{:?}", sizes);
                 // Use MeanShift centers to start the medoids
                 let mut medoids = ms_result.medoids.clone();
 
-                let (assignments, quality) = if !m_args.meanshift {
+                let (assignments, quality) = if m_args.lengthonly {
+                    (ms_result.labels, vec![1.0; k + 1])
+                } else {
                     // Kmedoid Clustering
                     let dist: Array2<f32> =
                         Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
@@ -176,40 +185,22 @@ fn task_thread(
                         });
 
                     let (_loss, assignments, _, _): (f32, _, _, _) =
-                        kmedoids::fasterpam(&dist.view(), &mut medoids, 300);
+                        kmedoids::fasterpam(&dist.view(), &mut medoids, 100);
                     let (_, quality): (f64, Vec<f64>) =
                         kmedoids::medoid_silhouette(&dist, &medoids, true);
                     let quality = cluster_quality(k, &quality, &assignments);
                     (assignments, quality)
-                } else {
-                    (ms_result.labels, vec![1.0; k + 1])
                 };
 
-                // Set Reference allele coverage
-                let mut read_counts = Array::<usize, _>::zeros((k + 1, 3));
-                read_counts[[0, 0]] = ref_coverage[0];
-                read_counts[[0, 1]] = ref_coverage[1];
-                read_counts[[0, 2]] = ref_coverage[2];
-
-                // Set Alternate allele coverage
-                for (&label, hap) in assignments.iter().zip(haplos.iter()) {
-                    let cluster_idx = label + 1;
-                    let sample_idx = hap.meta.samples_flag.trailing_zeros() as usize;
-                    read_counts[[cluster_idx, sample_idx]] += 1;
-                }
+                let read_counts = count_reads(k, &ref_coverage, &assignments, &haplos);
 
                 debug!("Read Counts:\n {:?}", read_counts);
-                // Run the TrioGenotyper to figure out what clusters we're using (maybe not all of
-                // them)
-                let (gts, gqs) = trio_genotyper(&read_counts, &quality);
-
-                debug!("GT: {:?}", gts);
-                debug!("GQ: {:?}", gqs);
+                // TODO: Should be using this GQ?
+                let (gts, _gqs) = trio_genotyper(&read_counts, &quality);
 
                 let mut clustered_haps: Vec<Haplotype> =
                     medoids.iter().map(|i| haplos[*i].clear_clone()).collect();
 
-                debug!("Picking {:?}", clustered_haps);
                 let mut hp_cnt = Array::<u16, _>::zeros((k, 3, 2));
 
                 // Collapse Haplotypes
@@ -231,9 +222,9 @@ fn task_thread(
                                 hp_cnt[[cluster_idx, idx, val as usize - 1]] += 1;
                             }
                         }
+                        // TODO: Reassignment of reads assigned to unused clusters?
                     });
 
-                debug!("Updated {:?}", clustered_haps);
                 // HP tag for GT order
                 for (i, m_hap) in clustered_haps.iter_mut().enumerate() {
                     for j in 0..3 {
@@ -252,10 +243,6 @@ fn task_thread(
                         }
                     }
                 }
-                debug!(
-                    "Coverages: {} {} {}",
-                    pro_coverage, pat_coverage, mat_coverage,
-                );
 
                 let should_build = !clustered_haps.is_empty()
                     && !m_args.kd.one_to_one
@@ -281,7 +268,7 @@ fn task_thread(
                         }
                     }
                 }
-
+                // HP Ordering
                 let separated_paths: Vec<&[PathScore]> = separated_paths
                     .iter_mut()
                     .map(|bin| {
@@ -316,9 +303,9 @@ pub struct TrioCommand {
     #[command(flatten)]
     pub kd: KDParams,
 
-    /// Allow early clustering exit at MeanShift
+    /// Only cluster on haplotype lengths
     #[arg(long, default_value_t = false, help_heading = "Trio")]
-    pub meanshift: bool,
+    pub lengthonly: bool,
 
     /// Minimum number of reads in a cluster
     #[arg(long, default_value_t = 3, help_heading = "Trio")]
