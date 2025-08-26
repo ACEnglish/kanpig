@@ -94,8 +94,9 @@ below), reducing runtime and memory usage. This may reduce recall in regions wit
 problematic anyway.
 
 ### `--hapsim`
-After performing kmeans clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
-above `hapsim`, they are consolidated into a homozygous allele.
+After performing kmedoid clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
+above `hapsim`, they are consolidated into a homozygous allele. This is useful for when input SVs over a certain 
+size/sequence sequence similarity have already been merged (see [truvari collapse](https://github.com/ACEnglish/truvari)).
 
 ### `--threads`
 Number of analysis threads to use. Note that in addition to the analysis threads, kanpig keeps one dedicated IO thread
@@ -107,18 +108,18 @@ The `SAMPLE` column fields populated by kanpig are:
 
 | Field   | Description |
 |---------|-------------|
-| **FT**  | Bit flag for properties of the variant's genotyping. Flags == 0 are considered PASS. |
+| **FT**  | Bit flag for properties of the variant's genotyping |
 | **SQ**  | Phred scaled likelihood variant alternate is present in the sample |
 | **GQ**  | Phred scale difference between most and second-most likely genotypes |
 | **PS**  | Phase set pulled from haplotagged reads for long-range phasing or Neighborhood id of variants evaluated together for short-range phasing |
 | **DP**  | Read coverage over the region |
-| **AD**  | Read coverage supporting the reference and alternate alleles. |
+| **AD**  | Read coverage supporting the reference and alternate alleles |
 | **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
 
 Details of `FT`
 | Flag   | Description |
 |--------|-------------|
-| 0x1    | The genotype observed from variants matching paths is not equal to the genotype observed from measuring the proportions of reads supporting the two alleles. |
+| 0x1    | The genotype observed from variants paths matching is not equal to the genotype observed from measuring the proportions of reads supporting the two alleles. |
 | 0x2    | The genotype quality is less than 5 |
 | 0x4    | The depth (DP) is less than 5 |
 | 0x8    | The sample quality (SQ) is less than 5 (only present on non-ref variants) |
@@ -136,6 +137,8 @@ VCF. As a example of kanpig's resource usage with 16 cores available, genotyping
 sample VCF (4.3 million SVs) took 13 minutes with a maximum memory usage of 12GB. Converting the bam to a plup file took
 4 minutes (8GB of memory) and genotyping with this plup file took 3 minutes (12GB memory). 
 
+Note that kanpig `gt` is predominantly I/O limited and may not benefit more than ~4-8 cores.
+
 While genotyping against a plup file is usually faster, bam to plup conversion is most useful for:
 * genotyping a large VCF or super-high (>50x) coverage bam.
 * a sample that will be genotyped multiple times (e.g. N+1 pipelines) 
@@ -146,7 +149,7 @@ While genotyping against a plup file is usually faster, bam to plup conversion i
 These parameters have a varying effect on the results and are not guaranteed to be stable across releases. 
 
 ### `--one-to-one`
-Instead of performing the path-finding algorithm that applies a haplotype to the variant graph, perform a 1-to-1 
+Instead of performing the path-finding algorithm to apply a haplotype to the variant graph, perform a 1-to-1 
 comparison of the haplotype to each node in the variant graph. If a single node matches above `sizesim` and `seqsim`, 
 the haplotype is applied to it. 
 
@@ -160,8 +163,8 @@ to `maxhom`. For example, `--maxhom 5` will only count two four-mers in homopoly
 By default, the `--gpenalty` is applied to the scoring function as the difference between a path's node count and a 
 haplotype's variant count. With `--squish` the score is weighed by the path's node count minus one. This means paths
 with fewer nodes are preferred over paths with a consistent representation to the alignment. This parameter is useful
-for multi-sample VCFs where consistency between variants' genotypes is more important than preserving the set of exact
-set of variants that best reflect those described by the alignments.
+for multi-sample VCFs where consistency between variants' genotypes is more important than preserving the exact set of
+variants that best reflect those described by the alignments.
 
 ### `--ab`
 In loci where reads cluster into a potentially compound heterozygous site, the proportion of reads supporting the
@@ -182,3 +185,14 @@ all clusters for a K to be considered valid. Additionally, reads from a sample c
 
 Missing features which should eventually be added include inheritance pattern probabilities in genotypes, leveraging 
 ploidy beds, `--hapsim` simplification, `--ab` enforcement.
+||||||| 3088253
+In loci where reads cluster into a potentially compound heterozygous site, the proportion of reads supporting the
+haplotype with lower coverage must have at least `--ab` fraction of the reads. Otherwise, we assume that the
+lower-covered haplotype is a mapping/sequencing anaomaly and treat its reads as supporting the reference. This parameter
+at 0.20 boosts specificity and genotype concordance at the cost of (a little bit less) recall.
+=======
+Minimum allele balance for compound heterozygous genotypes to be possible. In loci where reads cluster into a 
+potentially compound heterozygous site, the proportion of reads supporting the haplotype with lower coverage must have 
+at least `--ab` fraction of the reads. Otherwise, we assume that the lower-covered haplotype is a mapping/sequencing 
+anaomaly and treat its reads as supporting the reference. This parameter at 0.20 boosts specificity and genotype 
+concordance at the cost of (a little bit less) recall.

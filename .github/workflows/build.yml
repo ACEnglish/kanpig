@@ -79,7 +79,7 @@ jobs:
           fi
       
       - name: Uploading asset
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: asset
+          name: kanpig-${{ matrix.os }}-${{ matrix.version }}
           path: ${{ env.ASSET }}
