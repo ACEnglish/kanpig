@@ -340,7 +340,7 @@ fn task_thread(
 
                 debug!("Read Counts:\n {:?}", read_counts);
                 // TODO: Should be using this GQ?
-                let (gts, _gqs) = trio_genotyper(&read_counts, &cluster_result.quality);
+                let gts = trio_genotyper(&read_counts, &cluster_result.quality);
 
                 let clustered_haps = process_clustered_haplotypes(cluster_result, haplos, gts);
 

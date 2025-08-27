@@ -11,3 +11,9 @@ experiments/
 *.pdb
 
 trash/
+.DS_Store
+errnotes.txt
+imgs/FastPig.webp
+imgs/Tagging.png
+scratch/
+versions/
