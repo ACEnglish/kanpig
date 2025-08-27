@@ -35,6 +35,8 @@ pub use crate::kplib::pileup::{PileupVariant, ReadPileup};
 mod ploidy;
 pub use crate::kplib::ploidy::{Ploidy, PloidyRegions};
 
+pub mod polycluster;
+
 mod readparsers;
 pub use crate::kplib::readparsers::{open_reads, PlupParser, ReadParser};
 
