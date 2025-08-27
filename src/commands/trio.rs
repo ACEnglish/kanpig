@@ -14,7 +14,7 @@ use crate::{
     kplib::{
         build_region_tree, hp_sorter, metrics, open_reads, open_writer_thread, trio_genotyper,
         ChannelInput, ChannelOutput, GraphParams, Haplotype, MeanShift, PathScore, Ploidy,
-        PloidyRegions, Variants, VcfChunker,
+        PloidyRegions, ReadParser, Variants, VcfChunker,
     },
 };
 
@@ -66,6 +66,197 @@ fn count_reads(
     read_counts
 }
 
+// Data structure to hold pileup information
+#[derive(Clone)]
+struct PileupData {
+    pro_haps: Vec<Haplotype>,
+    pat_haps: Vec<Haplotype>,
+    mat_haps: Vec<Haplotype>,
+    ref_coverage: [usize; 3],
+    coverages: [u64; 3],
+}
+
+// Collect pileup data from all three samples
+fn collect_pileup_data(
+    pro_reads: &mut Box<dyn ReadParser>,
+    pat_reads: &mut Box<dyn ReadParser>,
+    mat_reads: &mut Box<dyn ReadParser>,
+    m_graph: &Variants,
+) -> PileupData {
+    let (pro_haps, pro_coverage) =
+        pro_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+    let (pat_haps, pat_coverage) =
+        pat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+    let (mat_haps, mat_coverage) =
+        mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+
+    let ref_coverage = [
+        pro_coverage as usize - pro_haps.len(),
+        pat_coverage as usize - pat_haps.len(),
+        mat_coverage as usize - mat_haps.len(),
+    ];
+
+    PileupData {
+        pro_haps,
+        pat_haps,
+        mat_haps,
+        ref_coverage,
+        coverages: [pro_coverage, pat_coverage, mat_coverage],
+    }
+}
+
+// Structure to hold clustering results
+struct ClusterResult {
+    assignments: Vec<usize>,
+    quality: Vec<f64>,
+    k: usize,
+    medoids: Vec<usize>,
+}
+
+// Perform MeanShift and K-medoid clustering
+fn perform_clustering(haplos: &[Haplotype], m_args: &TrioCommand) -> ClusterResult {
+    // MeanShift to determine K
+    let sizes: Vec<f64> = haplos.iter().map(|x| x.size as f64).collect();
+    let mut ms = MeanShift::new().min_size(m_args.msmin);
+    let ms_result = ms.fit(&sizes);
+
+    let k = ms_result.cluster_centers.len();
+    debug!("Setting K to {:?}", k);
+
+    let mut medoids = ms_result.medoids.clone();
+
+    let (assignments, quality) = if m_args.lengthonly {
+        (ms_result.labels, vec![1.0; k + 1])
+    } else {
+        // Kmedoid Clustering
+        let dist: Array2<f32> = Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
+            let mut dist: f32 = 1.0
+                - (metrics::seqsim(
+                    &haplos[i].kfeat,
+                    &haplos[j].kfeat,
+                    m_args.graph.minkfreq as f32,
+                ));
+            // if same sample and different hp, hps_weight penalty
+            let i_samp = haplos[i].meta.samples_flag;
+            let j_samp = haplos[j].meta.samples_flag;
+            if i_samp == j_samp {
+                match (
+                    haplos[i].meta.hp[i_samp.trailing_zeros() as usize],
+                    haplos[j].meta.hp[j_samp.trailing_zeros() as usize],
+                ) {
+                    (Some(group_i), Some(group_j)) if group_i != group_j => {
+                        dist *= 1.0 + m_args.hps_weight;
+                    }
+                    _ => (),
+                }
+            }
+            if ms_result.labels[i] != ms_result.labels[j] {
+                dist *= 1.0 + m_args.len_weight;
+            }
+            dist
+        });
+
+        let (_loss, assignments, _, _): (f32, _, _, _) =
+            kmedoids::fasterpam(&dist.view(), &mut medoids, 100);
+        let (_, quality): (f64, Vec<f64>) = kmedoids::medoid_silhouette(&dist, &medoids, true);
+        let quality = cluster_quality(k, &quality, &assignments);
+        (assignments, quality)
+    };
+
+    ClusterResult {
+        assignments,
+        quality,
+        k,
+        medoids,
+    }
+}
+
+// Process clustered haplotypes and assign reads
+fn process_clustered_haplotypes(
+    cluster_result: ClusterResult,
+    haplos: Vec<Haplotype>,
+    gts: [[usize; 2]; 3],
+) -> Vec<Haplotype> {
+    let mut clustered_haps: Vec<Haplotype> = cluster_result
+        .medoids
+        .iter()
+        .map(|i| haplos[*i].clear_clone())
+        .collect();
+
+    let mut hp_cnt = Array::<u16, _>::zeros((cluster_result.k, 3, 2));
+
+    // Collapse haplotypes into clusters
+    cluster_result
+        .assignments
+        .into_iter()
+        .zip(haplos)
+        .for_each(|(cluster_idx, m_hap)| {
+            // Sample index inside the HaplotypeMeta
+            let idx = m_hap.meta.samples_flag.trailing_zeros() as usize;
+            // Only apply reads to the clustered_hap if it goes together
+            if gts[idx].contains(&(cluster_idx + 1)) {
+                let k_hap = &mut clustered_haps[cluster_idx];
+                k_hap.meta.coverage[idx] += 1;
+                k_hap.meta.ps[idx] = k_hap.meta.ps[idx].or(m_hap.meta.ps[idx]);
+                k_hap.meta.hp[idx] = k_hap.meta.hp[idx].or(m_hap.meta.hp[idx]);
+                k_hap.meta.samples_flag |= m_hap.meta.samples_flag;
+
+                if let Some(val) = m_hap.meta.hp[idx] {
+                    hp_cnt[[cluster_idx, idx, val as usize - 1]] += 1;
+                }
+            }
+            // TODO: Reassignment of reads assigned to unused clusters?
+        });
+
+    // Set HP tag to the most common seen in the cluster
+    for (i, m_hap) in clustered_haps.iter_mut().enumerate() {
+        for j in 0..3 {
+            if m_hap.meta.hp[j].is_some() {
+                let max_idx: u8 = hp_cnt
+                    .slice(ndarray::s![i, j, ..])
+                    .iter()
+                    .cloned()
+                    .enumerate()
+                    .max_by_key(|&(_, val)| val)
+                    .map(|(idx, _)| idx)
+                    .unwrap_or(1)
+                    .try_into()
+                    .unwrap();
+                m_hap.meta.hp[j] = Some(max_idx + 1);
+            }
+        }
+    }
+
+    clustered_haps
+}
+
+// Separate paths by sample
+fn separate_paths_by_sample(paths: Vec<PathScore>) -> Vec<Vec<PathScore>> {
+    const NUM_SAMPLES: usize = 3;
+    let mut separated_paths: Vec<Vec<PathScore>> = vec![Vec::new(); NUM_SAMPLES];
+
+    for path in paths {
+        for (bit, s_paths) in separated_paths.iter_mut().enumerate().take(NUM_SAMPLES) {
+            if (path.meta.samples_flag & (1 << bit)) != 0 {
+                let mut p = path.clone();
+                p.meta.samples_flag = bit;
+                s_paths.push(p);
+            }
+        }
+    }
+
+    // Sort by HP
+    separated_paths.iter_mut().for_each(|bin| {
+        bin.sort_by(|a, b| {
+            hp_sorter(
+                &a.meta.hp[a.meta.samples_flag],
+                &b.meta.hp[b.meta.samples_flag],
+            )
+        });
+    });
+    separated_paths
+}
+
 fn task_thread(
     m_args: TrioCommand,
     m_receiver: Receiver<ChannelInput>,
@@ -114,28 +305,15 @@ fn task_thread(
                     continue;
                 }
 
-                let (pro_haps, pro_coverage) =
-                    pro_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                //let pro_haps = ploidy.cluster(pro_haps, pro_coverage, 0, &m_args.graph);
+                // Process reads and find pileups
+                let pileup_data =
+                    collect_pileup_data(&mut pro_reads, &mut pat_reads, &mut mat_reads, &m_graph);
 
-                let (pat_haps, pat_coverage) =
-                    pat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                //let pat_haps = ploidy.cluster(pat_haps, pat_coverage, 1, &m_args.graph);
-
-                let (mat_haps, mat_coverage) =
-                    mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-                //let mat_haps = ploidy.cluster(mat_haps, mat_coverage, 2, &m_args.graph);
-
-                let ref_coverage = [
-                    pro_coverage as usize - pro_haps.len(),
-                    pat_coverage as usize - pat_haps.len(),
-                    mat_coverage as usize - mat_haps.len(),
-                ];
-
-                let haplos: Vec<Haplotype> = pro_haps
+                let haplos: Vec<Haplotype> = pileup_data
+                    .pro_haps
                     .into_iter()
-                    .chain(pat_haps)
-                    .chain(mat_haps)
+                    .chain(pileup_data.pat_haps)
+                    .chain(pileup_data.mat_haps)
                     .collect();
 
                 // TODO: is_empty checks on the input haplotypes.
@@ -143,109 +321,21 @@ fn task_thread(
                     continue;
                 }
 
-                // MeanShift to determine K
-                let sizes: Vec<f64> = haplos.iter().map(|x| x.size as f64).collect();
-                let mut ms = MeanShift::new().min_size(m_args.msmin);
-                let ms_result = ms.fit(&sizes);
+                // Perform clustering analysis
+                let cluster_result = perform_clustering(&haplos, &m_args);
 
-                // KMedoid Clustering
-                let k = ms_result.cluster_centers.len();
-                debug!("Setting K to {:?}", k);
-                // Use MeanShift centers to start the medoids
-                let mut medoids = ms_result.medoids.clone();
-
-                let (assignments, quality) = if m_args.lengthonly {
-                    (ms_result.labels, vec![1.0; k + 1])
-                } else {
-                    // Kmedoid Clustering
-                    let dist: Array2<f32> =
-                        Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
-                            let mut dist: f32 = 1.0
-                                - (metrics::seqsim(
-                                    &haplos[i].kfeat,
-                                    &haplos[j].kfeat,
-                                    m_args.graph.minkfreq as f32,
-                                ));
-                            // if same sample and different hp, hps_weight penalty
-                            let i_samp = haplos[i].meta.samples_flag;
-                            let j_samp = haplos[j].meta.samples_flag;
-                            if i_samp == j_samp {
-                                match (
-                                    haplos[i].meta.hp[i_samp.trailing_zeros() as usize],
-                                    haplos[j].meta.hp[j_samp.trailing_zeros() as usize],
-                                ) {
-                                    (Some(group_i), Some(group_j)) if group_i != group_j => {
-                                        dist *= 1.0 + m_args.hps_weight;
-                                    }
-                                    _ => (),
-                                }
-                            }
-                            if ms_result.labels[i] != ms_result.labels[j] {
-                                dist *= 1.0 + m_args.len_weight;
-                            }
-                            dist
-                        });
-
-                    let (_loss, assignments, _, _): (f32, _, _, _) =
-                        kmedoids::fasterpam(&dist.view(), &mut medoids, 100);
-                    let (_, quality): (f64, Vec<f64>) =
-                        kmedoids::medoid_silhouette(&dist, &medoids, true);
-                    let quality = cluster_quality(k, &quality, &assignments);
-                    (assignments, quality)
-                };
-
-                let read_counts = count_reads(k, &ref_coverage, &assignments, &haplos);
+                let read_counts = count_reads(
+                    cluster_result.k,
+                    &pileup_data.ref_coverage,
+                    &cluster_result.assignments,
+                    &haplos,
+                );
 
                 debug!("Read Counts:\n {:?}", read_counts);
                 // TODO: Should be using this GQ?
-                let (gts, _gqs) = trio_genotyper(&read_counts, &quality);
+                let (gts, _gqs) = trio_genotyper(&read_counts, &cluster_result.quality);
 
-                let mut clustered_haps: Vec<Haplotype> =
-                    medoids.iter().map(|i| haplos[*i].clear_clone()).collect();
-
-                let mut hp_cnt = Array::<u16, _>::zeros((k, 3, 2));
-
-                // Collapse Haplotypes
-                assignments
-                    .into_iter()
-                    .zip(haplos)
-                    .for_each(|(cluster_idx, m_hap)| {
-                        // Sample index inside the HaplotypeMeta
-                        let idx = m_hap.meta.samples_flag.trailing_zeros() as usize;
-                        // Only apply reads to the clustered_hap if it goes together
-                        if gts[idx].contains(&(cluster_idx + 1)) {
-                            let k_hap = &mut clustered_haps[cluster_idx];
-                            k_hap.meta.coverage[idx] += 1;
-                            k_hap.meta.ps[idx] = k_hap.meta.ps[idx].or(m_hap.meta.ps[idx]);
-                            k_hap.meta.hp[idx] = k_hap.meta.hp[idx].or(m_hap.meta.hp[idx]);
-                            k_hap.meta.samples_flag |= m_hap.meta.samples_flag;
-
-                            if let Some(val) = m_hap.meta.hp[idx] {
-                                hp_cnt[[cluster_idx, idx, val as usize - 1]] += 1;
-                            }
-                        }
-                        // TODO: Reassignment of reads assigned to unused clusters?
-                    });
-
-                // HP tag for GT order
-                // Set HP tag to the most common seen in the cluster
-                for (i, m_hap) in clustered_haps.iter_mut().enumerate() {
-                    for j in 0..3 {
-                        if m_hap.meta.hp[j].is_some() {
-                            let max_idx: u8 = hp_cnt
-                                .slice(ndarray::s![i, j, ..])
-                                .iter()
-                                .cloned()
-                                .enumerate()
-                                .max_by_key(|&(_, val)| val)
-                                .map(|(idx, _)| idx)
-                                .unwrap_or(1)
-                                .try_into()
-                                .unwrap();
-                            m_hap.meta.hp[j] = Some(max_idx + 1);
-                        }
-                    }
-                }
+                let clustered_haps = process_clustered_haplotypes(cluster_result, haplos, gts);
 
                 let should_build = !clustered_haps.is_empty()
                     && !m_args.graph.one_to_one
@@ -260,35 +350,16 @@ fn task_thread(
                     .collect();
 
                 // Separate paths back out to the samples
-                let num_samples = 3;
-                let mut separated_paths: Vec<Vec<PathScore>> = vec![Vec::new(); num_samples];
-                for path in paths {
-                    for (bit, s_paths) in separated_paths.iter_mut().enumerate().take(num_samples) {
-                        if (path.meta.samples_flag & (1 << bit)) != 0 {
-                            let mut p = path.clone();
-                            p.meta.samples_flag = bit;
-                            s_paths.push(p);
-                        }
-                    }
-                }
-                // HP Ordering
-                let separated_paths: Vec<&[PathScore]> = separated_paths
-                    .iter_mut()
-                    .map(|bin| {
-                        bin.sort_by(|a, b| {
-                            hp_sorter(
-                                &a.meta.hp[a.meta.samples_flag],
-                                &b.meta.hp[b.meta.samples_flag],
-                            )
-                        });
-                        bin.as_slice()
-                    })
-                    .collect();
+                let separated_paths = separate_paths_by_sample(paths);
+
+                // I can't remember why we want these as slices
+                let separated_paths_refs: Vec<&[PathScore]> =
+                    separated_paths.iter().map(|bin| bin.as_slice()).collect();
 
                 m_result_sender
                     .send(m_graph.take_annotated(
-                        separated_paths,
-                        vec![pro_coverage, pat_coverage, mat_coverage],
+                        separated_paths_refs,
+                        pileup_data.coverages.to_vec(),
                         vec![&ploidy, &ploidy, &ploidy], // TODO: set this up for each
                     ))
                     .unwrap();
