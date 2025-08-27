@@ -359,13 +359,9 @@ fn task_thread(
                 // Separate paths back out to the samples
                 let separated_paths = separate_paths_by_sample(paths);
 
-                // I can't remember why we want these as slices
-                let separated_paths_refs: Vec<&[PathScore]> =
-                    separated_paths.iter().map(|bin| bin.as_slice()).collect();
-
                 m_result_sender
                     .send(m_graph.take_annotated(
-                        separated_paths_refs,
+                        separated_paths.iter().map(|bin| bin.as_slice()).collect(),
                         pileup_data.coverages.to_vec(),
                         vec![&ploidy, &ploidy, &ploidy], // TODO: set this up for each
                     ))
