@@ -22,7 +22,7 @@ pub struct VcfWriter {
     sample_count: usize,
     header: vcf::Header,
     keys: Keys,
-    pub gtcounts: HashMap<GTstate, usize>,
+    pub gtcounts: Vec<HashMap<GTstate, usize>>,
     pub iupac_fixed: bool,
     buf: Vec<u8>,
 }
@@ -75,7 +75,7 @@ impl VcfWriter {
             header,
             sample_count: sample_names.len(),
             keys: Keys::from_iter(new_fmts),
-            gtcounts: HashMap::new(),
+            gtcounts: vec![HashMap::new(); sample_names.len()],
             iupac_fixed: false,
             buf: vec![],
         }
@@ -94,7 +94,9 @@ impl VcfWriter {
         }
 
         // TODO: This is broken... gtcounts will need to be done per-sample
-        *self.gtcounts.entry(annots[0].gt_state).or_insert(0) += 1;
+        for (gtcount_map, annot) in self.gtcounts.iter_mut().zip(annots.iter()) {
+            *gtcount_map.entry(annot.gt_state).or_insert(0) += 1;
+        }
 
         let out_fields: Vec<_> = annots.iter().map(|a| a.make_fields()).collect();
         *entry.samples_mut() = Samples::new(self.keys.clone(), out_fields);

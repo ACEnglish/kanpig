@@ -318,6 +318,13 @@ fn task_thread(
 
                 // TODO: is_empty checks on the input haplotypes.
                 if haplos.len() <= 1 {
+                    m_result_sender
+                        .send(m_graph.take_annotated(
+                            vec![&[], &[], &[]],
+                            pileup_data.coverages.to_vec(),
+                            vec![&ploidy, &ploidy, &ploidy],
+                        ))
+                        .unwrap();
                     continue;
                 }
 
