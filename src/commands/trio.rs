@@ -1,6 +1,6 @@
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use ndarray::{Array, Array2};
+use ndarray::{Array, Array2, Axis};
 use noodles_vcf::{self as vcf};
 use std::{
     path::PathBuf,
@@ -105,6 +105,26 @@ fn collect_pileup_data(
     }
 }
 
+fn top_n_rows_by_sum(arr: &Array2<usize>, n: usize) -> Vec<usize> {
+    // Calculate row sums and pair with indices
+    let mut row_sums_with_indices: Vec<(usize, usize)> = arr
+        .axis_iter(Axis(0)) // Iterate over rows
+        .enumerate()
+        .skip(1)
+        .map(|(idx, row)| (idx - 1, row.sum()))
+        .collect();
+
+    // Sort by sum in descending order
+    row_sums_with_indices.sort_by(|a, b| b.1.cmp(&a.1));
+
+    // Take the top N indices
+    row_sums_with_indices
+        .into_iter()
+        .take(n)
+        .map(|(idx, _sum)| idx)
+        .collect()
+}
+
 // Structure to hold clustering results
 struct ClusterResult {
     assignments: Vec<usize>,
@@ -121,12 +141,22 @@ fn perform_clustering(haplos: &[Haplotype], m_args: &TrioCommand) -> ClusterResu
     let ms_result = ms.fit(&sizes);
 
     let k = ms_result.cluster_centers.len();
+    let (mut medoids, k) = if k > m_args.maxclust {
+        // Only collect the highest covered medoids if MSk > maxclust
+        let read_counts = count_reads(k, &[0, 0, 0], &ms_result.labels, haplos);
+
+        let top = top_n_rows_by_sum(&read_counts, m_args.maxclust);
+        let new_meds = ms_result.medoids.clone();
+        (top.iter().map(|&i| new_meds[i]).collect(), m_args.maxclust)
+    } else {
+        (ms_result.medoids.clone(), k)
+    };
     debug!("Setting K to {:?}", k);
 
-    let mut medoids = ms_result.medoids.clone();
-
     let (assignments, quality) = if m_args.lengthonly {
-        (ms_result.labels, vec![1.0; k + 1])
+        // TODO: this is broken. doesn't respect maxclust
+        let m_k = ms_result.labels.len();
+        (ms_result.labels, vec![1.0; m_k + 1])
     } else {
         // Kmedoid Clustering
         let dist: Array2<f32> = Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
@@ -268,7 +298,7 @@ fn task_thread(
         m_args.io.reference.clone(),
         m_args.io.proband_sample.clone(),
         0, // First sample is index 0 in the HaplotypeMeta vectros
-        3, // One total sample will be opened (for HaplotypeMeta)
+        3, // Three total samples will be opened (for HaplotypeMeta)
         &m_args.graph,
     );
 
@@ -305,7 +335,6 @@ fn task_thread(
                     continue;
                 }
 
-                // Process reads and find pileups
                 let pileup_data =
                     collect_pileup_data(&mut pro_reads, &mut pat_reads, &mut mat_reads, &m_graph);
 
@@ -316,7 +345,6 @@ fn task_thread(
                     .chain(pileup_data.mat_haps)
                     .collect();
 
-                // TODO: is_empty checks on the input haplotypes.
                 if haplos.len() <= 1 {
                     m_result_sender
                         .send(m_graph.take_annotated(
@@ -328,7 +356,6 @@ fn task_thread(
                     continue;
                 }
 
-                // Perform clustering analysis
                 let cluster_result = perform_clustering(&haplos, &m_args);
 
                 let read_counts = count_reads(
@@ -339,7 +366,6 @@ fn task_thread(
                 );
 
                 debug!("Read Counts:\n {:?}", read_counts);
-                // TODO: Should be using this GQ?
                 let gts = trio_genotyper(&read_counts, &cluster_result.quality);
 
                 let clustered_haps = process_clustered_haplotypes(cluster_result, haplos, gts);
@@ -349,14 +375,12 @@ fn task_thread(
                     && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
                 m_graph.build(should_build);
 
-                // Haplotypes to PathScores
                 let paths: Vec<PathScore> = clustered_haps
                     .into_iter()
                     .map(|h| m_graph.apply_haplotype(&h, &m_args.graph))
                     .filter(|p| *p != PathScore::default())
                     .collect();
 
-                // Separate paths back out to the samples
                 let separated_paths = separate_paths_by_sample(paths);
 
                 m_result_sender
@@ -383,6 +407,10 @@ pub struct TrioCommand {
     /// Minimum number of reads in a cluster
     #[arg(long, default_value_t = 5, help_heading = "Genotyping")]
     pub msmin: usize,
+
+    /// Max clusters
+    #[arg(long, default_value_t = 5, help_heading = "Genotyping")]
+    pub maxclust: usize,
 
     /// Clustering weight for haplotagged reads (off=0.0, full=1.0)
     #[arg(long, default_value_t = 0.25, help_heading = "Genotyping")]
@@ -508,6 +536,11 @@ impl KanpigCommand for TrioCommand {
 
         if self.io.threads < 1 {
             error!("--threads must be at least 1");
+            is_ok = false;
+        }
+
+        if self.maxclust < 4 {
+            error!("--maxclust must be at least 4");
             is_ok = false;
         }
 
