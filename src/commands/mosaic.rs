@@ -1,5 +1,6 @@
 use clap::{ArgAction, Parser};
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use ndarray::Axis;
 use noodles_vcf::{self as vcf};
 use std::{
     path::PathBuf,
@@ -14,10 +15,20 @@ use crate::{
     kplib::{
         build_region_tree, open_reads, open_writer_thread,
         polycluster::{self, ToPolyCluParams},
-        trio_genotyper, ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions,
+        mosaic_genotyper, ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions,
         ReadParser, Variants, VcfChunker,
     },
 };
+/// For each sample (first index), identify the germline/somatic alleles.
+/// Which.. we do so by... straight up genotyping, I guess?
+/// But like, I'm concerned about e.g. an SV looks HET when it has 70 reads of 100, but those other
+/// 30 are assigned to other paths, so we should be genotyping it as like 70/70
+/// Let assume you figure that out. You also need to think about finding what's germline.
+/// You can't just take the two highest covered paths, you need to balance because one path might
+/// be germline (het or hom alt). Yeah, we got to make a mosaic_genotyper.
+//fn separate_path_by_vaf() -> (Vec<Path>, Vec<Path>) {
+//
+//}
 
 fn task_thread(
     m_args: MosaicCommand,
@@ -26,7 +37,7 @@ fn task_thread(
     m_ploidy: PloidyRegions,
 ) {
     // For each bam (mainly one) open_reads add to list
-    let n_samps = m_args.io.reads.len();
+    let n_samples = m_args.io.reads.len();
     let mut reads: Vec<Box<dyn ReadParser>> = m_args
         .io
         .reads
@@ -39,7 +50,7 @@ fn task_thread(
                 m_args.io.reference.clone(),
                 sample.clone(),
                 idx,
-                n_samps,
+                n_samples,
                 &m_args.graph,
             )
         })
@@ -57,6 +68,7 @@ fn task_thread(
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam
+                // TODO: This doesn't work for multiple sample. Also broken in trio mode
                 if ploidy == Ploidy::Zero {
                     m_result_sender
                         .send(m_graph.take_annotated(vec![&[]], vec![0], vec![&ploidy]))
@@ -69,16 +81,16 @@ fn task_thread(
                 if pileup_data.haplos.len() <= 1 {
                     m_result_sender
                         .send(m_graph.take_annotated(
-                            vec![&[], &[], &[]],
+                            vec![&[]; n_samples],
                             pileup_data.coverages.to_vec(),
-                            vec![&ploidy, &ploidy, &ploidy],
+                            vec![&ploidy; n_samples],
                         ))
                         .unwrap();
                     continue;
                 }
 
                 let cluster_result =
-                    polycluster::perform_clustering(&pileup_data.haplos, &pclu_params, n_samps);
+                    polycluster::perform_clustering(&pileup_data.haplos, &pclu_params, n_samples);
 
                 let read_counts = polycluster::count_reads(
                     cluster_result.k,
@@ -88,12 +100,22 @@ fn task_thread(
                 );
 
                 debug!("Read Counts:\n {:?}", read_counts);
-                let gts = trio_genotyper(&read_counts, &cluster_result.quality);
-
-                let clustered_haps = polycluster::process_clustered_haplotypes(
+                let mut allele_support: Vec<u32> = read_counts
+                    .axis_iter(Axis(0)) // Iterate over cols
+                    .map(|row| row.sum() as u32)
+                    .collect();
+                let gts = mosaic_genotyper(&allele_support);
+                // This returns an Option<GenotypingResult>, if None, that means there's
+                // insufficient coverage to detect mosaicism
+                
+                // This is all still Trio
+                // All its doing is doing the collapsing and HP work
+                // important part is gts[idx].contains, which is only relevant for trios
+                //
+                let clustered_haps = polycluster::collapse_haplotypes(
                     cluster_result,
                     pileup_data.haplos,
-                    gts,
+                    [[1,2],[1,2],[1,2]],
                 );
 
                 let should_build = !clustered_haps.is_empty()
@@ -108,7 +130,24 @@ fn task_thread(
                     .collect();
 
                 let separated_paths = polycluster::separate_paths_by_sample(paths);
-
+                //let (germline_paths, somatic_paths) = separate_paths_by_vaf(separated_paths);
+                //let germ_anno_vars = m_graph.take_annotated(
+                    //germline_paths.iter().map(|bin| bin.as_slice()).collect,
+                    //pileup_data.coverages.to_vec(),
+                    //vec![&ploidy; n_samples],
+                //);
+                // Now, for each sample, I need to separate the germline from the somatic
+                // And then I m_graph.take_annotated on the germline paths
+                // But then, for each Vec<RecordBuf, Vec<GenotypeAnno>, I need to
+                // potentially edit the GenotypeAnno to be mosaic if the record (idx) is in somatic
+                // paths.
+                // 1. What would I edit in GenotypeAnno
+                //      `anno.filt |= FiltFlags::SOMATIC`
+                //      `anno.ad[1]` increased by coverage?
+                // 2. How does take_annotated intersect the record to path.. need that logic
+                //      PathScore.path.contains(var_idx), which I believe var_idx will be
+                //      enumerate(variants), with maybe a +1 because of anchor Node
+                // 3. Remember you're making an infra::ChannelOutput to send back
                 m_result_sender
                     .send(m_graph.take_annotated(
                         separated_paths.iter().map(|bin| bin.as_slice()).collect(),
@@ -146,9 +185,9 @@ pub struct MosaicCommand {
     #[arg(long, default_value_t = 0.25, help_heading = "Genotyping")]
     pub len_weight: f32,
 
-    /// Only cluster on haplotype lengths
-    #[arg(long, default_value_t = false, help_heading = "Genotyping")]
-    pub lengthonly: bool,
+    /// Minimum haplotype size difference for K estimation
+    #[arg(long, default_value_t = 5, help_heading = "Genotyping")]
+    pub bandwidth: usize,
 }
 
 impl ToPolyCluParams for MosaicCommand {
@@ -158,8 +197,8 @@ impl ToPolyCluParams for MosaicCommand {
             maxclust: self.maxclust,
             hps_weight: self.hps_weight,
             len_weight: self.len_weight,
-            lengthonly: self.lengthonly,
             minkfreq: self.graph.minkfreq,
+            bandwidth: Some(self.bandwidth as f64),
             ..Default::default() // Fill remaining fields with defaults
         }
     }

@@ -23,6 +23,9 @@ pub use crate::kplib::meanshift::{MeanShift, MeanShiftResult};
 
 pub mod metrics;
 
+pub mod mosaic_genotyper;
+pub use crate::kplib::mosaic_genotyper::mosaic_genotyper;
+
 mod pathscore;
 pub use crate::kplib::pathscore::PathScore;
 

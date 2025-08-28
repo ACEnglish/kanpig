@@ -128,7 +128,7 @@ fn task_thread(
                 debug!("Read Counts:\n {:?}", read_counts);
                 let gts = trio_genotyper(&read_counts, &cluster_result.quality);
 
-                let clustered_haps = polycluster::process_clustered_haplotypes(
+                let clustered_haps = polycluster::collapse_haplotypes(
                     cluster_result,
                     pileup_data.haplos,
                     gts,

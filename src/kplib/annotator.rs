@@ -16,6 +16,7 @@ bitflags! {
         const LOWSQ      = 0b00001000;  // Sample quality below 5 (non-ref genotypes only)
         const LOWALT     = 0b00010000;  // Alt coverage below 5 (non-ref genotypes only)
         const PARTIAL    = 0b00100000;  // Best scoring path uses only part of the haplotype
+        const SOMATIC    = 0b01000000;  // SV was found at non-germline VAF
     }
 }
 

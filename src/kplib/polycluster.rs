@@ -26,6 +26,9 @@ pub struct PolyCluParams {
 
     /// Minimum K Freq for seq_to_kmer
     pub minkfreq: u64,
+
+    /// BP difference between MeanShift clusters
+    pub bandwidth: Option<f64>,
 }
 
 impl Default for PolyCluParams {
@@ -37,6 +40,7 @@ impl Default for PolyCluParams {
             len_weight: 0.25,
             lengthonly: false,
             minkfreq: 1,
+            bandwidth: None,
         }
     }
 }
@@ -95,7 +99,7 @@ pub fn top_n_rows_by_sum(arr: &Array2<usize>, n: usize) -> Vec<usize> {
         .axis_iter(Axis(0)) // Iterate over rows
         .enumerate()
         .skip(1)
-        .map(|(idx, row)| (idx - 1, row.sum()))
+        .map(|(idx, rows)| (idx - 1, rows.sum()))
         .collect();
 
     // Sort by sum in descending order
@@ -125,7 +129,7 @@ pub fn perform_clustering(
 ) -> ClusterResult {
     // MeanShift to determine K
     let sizes: Vec<f64> = haplos.iter().map(|x| x.size as f64).collect();
-    let mut ms = MeanShift::new().min_size(m_args.msmin);
+    let mut ms = MeanShift::new(&m_args);
     let ms_result = ms.fit(&sizes);
 
     let k = ms_result.cluster_centers.len();
@@ -185,8 +189,10 @@ pub fn perform_clustering(
     }
 }
 
-// Process clustered haplotypes and assign reads
-pub fn process_clustered_haplotypes(
+// Collapse haplotypes into their assigned cluster, updating HP tags when necessary
+// TODO: Work on a GenotypeResult instead of the gts; there's a
+// GenotypeResult.genotype.observed_alleles
+pub fn collapse_haplotypes(
     cluster_result: ClusterResult,
     haplos: Vec<Haplotype>,
     gts: [[usize; 2]; 3],
@@ -199,7 +205,6 @@ pub fn process_clustered_haplotypes(
 
     let mut hp_cnt = Array::<u16, _>::zeros((cluster_result.k, 3, 2));
 
-    // Collapse haplotypes into clusters
     cluster_result
         .assignments
         .into_iter()

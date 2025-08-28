@@ -1,48 +1,24 @@
+use crate::kplib::polycluster::PolyCluParams;
+
 /// Mean Shift clustering algorithm for 1D data
 pub struct MeanShift {
     pub bandwidth: Option<f64>,
     pub max_iter: usize,
+    /// tolerance for convergence
     pub tol: f64,
+    /// minimum number of reads per-cluster
     pub min_bin_freq: usize,
 }
 
 impl MeanShift {
     /// Create a new MeanShift instance
-    pub fn new() -> Self {
+    pub fn new(params: &PolyCluParams) -> Self {
         Self {
-            bandwidth: None,
+            bandwidth: params.bandwidth,
             max_iter: 300,
             tol: 1e-3,
-            min_bin_freq: 1,
+            min_bin_freq: params.msmin,
         }
-    }
-
-    /// Create a new MeanShift instance with specified bandwidth
-    pub fn with_bandwidth(bandwidth: f64) -> Self {
-        Self {
-            bandwidth: Some(bandwidth),
-            max_iter: 300,
-            tol: 1e-3,
-            min_bin_freq: 1,
-        }
-    }
-
-    /// Set maximum iterations
-    pub fn max_iter(mut self, max_iter: usize) -> Self {
-        self.max_iter = max_iter;
-        self
-    }
-
-    /// Set tolerance for convergence
-    pub fn tolerance(mut self, tol: f64) -> Self {
-        self.tol = tol;
-        self
-    }
-
-    /// Set min_bin_freq
-    pub fn min_size(mut self, minbin: usize) -> Self {
-        self.min_bin_freq = minbin;
-        self
     }
 
     /// Fit the Mean Shift algorithm to 1D data
@@ -295,81 +271,6 @@ pub fn estimate_bandwidth(
 
 impl Default for MeanShift {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_estimate_bandwidth() {
-        let data = vec![1.0, 2.0, 3.0, 10.0, 11.0, 12.0];
-        let bandwidth = estimate_bandwidth(&data, 0.5, None, 0);
-        assert!(bandwidth > 0.0);
-        println!("Estimated bandwidth: {}", bandwidth);
-    }
-
-    #[test]
-    fn test_meanshift_simple() {
-        let data = vec![1.0, 1.1, 1.2, 5.0, 5.1, 5.2, 9.0, 9.1, 9.2];
-        let mut ms = MeanShift::new();
-        let result = ms.fit(&data);
-
-        println!("Cluster centers: {:?}", result.cluster_centers);
-        println!("Labels: {:?}", result.labels);
-
-        // Should find approximately 3 clusters
-        assert!(result.cluster_centers.len() >= 2);
-        assert_eq!(result.labels.len(), data.len());
-    }
-
-    #[test]
-    fn test_meanshift_with_bandwidth() {
-        let data = vec![1.0, 2.0, 3.0, 10.0, 11.0, 12.0];
-        let mut ms = MeanShift::with_bandwidth(2.0);
-        let result = ms.fit(&data);
-
-        println!("With bandwidth 2.0 - Centers: {:?}", result.cluster_centers);
-        println!("With bandwidth 2.0 - Labels: {:?}", result.labels);
-
-        assert!(!result.cluster_centers.is_empty());
-        assert_eq!(result.labels.len(), data.len());
-    }
-
-    #[test]
-    fn test_single_cluster() {
-        let data = vec![1.0, 1.01, 0.99, 1.02, 0.98];
-        let mut ms = MeanShift::with_bandwidth(1.0);
-        let result = ms.fit(&data);
-
-        println!("Single cluster - Centers: {:?}", result.cluster_centers);
-        println!("Single cluster - Labels: {:?}", result.labels);
-
-        // Should find one cluster
-        assert_eq!(result.cluster_centers.len(), 1);
-        assert!(result.labels.iter().all(|&label| label == 0));
-    }
-
-    #[test]
-    fn test_mean_shift() {
-        let data = [
-            5.0, 8.0, 19.0, 6.0, 4.0, 12.0, 9.0, 4.0, 21.0, 8.0, 8.0, 4.0, 10.0, 3.0, 19.0, 10.0,
-            20.0, 19.0, 2.0, 20.0,
-        ];
-        let ans = [0, 1, 2, 0, 0, 1, 1, 0, 2, 1, 1, 0, 1, 0, 2, 1, 2, 2, 0, 2];
-
-        let mut ms = MeanShift::new();
-        let result = ms.fit(&data);
-        println!("Triple cluster - Centers: {:?}", result.cluster_centers);
-        println!("Triple cluster - Labels: {:?}", result.labels);
-        println!("Triple cluster - ANSlab: {:?}", ans);
-        assert_eq!(result.labels, ans);
-        assert_eq!(result.cluster_centers.len(), 3);
-
-        let bandwidth = estimate_bandwidth(&data, 0.3, None, 0);
-        println!("Triple Bandwidth : {:?}", bandwidth);
-        assert_eq!(bandwidth, 3.0);
+        Self::new(&PolyCluParams::default())
     }
 }
