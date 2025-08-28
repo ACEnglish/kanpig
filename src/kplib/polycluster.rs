@@ -1,9 +1,45 @@
 use ndarray::{Array, Array2, Axis};
 
-// For now, we just pull the TrioCommand args. Eventually we'll need a PolyCluParam object
-// That can be filled in by both TrioCommand and MosaicCommand
-use crate::commands::trio::TrioCommand;
 use crate::kplib::{hp_sorter, metrics, Haplotype, MeanShift, PathScore};
+
+// Put this trait on TrioCommand and Mosaic Command so we contain the copying
+pub trait ToPolyCluParams {
+    fn to_polyclu_params(&self) -> PolyCluParams;
+}
+
+// Parameters to pass around the polyclust methods
+pub struct PolyCluParams {
+    /// Minimum number of reads in a cluster
+    pub msmin: usize,
+
+    /// Max clusters
+    pub maxclust: usize,
+
+    /// Clustering weight for haplotagged reads (off=0.0, full=1.0)
+    pub hps_weight: f32,
+
+    /// Clustering weight for haplotype lengths (off=0.0, full=1.0)
+    pub len_weight: f32,
+
+    /// Only cluster on haplotype lengths
+    pub lengthonly: bool,
+
+    /// Minimum K Freq for seq_to_kmer
+    pub minkfreq: u64,
+}
+
+impl Default for PolyCluParams {
+    fn default() -> Self {
+        PolyCluParams {
+            msmin: 5,
+            maxclust: 5,
+            hps_weight: 0.25,
+            len_weight: 0.25,
+            lengthonly: false,
+            minkfreq: 1,
+        }
+    }
+}
 
 pub fn cluster_quality(k: usize, quality_scores: &[f64], labels: &[usize]) -> Vec<f64> {
     // Find the maximum label to determine the size needed
@@ -37,14 +73,14 @@ pub fn cluster_quality(k: usize, quality_scores: &[f64], labels: &[usize]) -> Ve
 /// Count reads in each cluster
 pub fn count_reads(
     k: usize,
-    ref_coverage: &[usize; 3],
+    ref_coverage: &[usize],
     assignments: &[usize],
     haplos: &[Haplotype],
 ) -> Array2<usize> {
-    let mut read_counts = Array::<usize, _>::zeros((k + 1, 3));
-    read_counts[[0, 0]] = ref_coverage[0];
-    read_counts[[0, 1]] = ref_coverage[1];
-    read_counts[[0, 2]] = ref_coverage[2];
+    let mut read_counts = Array::<usize, _>::zeros((k + 1, ref_coverage.len()));
+    for (i, &coverage) in ref_coverage.iter().enumerate() {
+        read_counts[[0, i]] = coverage;
+    }
     for (&label, hap) in assignments.iter().zip(haplos.iter()) {
         let cluster_idx = label + 1;
         let sample_idx = hap.meta.samples_flag.trailing_zeros() as usize;
@@ -52,6 +88,7 @@ pub fn count_reads(
     }
     read_counts
 }
+
 pub fn top_n_rows_by_sum(arr: &Array2<usize>, n: usize) -> Vec<usize> {
     // Calculate row sums and pair with indices
     let mut row_sums_with_indices: Vec<(usize, usize)> = arr
@@ -81,7 +118,11 @@ pub struct ClusterResult {
 }
 
 // Perform MeanShift and K-medoid clustering
-pub fn perform_clustering(haplos: &[Haplotype], m_args: &TrioCommand) -> ClusterResult {
+pub fn perform_clustering(
+    haplos: &[Haplotype],
+    m_args: &PolyCluParams,
+    n_samps: usize,
+) -> ClusterResult {
     // MeanShift to determine K
     let sizes: Vec<f64> = haplos.iter().map(|x| x.size as f64).collect();
     let mut ms = MeanShift::new().min_size(m_args.msmin);
@@ -90,7 +131,7 @@ pub fn perform_clustering(haplos: &[Haplotype], m_args: &TrioCommand) -> Cluster
     let k = ms_result.cluster_centers.len();
     let (mut medoids, k) = if k > m_args.maxclust {
         // Only collect the highest covered medoids if MSk > maxclust
-        let read_counts = count_reads(k, &[0, 0, 0], &ms_result.labels, haplos);
+        let read_counts = count_reads(k, &vec![0; n_samps], &ms_result.labels, haplos);
 
         let top = top_n_rows_by_sum(&read_counts, m_args.maxclust);
         let new_meds = ms_result.medoids.clone();
@@ -107,12 +148,8 @@ pub fn perform_clustering(haplos: &[Haplotype], m_args: &TrioCommand) -> Cluster
     } else {
         // Kmedoid Clustering
         let dist: Array2<f32> = Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
-            let mut dist: f32 = 1.0
-                - (metrics::seqsim(
-                    &haplos[i].kfeat,
-                    &haplos[j].kfeat,
-                    m_args.graph.minkfreq as f32,
-                ));
+            let mut dist: f32 =
+                1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, m_args.minkfreq as f32));
             // if same sample and different hp, hps_weight penalty
             let i_samp = haplos[i].meta.samples_flag;
             let j_samp = haplos[j].meta.samples_flag;
@@ -207,7 +244,6 @@ pub fn process_clustered_haplotypes(
     clustered_haps
 }
 
-// Separate paths by sample
 pub fn separate_paths_by_sample(paths: Vec<PathScore>) -> Vec<Vec<PathScore>> {
     const NUM_SAMPLES: usize = 3;
     let mut separated_paths: Vec<Vec<PathScore>> = vec![Vec::new(); NUM_SAMPLES];

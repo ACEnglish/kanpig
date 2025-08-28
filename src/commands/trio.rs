@@ -11,48 +11,40 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, open_reads, open_writer_thread, polycluster, trio_genotyper,
-        ChannelInput, ChannelOutput, GraphParams, Haplotype, PathScore, Ploidy, PloidyRegions,
-        ReadParser, Variants, VcfChunker,
+        build_region_tree, open_reads, open_writer_thread,
+        polycluster::{self, ToPolyCluParams},
+        trio_genotyper, ChannelInput, ChannelOutput, GraphParams, Haplotype, PathScore, Ploidy,
+        PloidyRegions, ReadParser, Variants, VcfChunker,
     },
 };
 
 // Data structure to hold pileup information
 #[derive(Clone)]
-struct PileupData {
-    pro_haps: Vec<Haplotype>,
-    pat_haps: Vec<Haplotype>,
-    mat_haps: Vec<Haplotype>,
-    ref_coverage: [usize; 3],
-    coverages: [u64; 3],
+pub struct PileupData {
+    pub haplos: Vec<Haplotype>,
+    pub ref_coverage: Vec<usize>,
+    pub coverages: Vec<u64>,
 }
 
 // Collect pileup data from all three samples
-fn collect_pileup_data(
-    pro_reads: &mut Box<dyn ReadParser>,
-    pat_reads: &mut Box<dyn ReadParser>,
-    mat_reads: &mut Box<dyn ReadParser>,
+pub fn collect_pileup_data(
+    mut samples: Vec<&mut Box<dyn ReadParser>>,
     m_graph: &Variants,
 ) -> PileupData {
-    let (pro_haps, pro_coverage) =
-        pro_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-    let (pat_haps, pat_coverage) =
-        pat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-    let (mat_haps, mat_coverage) =
-        mat_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-
-    let ref_coverage = [
-        pro_coverage as usize - pro_haps.len(),
-        pat_coverage as usize - pat_haps.len(),
-        mat_coverage as usize - mat_haps.len(),
-    ];
+    let mut ref_coverage = Vec::<usize>::with_capacity(samples.len());
+    let mut coverages = Vec::<u64>::with_capacity(samples.len());
+    let mut haplos = Vec::<Haplotype>::new();
+    for samp in samples.iter_mut() {
+        let (haps, cov) = samp.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+        ref_coverage.push(cov as usize - haps.len());
+        coverages.push(cov);
+        haplos.extend(haps);
+    }
 
     PileupData {
-        pro_haps,
-        pat_haps,
-        mat_haps,
+        haplos,
         ref_coverage,
-        coverages: [pro_coverage, pat_coverage, mat_coverage],
+        coverages,
     }
 }
 
@@ -89,6 +81,10 @@ fn task_thread(
         &m_args.graph,
     );
 
+    // These need to be pulled out so we can do the polyclustering
+    // on both TrioCommand and MosaicCommand
+    let pclu_params = m_args.to_polyclu_params();
+
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
@@ -104,17 +100,12 @@ fn task_thread(
                     continue;
                 }
 
-                let pileup_data =
-                    collect_pileup_data(&mut pro_reads, &mut pat_reads, &mut mat_reads, &m_graph);
+                let pileup_data = collect_pileup_data(
+                    vec![&mut pro_reads, &mut pat_reads, &mut mat_reads],
+                    &m_graph,
+                );
 
-                let haplos: Vec<Haplotype> = pileup_data
-                    .pro_haps
-                    .into_iter()
-                    .chain(pileup_data.pat_haps)
-                    .chain(pileup_data.mat_haps)
-                    .collect();
-
-                if haplos.len() <= 1 {
+                if pileup_data.haplos.len() <= 1 {
                     m_result_sender
                         .send(m_graph.take_annotated(
                             vec![&[], &[], &[]],
@@ -125,20 +116,24 @@ fn task_thread(
                     continue;
                 }
 
-                let cluster_result = polycluster::perform_clustering(&haplos, &m_args);
+                let cluster_result =
+                    polycluster::perform_clustering(&pileup_data.haplos, &pclu_params, 3);
 
                 let read_counts = polycluster::count_reads(
                     cluster_result.k,
                     &pileup_data.ref_coverage,
                     &cluster_result.assignments,
-                    &haplos,
+                    &pileup_data.haplos,
                 );
 
                 debug!("Read Counts:\n {:?}", read_counts);
                 let gts = trio_genotyper(&read_counts, &cluster_result.quality);
 
-                let clustered_haps =
-                    polycluster::process_clustered_haplotypes(cluster_result, haplos, gts);
+                let clustered_haps = polycluster::process_clustered_haplotypes(
+                    cluster_result,
+                    pileup_data.haplos,
+                    gts,
+                );
 
                 let should_build = !clustered_haps.is_empty()
                     && !m_args.graph.one_to_one
@@ -193,6 +188,20 @@ pub struct TrioCommand {
     /// Only cluster on haplotype lengths
     #[arg(long, default_value_t = false, help_heading = "Genotyping")]
     pub lengthonly: bool,
+}
+
+impl ToPolyCluParams for TrioCommand {
+    fn to_polyclu_params(&self) -> polycluster::PolyCluParams {
+        polycluster::PolyCluParams {
+            msmin: self.msmin,
+            maxclust: self.maxclust,
+            hps_weight: self.hps_weight,
+            len_weight: self.len_weight,
+            lengthonly: self.lengthonly,
+            minkfreq: self.graph.minkfreq,
+            ..Default::default() // Fill remaining fields with defaults
+        }
+    }
 }
 
 #[derive(clap::Args, Clone, Debug)]

@@ -16,6 +16,9 @@ use crate::commands::plup::PlupCommand;
 pub mod trio;
 use crate::commands::trio::TrioCommand;
 
+pub mod mosaic;
+use crate::commands::mosaic::MosaicCommand;
+
 /// Set of commands
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
@@ -27,4 +30,7 @@ pub enum Commands {
 
     #[command(about = "Trio Genotyping")]
     Trio(TrioCommand),
+
+    #[command(about = "Mosaic Genotyping")]
+    Mosaic(MosaicCommand),
 }
