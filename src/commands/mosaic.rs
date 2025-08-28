@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{ArgAction, Parser};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use noodles_vcf::{self as vcf};
 use std::{
@@ -8,84 +8,46 @@ use std::{
 };
 
 use crate::{
+    commands::trio::collect_pileup_data,
     commands::KanpigCommand,
     file_validators,
     kplib::{
         build_region_tree, open_reads, open_writer_thread,
         polycluster::{self, ToPolyCluParams},
-        trio_genotyper, ChannelInput, ChannelOutput, GraphParams, Haplotype, PathScore, Ploidy,
-        PloidyRegions, ReadParser, Variants, VcfChunker,
+        trio_genotyper, ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions,
+        ReadParser, Variants, VcfChunker,
     },
 };
 
-// Data structure to hold pileup information
-#[derive(Clone)]
-pub struct PileupData {
-    pub haplos: Vec<Haplotype>,
-    pub ref_coverage: Vec<usize>,
-    pub coverages: Vec<u64>,
-}
-
-// Collect pileup data from all three samples
-pub fn collect_pileup_data(
-    samples: &mut Vec<Box<dyn ReadParser>>,
-    m_graph: &Variants,
-) -> PileupData {
-    let mut ref_coverage = Vec::<usize>::with_capacity(samples.len());
-    let mut coverages = Vec::<u64>::with_capacity(samples.len());
-    let mut haplos = Vec::<Haplotype>::new();
-    for samp in samples.iter_mut() {
-        let (haps, cov) = samp.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-        ref_coverage.push(cov as usize - haps.len());
-        coverages.push(cov);
-        haplos.extend(haps);
-    }
-
-    PileupData {
-        haplos,
-        ref_coverage,
-        coverages,
-    }
-}
-
 fn task_thread(
-    m_args: TrioCommand,
+    m_args: MosaicCommand,
     m_receiver: Receiver<ChannelInput>,
     m_result_sender: Sender<ChannelOutput>,
     m_ploidy: PloidyRegions,
 ) {
-    let pro_reads = open_reads(
-        m_args.io.proband.clone(),
-        m_args.io.reference.clone(),
-        m_args.io.proband_sample.clone(),
-        0, // First sample is index 0 in the HaplotypeMeta vectros
-        3, // Three total samples will be opened (for HaplotypeMeta)
-        &m_args.graph,
-    );
+    // For each bam (mainly one) open_reads add to list
+    let n_samps = m_args.io.reads.len();
+    let mut reads: Vec<Box<dyn ReadParser>> = m_args
+        .io
+        .reads
+        .iter()
+        .zip(m_args.io.sample.iter())
+        .enumerate()
+        .map(|(idx, (filename, sample))| {
+            open_reads(
+                filename.clone(),
+                m_args.io.reference.clone(),
+                sample.clone(),
+                idx,
+                n_samps,
+                &m_args.graph,
+            )
+        })
+        .collect();
 
-    let pat_reads = open_reads(
-        m_args.io.father.clone(),
-        m_args.io.reference.clone(),
-        m_args.io.father_sample.clone(),
-        1,
-        3,
-        &m_args.graph,
-    );
+    // Then convert to mutable references when calling the function
 
-    let mat_reads = open_reads(
-        m_args.io.mother.clone(),
-        m_args.io.reference.clone(),
-        m_args.io.mother_sample.clone(),
-        2,
-        3,
-        &m_args.graph,
-    );
-
-    // These need to be pulled out so we can do the polyclustering
-    // on both TrioCommand and MosaicCommand
     let pclu_params = m_args.to_polyclu_params();
-
-    let mut reads = vec![pro_reads, pat_reads, mat_reads];
 
     loop {
         match m_receiver.recv() {
@@ -116,7 +78,7 @@ fn task_thread(
                 }
 
                 let cluster_result =
-                    polycluster::perform_clustering(&pileup_data.haplos, &pclu_params, 3);
+                    polycluster::perform_clustering(&pileup_data.haplos, &pclu_params, n_samps);
 
                 let read_counts = polycluster::count_reads(
                     cluster_result.k,
@@ -161,7 +123,7 @@ fn task_thread(
 }
 
 #[derive(Parser, Debug, Clone)]
-pub struct TrioCommand {
+pub struct MosaicCommand {
     #[command(flatten)]
     pub io: IOParams,
 
@@ -169,11 +131,11 @@ pub struct TrioCommand {
     pub graph: GraphParams,
 
     /// Minimum number of reads in a cluster
-    #[arg(long, default_value_t = 5, help_heading = "Genotyping")]
+    #[arg(long, default_value_t = 2, help_heading = "Genotyping")]
     pub msmin: usize,
 
     /// Max clusters
-    #[arg(long, default_value_t = 5, help_heading = "Genotyping")]
+    #[arg(long, default_value_t = 8, help_heading = "Genotyping")]
     pub maxclust: usize,
 
     /// Clustering weight for haplotagged reads (off=0.0, full=1.0)
@@ -189,7 +151,7 @@ pub struct TrioCommand {
     pub lengthonly: bool,
 }
 
-impl ToPolyCluParams for TrioCommand {
+impl ToPolyCluParams for MosaicCommand {
     fn to_polyclu_params(&self) -> polycluster::PolyCluParams {
         polycluster::PolyCluParams {
             msmin: self.msmin,
@@ -209,17 +171,9 @@ pub struct IOParams {
     #[arg(short, long, help_heading = "I/O")]
     pub input: PathBuf,
 
-    /// Proband reads to genotype (indexed .bam, .cram, or .plup.gz)
-    #[arg(long, help_heading = "I/O")]
-    pub proband: PathBuf,
-
-    /// Paternal reads to genotype (indexed .bam, .cram, or .plup.gz)
-    #[arg(long, help_heading = "I/O")]
-    pub father: PathBuf,
-
-    /// Maternal reads to genotype (indexed .bam, .cram, or .plup.gz)
-    #[arg(long, help_heading = "I/O")]
-    pub mother: PathBuf,
+    /// Reads to genotype (indexed .bam, .cram, or .plup.gz; can be specified multiple times).
+    #[arg(long, help_heading = "I/O", action = ArgAction::Append)]
+    pub reads: Vec<PathBuf>,
 
     /// Reference genome
     #[arg(short = 'f', long, help_heading = "I/O")]
@@ -233,17 +187,9 @@ pub struct IOParams {
     #[arg(short, long, default_value_t = 1, help_heading = "I/O")]
     pub threads: usize,
 
-    /// Output VCF proband sample name
-    #[arg(long, default_value = "PRO", help_heading = "I/O")]
-    pub proband_sample: String,
-
-    /// Output VCF paternal sample name
-    #[arg(long, default_value = "PAT", help_heading = "I/O")]
-    pub father_sample: String,
-
-    /// Output VCF maternal sample name
-    #[arg(long, default_value = "MAT", help_heading = "I/O")]
-    pub mother_sample: String,
+    /// Output VCF sample names (one per `--reads`; can be specified multiple times)
+    #[arg(long, default_value = "SAMPLE", help_heading = "I/O", action = ArgAction::Append)]
+    pub sample: Vec<String>,
 
     // TODO: XYploidy_bed
     // XXploidy_bed
@@ -261,7 +207,7 @@ pub struct IOParams {
     pub debug: bool,
 }
 
-impl KanpigCommand for TrioCommand {
+impl KanpigCommand for MosaicCommand {
     fn debug(&self) -> bool {
         self.io.debug
     }
@@ -269,10 +215,14 @@ impl KanpigCommand for TrioCommand {
     fn validate(&self) -> bool {
         let mut is_ok = true;
 
+        // Per-Bam
         is_ok &= file_validators::validate_file(&self.io.input, "--input");
-        is_ok &= file_validators::validate_reads(&self.io.proband, &self.graph);
-        is_ok &= file_validators::validate_reads(&self.io.mother, &self.graph);
-        is_ok &= file_validators::validate_reads(&self.io.father, &self.graph);
+        for i in self.io.reads.iter() {
+            is_ok &= file_validators::validate_reads(i, &self.graph);
+        }
+
+        // TODO: one sample per bam. If no samples, just name them S1,S2 etc
+        // If any, must provide all
         is_ok &= file_validators::validate_reference(&self.io.reference);
 
         if let Some(bed_file) = &self.io.bed {
@@ -317,8 +267,8 @@ impl KanpigCommand for TrioCommand {
             is_ok = false;
         }
 
-        if self.maxclust < 4 {
-            error!("--maxclust must be at least 4");
+        if self.maxclust < 3 {
+            error!("--maxclust must be at least 3");
             is_ok = false;
         }
 
@@ -332,10 +282,7 @@ impl KanpigCommand for TrioCommand {
 
         let input_header = input_vcf.read_header().expect("Unable to parse vcf header");
 
-        info!(
-            "Setting samples to {}, {}, {}",
-            self.io.proband_sample, self.io.father_sample, self.io.mother_sample
-        );
+        info!("Setting samples to {:?}", self.io.sample);
 
         let m_contigs = input_header.contigs().clone();
 
@@ -370,11 +317,7 @@ impl KanpigCommand for TrioCommand {
         let write_handler = open_writer_thread(
             result_receiver,
             self.io.out.clone(),
-            vec![
-                self.io.proband_sample.clone(),
-                self.io.father_sample.clone(),
-                self.io.mother_sample.clone(),
-            ],
+            self.io.sample.clone(),
             input_header.clone(),
             num_variants.clone(),
         );
