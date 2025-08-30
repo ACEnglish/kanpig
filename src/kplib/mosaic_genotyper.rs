@@ -20,7 +20,7 @@ fn ln_factorial(n: u32) -> f64 {
 fn ln_multinomial_pmf(counts: &[u32], probs: &[f64]) -> f64 {
     let n: u32 = counts.iter().sum();
     let mut log_prob = ln_factorial(n);
-    
+
     for (count, prob) in counts.iter().zip(probs.iter()) {
         log_prob -= ln_factorial(*count);
         if *count > 0 && *prob > 0.0 {
@@ -36,8 +36,8 @@ fn ln_beta_pdf(x: f64, alpha: f64, beta: f64) -> f64 {
     if x <= 0.0 || x >= 1.0 {
         return f64::NEG_INFINITY;
     }
-    (alpha - 1.0) * x.ln() + (beta - 1.0) * (1.0 - x).ln() 
-        - ln_gamma(alpha) - ln_gamma(beta) + ln_gamma(alpha + beta)
+    (alpha - 1.0) * x.ln() + (beta - 1.0) * (1.0 - x).ln() - ln_gamma(alpha) - ln_gamma(beta)
+        + ln_gamma(alpha + beta)
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +54,42 @@ pub struct GenotypingResult {
     pub quality_score: f64,
 }
 
+/*
+* Beta Distribution Basics
+   The Beta distribution with parameters α (alpha) and β (beta) is defined on the interval [0, 1], making it perfect for modeling proportions like VAFs.
+   How Alpha and Beta Shape the Distribution
+
+   Mean: α / (α + β)
+   Variance: αβ / [(α + β)²(α + β + 1)]
+   Shape:
+
+   α > 1, β > 1: Bell-shaped
+   α < 1, β < 1: U-shaped
+   α = β = 1: Uniform distribution
+
+   somatic_vaf_prior_alpha: 1.0,    // α parameter
+   somatic_vaf_prior_beta: 10.0,    // β parameter
+   This gives you:
+
+   Mean somatic VAF: 1.0 / (1.0 + 10.0) = 0.091 (~9%)
+   Strong bias toward low VAFs: The distribution is heavily skewed toward 0
+   Biological rationale: Most somatic mutations have low VAFs (5-20%), so this prior encodes that expectation
+
+   Visual Interpretation
+   With α=1, β=10:
+
+   Peak probability near 0
+   Rapidly decreasing as VAF increases
+   Very low probability for VAFs > 0.3
+
+   Tuning Guidelines
+   More conservative (favor lower VAFs):
+   alpha: 0.5, beta: 20.0  // Mean ~2.4%, very low VAF bias
+   More permissive:
+   alpha: 2.0, beta: 8.0   // Mean ~20%, allows higher somatic VAFs
+   Uniform (no bias):
+   alpha: 1.0, beta: 1.0   // Mean 50%, no preference
+*/
 pub struct MultiAlleleGenotyper {
     pub error_rate: f64,
     pub somatic_vaf_prior_alpha: f64, // Beta prior parameters for somatic VAFs
@@ -65,11 +101,11 @@ pub struct MultiAlleleGenotyper {
 impl Default for MultiAlleleGenotyper {
     fn default() -> Self {
         Self {
-            error_rate: 0.001,
-            somatic_vaf_prior_alpha: 1.0,
-            somatic_vaf_prior_beta: 10.0, // Prior favoring low VAFs
-            max_somatic_vaf: 0.4,
-            min_depth_for_call: 10,
+            error_rate: 0.001,            // don't know what these do
+            somatic_vaf_prior_alpha: 1.0, // TODO: maybe a parameter
+            somatic_vaf_prior_beta: 15.0, // Prior favoring low VAFs
+            max_somatic_vaf: 0.2,         // TODO: Probably need this as a param
+            min_depth_for_call: 1,        // TODO: I don't know if I need this as a param
         }
     }
 }
@@ -84,13 +120,14 @@ impl MultiAlleleGenotyper {
         somatic_alpha: f64,
         somatic_beta: f64,
         max_somatic_vaf: f64,
+        min_depth_for_call: u32,
     ) -> Self {
         Self {
             error_rate,
             somatic_vaf_prior_alpha: somatic_alpha,
             somatic_vaf_prior_beta: somatic_beta,
             max_somatic_vaf,
-            min_depth_for_call: 10,
+            min_depth_for_call,
         }
     }
 
@@ -135,7 +172,11 @@ impl MultiAlleleGenotyper {
     }
 
     /// Calculate expected VAFs under a given genotype hypothesis
-    fn calculate_expected_vafs(&self, hypothesis: &GenotypeHypothesis, num_alleles: usize) -> Vec<f64> {
+    fn calculate_expected_vafs(
+        &self,
+        hypothesis: &GenotypeHypothesis,
+        num_alleles: usize,
+    ) -> Vec<f64> {
         let mut vafs = vec![self.error_rate; num_alleles];
 
         match hypothesis.germline_alleles.len() {
@@ -193,7 +234,7 @@ impl MultiAlleleGenotyper {
         // Could be improved with population allele frequencies
         log_prior += match hypothesis.germline_alleles.len() {
             1 => -1.0_f64.ln(), // Log uniform over homozygous states
-            2 => -2.0_f64.ln(), // Log uniform over heterozygous states  
+            2 => -2.0_f64.ln(), // Log uniform over heterozygous states
             _ => f64::NEG_INFINITY,
         };
 
@@ -201,14 +242,18 @@ impl MultiAlleleGenotyper {
     }
 
     /// Optimize somatic VAFs for a given hypothesis using simple grid search
-    fn optimize_somatic_vafs(&self, counts: &[u32], hypothesis: &GenotypeHypothesis) -> (GenotypeHypothesis, f64) {
+    fn optimize_somatic_vafs(
+        &self,
+        counts: &[u32],
+        hypothesis: &GenotypeHypothesis,
+    ) -> (GenotypeHypothesis, f64) {
         let total_depth: u32 = counts.iter().sum();
         if total_depth == 0 {
             return (hypothesis.clone(), f64::NEG_INFINITY);
         }
 
         let mut optimized_hypothesis = hypothesis.clone();
-        
+
         // Simple optimization: try different VAF values for each somatic allele
         let vaf_candidates: Vec<f64> = (1..=20).map(|i| (i as f64) * 0.01).collect(); // 0.01 to 0.20
 
@@ -226,12 +271,14 @@ impl MultiAlleleGenotyper {
                 if candidate_vaf > self.max_somatic_vaf {
                     break;
                 }
-                
+
                 // Create temporary hypothesis with this VAF
                 let mut temp_hypothesis = optimized_hypothesis.clone();
-                temp_hypothesis.somatic_vafs.insert(allele_idx, candidate_vaf);
+                temp_hypothesis
+                    .somatic_vafs
+                    .insert(allele_idx, candidate_vaf);
                 let likelihood = self.log_likelihood(counts, &temp_hypothesis);
-                
+
                 if likelihood > best_local_likelihood {
                     best_local_likelihood = likelihood;
                     best_vaf = candidate_vaf;
@@ -241,7 +288,9 @@ impl MultiAlleleGenotyper {
             // Also try the observed VAF if it's reasonable
             if observed_vaf > 0.0 && observed_vaf <= self.max_somatic_vaf {
                 let mut temp_hypothesis = optimized_hypothesis.clone();
-                temp_hypothesis.somatic_vafs.insert(allele_idx, observed_vaf);
+                temp_hypothesis
+                    .somatic_vafs
+                    .insert(allele_idx, observed_vaf);
                 let likelihood = self.log_likelihood(counts, &temp_hypothesis);
                 if likelihood > best_local_likelihood {
                     best_vaf = observed_vaf;
@@ -249,7 +298,9 @@ impl MultiAlleleGenotyper {
             }
 
             // Update the optimized hypothesis with the best VAF
-            optimized_hypothesis.somatic_vafs.insert(allele_idx, best_vaf);
+            optimized_hypothesis
+                .somatic_vafs
+                .insert(allele_idx, best_vaf);
         }
 
         let final_likelihood = self.log_likelihood(counts, &optimized_hypothesis);
@@ -259,7 +310,7 @@ impl MultiAlleleGenotyper {
     /// Main genotyping function
     pub fn genotype(&self, allele_counts: &[u32]) -> Option<GenotypingResult> {
         let total_depth: u32 = allele_counts.iter().sum();
-        
+
         if total_depth < self.min_depth_for_call {
             return None;
         }
@@ -283,12 +334,17 @@ impl MultiAlleleGenotyper {
 
         for hypothesis in hypotheses {
             // Skip hypotheses where germline alleles have zero coverage
-            if hypothesis.germline_alleles.iter().any(|&idx| allele_counts[idx] == 0) {
+            if hypothesis
+                .germline_alleles
+                .iter()
+                .any(|&idx| allele_counts[idx] == 0)
+            {
                 continue;
             }
 
             // Optimize somatic VAFs
-            let (optimized_hypothesis, log_likelihood) = self.optimize_somatic_vafs(allele_counts, &hypothesis);
+            let (optimized_hypothesis, log_likelihood) =
+                self.optimize_somatic_vafs(allele_counts, &hypothesis);
             let log_prior = self.log_prior(&optimized_hypothesis);
             let log_posterior = log_likelihood + log_prior;
 
@@ -303,17 +359,22 @@ impl MultiAlleleGenotyper {
 
         best_hypothesis.map(|mut genotype| {
             // Filter germline alleles to only include observed ones
-            genotype.germline_alleles.retain(|&x| non_zero_alleles.contains(&x));
+            genotype
+                .germline_alleles
+                .retain(|&x| non_zero_alleles.contains(&x));
 
             // Set observed alleles
             genotype.observed_alleles = non_zero_alleles.clone();
 
             // Filter somatic VAFs to only include observed alleles
-            genotype.somatic_vafs.retain(|&k, _| non_zero_alleles.contains(&k));
+            genotype
+                .somatic_vafs
+                .retain(|&k, _| non_zero_alleles.contains(&k));
 
             // Calculate quality score (difference in log posterior)
             let quality_score = if second_best_log_posterior.is_finite() {
-                (best_log_posterior - second_best_log_posterior) / (10.0_f64.ln() / 10.0) // Convert to Phred-like scale
+                (best_log_posterior - second_best_log_posterior) / (10.0_f64.ln() / 10.0)
+            // Convert to Phred-like scale
             } else {
                 100.0 // Very high confidence if only one viable hypothesis
             };
@@ -327,7 +388,8 @@ impl MultiAlleleGenotyper {
     }
 }
 
-pub fn mosaic_genotyper(counts: &Vec<u32>) -> Option<GenotypingResult> {
+pub fn mosaic_genotyper(counts: &[u32]) -> Option<GenotypingResult> {
+    // TODO: Params to pass
     let genotyper = MultiAlleleGenotyper::new();
     genotyper.genotype(counts)
 }
@@ -340,10 +402,10 @@ mod tests {
     #[test]
     fn test_simple_heterozygous() {
         let genotyper = MultiAlleleGenotyper::new();
-        
+
         // Simulate het with two alleles at ~50% each
         let counts = vec![45, 55, 2, 1]; // Two main alleles + noise
-        
+
         if let Some(result) = genotyper.genotype(&counts) {
             println!("Genotype result: {:#?}", result);
             assert_eq!(result.genotype.germline_alleles.len(), 2);
@@ -357,17 +419,30 @@ mod tests {
     #[test]
     fn test_homozygous_with_somatic() {
         let genotyper = MultiAlleleGenotyper::new();
-        
+
         // Simulate homozygous ref with somatic variants
         let counts = vec![90, 0, 8, 3]; // Dominant allele + somatic variants
-        
+
         if let Some(result) = genotyper.genotype(&counts) {
             println!("Genotype result: {:#?}", result);
-            assert_eq!(result.genotype.germline_alleles.len(), 2);
-            assert_eq!(result.genotype.germline_alleles[0], 2);
+            assert_eq!(result.genotype.germline_alleles.len(), 1);
+            assert_eq!(result.genotype.germline_alleles[0], 0);
             assert!(!result.genotype.somatic_vafs.is_empty());
         }
     }
+
+    #[test]
+    fn test_just_germline_het() {
+        let mut genotyper = MultiAlleleGenotyper::new();
+        genotyper.somatic_vaf_prior_beta = 0.15;
+
+        let counts = vec![47, 22, 4]; // Het with a tiny bit of noise
+
+        if let Some(result) = genotyper.genotype(&counts) {
+            println!("Genotype result: {:#?}", result);
+            assert_eq!(result.genotype.germline_alleles.len(), 2);
+            assert_eq!(result.genotype.germline_alleles[0], 1);
+            assert!(result.genotype.somatic_vafs.is_empty());
+        }
+    }
 }
-
-

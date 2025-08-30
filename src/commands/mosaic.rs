@@ -13,22 +13,41 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, open_reads, open_writer_thread,
+        build_region_tree, mosaic_genotyper,
+        mosaic_genotyper::GenotypeHypothesis,
+        open_reads, open_writer_thread,
         polycluster::{self, ToPolyCluParams},
-        mosaic_genotyper, ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions,
-        ReadParser, Variants, VcfChunker,
+        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, ReadParser,
+        Variants, VcfChunker,
     },
 };
-/// For each sample (first index), identify the germline/somatic alleles.
-/// Which.. we do so by... straight up genotyping, I guess?
-/// But like, I'm concerned about e.g. an SV looks HET when it has 70 reads of 100, but those other
-/// 30 are assigned to other paths, so we should be genotyping it as like 70/70
-/// Let assume you figure that out. You also need to think about finding what's germline.
-/// You can't just take the two highest covered paths, you need to balance because one path might
-/// be germline (het or hom alt). Yeah, we got to make a mosaic_genotyper.
-//fn separate_path_by_vaf() -> (Vec<Path>, Vec<Path>) {
-//
-//}
+
+fn separate_paths_by_vaf(
+    paths: Vec<Vec<PathScore>>,
+    gts: GenotypeHypothesis,
+) -> (Vec<Vec<PathScore>>, Vec<Vec<PathScore>>) {
+    let mut germ = Vec::with_capacity(paths.len());
+    let mut soma = Vec::with_capacity(paths.len());
+
+    // Initialize empty vectors for each sample
+    for _ in 0..paths.len() {
+        germ.push(Vec::new());
+        soma.push(Vec::new());
+    }
+
+    // Iterate through each sample's paths
+    for (idx, sample_paths) in paths.into_iter().enumerate() {
+        for path in sample_paths {
+            if gts.germline_alleles.contains(&path.meta.id) {
+                germ[idx].push(path);
+            } else {
+                soma[idx].push(path);
+            }
+        }
+    }
+
+    (germ, soma)
+}
 
 fn task_thread(
     m_args: MosaicCommand,
@@ -100,42 +119,55 @@ fn task_thread(
                 );
 
                 debug!("Read Counts:\n {:?}", read_counts);
-                let mut allele_support: Vec<u32> = read_counts
+                let allele_support: Vec<u32> = read_counts
                     .axis_iter(Axis(0)) // Iterate over cols
                     .map(|row| row.sum() as u32)
                     .collect();
                 let gts = mosaic_genotyper(&allele_support);
-                // This returns an Option<GenotypingResult>, if None, that means there's
-                // insufficient coverage to detect mosaicism
-                
-                // This is all still Trio
-                // All its doing is doing the collapsing and HP work
-                // important part is gts[idx].contains, which is only relevant for trios
-                //
+
+                debug!("GTs; {:#?}", gts);
+                if gts.is_none() {
+                    m_result_sender
+                        .send(m_graph.take_annotated(
+                            vec![&[]; n_samples],
+                            pileup_data.coverages.to_vec(),
+                            vec![&ploidy; n_samples],
+                        ))
+                        .unwrap();
+                    continue;
+                }
+
+                // Assuming gts is Some
                 let clustered_haps = polycluster::collapse_haplotypes(
                     cluster_result,
                     pileup_data.haplos,
-                    [[1,2],[1,2],[1,2]],
+                    vec![gts.clone().unwrap().genotype.observed_alleles; n_samples],
                 );
+
+                debug!("Haps: {:#?}", clustered_haps);
 
                 let should_build = !clustered_haps.is_empty()
                     && !m_args.graph.one_to_one
                     && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
                 m_graph.build(should_build);
 
+                // I think I need to put an id on the haplotype/PathScore so we can still tie it
+                // back to the gt.genotype.observed_alleles
                 let paths: Vec<PathScore> = clustered_haps
                     .into_iter()
                     .map(|h| m_graph.apply_haplotype(&h, &m_args.graph))
                     .filter(|p| *p != PathScore::default())
                     .collect();
 
+                // I have to work with the indices first
                 let separated_paths = polycluster::separate_paths_by_sample(paths);
-                //let (germline_paths, somatic_paths) = separate_paths_by_vaf(separated_paths);
-                //let germ_anno_vars = m_graph.take_annotated(
-                    //germline_paths.iter().map(|bin| bin.as_slice()).collect,
-                    //pileup_data.coverages.to_vec(),
-                    //vec![&ploidy; n_samples],
-                //);
+                let (germline_paths, somatic_paths) =
+                    separate_paths_by_vaf(separated_paths, gts.clone().unwrap().genotype);
+                /*let germ_anno_vars = m_graph.take_annotated(
+                    germline_paths.iter().map(|bin| bin.as_slice()).collect,
+                    pileup_data.coverages.to_vec(),
+                    vec![&ploidy; n_samples],
+                ;*/
                 // Now, for each sample, I need to separate the germline from the somatic
                 // And then I m_graph.take_annotated on the germline paths
                 // But then, for each Vec<RecordBuf, Vec<GenotypeAnno>, I need to
@@ -150,7 +182,7 @@ fn task_thread(
                 // 3. Remember you're making an infra::ChannelOutput to send back
                 m_result_sender
                     .send(m_graph.take_annotated(
-                        separated_paths.iter().map(|bin| bin.as_slice()).collect(),
+                        germline_paths.iter().map(|bin| bin.as_slice()).collect(),
                         pileup_data.coverages.to_vec(),
                         vec![&ploidy, &ploidy, &ploidy], // TODO: set this up for each
                     ))
@@ -306,8 +338,8 @@ impl KanpigCommand for MosaicCommand {
             is_ok = false;
         }
 
-        if self.maxclust < 3 {
-            error!("--maxclust must be at least 3");
+        if self.maxclust < 2 {
+            error!("--maxclust must be at least 2");
             is_ok = false;
         }
 

@@ -17,6 +17,9 @@ use std::{
 /// haplotype. e.g. flag & 1 means this is a proband haplotype
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct HaplotypeMeta {
+    // Once we cluster/genotype, we need to be able to identify them
+    // esp for mosaic
+    pub id: usize,
     pub coverage: Vec<u64>,
     pub ps: Vec<Option<u32>>,
     pub hp: Vec<Option<u8>>,
@@ -28,6 +31,7 @@ impl HaplotypeMeta {
         let mut coverage = vec![0u64; num_samples];
         coverage[sample_idx] += 1;
         HaplotypeMeta {
+            id: 0,
             coverage,
             ps: vec![None; num_samples],
             hp: vec![None; num_samples],
@@ -39,6 +43,7 @@ impl HaplotypeMeta {
     pub fn new_blank(num_samples: usize) -> Self {
         let coverage = vec![0u64; num_samples];
         HaplotypeMeta {
+            id: 0,
             coverage,
             ps: vec![None; num_samples],
             hp: vec![None; num_samples],
@@ -103,9 +108,10 @@ impl Haplotype {
     }
 
     /// Clear the Metadata and return a clone
-    pub fn clear_clone(&self) -> Haplotype {
+    pub fn clear_clone(&self, id: usize) -> Haplotype {
         let mut ret = self.clone();
-        let n_meta = HaplotypeMeta::new_blank(self.meta.coverage.len());
+        let mut n_meta = HaplotypeMeta::new_blank(self.meta.coverage.len());
+        n_meta.id = id;
         ret.meta = n_meta;
         ret
     }

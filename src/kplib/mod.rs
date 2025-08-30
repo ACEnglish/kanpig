@@ -6,14 +6,14 @@ pub use crate::kplib::bedparser::BedParser;
 
 mod cluster;
 
+mod graphparams;
+pub use crate::kplib::graphparams::GraphParams;
+
 mod haplotype;
 pub use crate::kplib::haplotype::{Haplotype, HaplotypeMeta};
 
 mod infra;
 pub use crate::kplib::infra::{ChannelInput, ChannelOutput};
-
-mod graphparams;
-pub use crate::kplib::graphparams::GraphParams;
 
 mod kmer;
 pub use crate::kplib::kmer::seq_to_kmer;

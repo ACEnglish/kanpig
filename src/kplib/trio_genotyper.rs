@@ -115,7 +115,7 @@ fn __genotype_quality<T>(posteriors: &[(T, f64)]) -> i32 {
 }
 
 /// Joint trio genotyping: returns best genotype tuple (child, father, mother)
-pub fn trio_genotyper(read_counts: &Array2<usize>, qual: &[f64]) -> [[usize; 2]; 3] {
+pub fn trio_genotyper(read_counts: &Array2<usize>, qual: &[f64]) -> Vec<Vec<usize>> {
     let n_clusters = read_counts.nrows();
 
     // generate all diploid genotypes
@@ -169,12 +169,20 @@ pub fn trio_genotyper(read_counts: &Array2<usize>, qual: &[f64]) -> [[usize; 2];
         }
     }
 
-    let best = trio_posteriors
+    /*let best = trio_posteriors
         .iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
         .map(|(geno, _)| *geno) // take the genotype part
         .unwrap();
+    let gq = genotype_quality(&trio_posteriors[..2]); */
 
-    // let gq = genotype_quality(&trio_posteriors[..2]);
-    best
+    trio_posteriors
+        .iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .map(|(geno, _)| {
+            geno.iter()
+                .map(|inner| inner.to_vec())
+                .collect::<Vec<Vec<usize>>>()
+        })
+        .unwrap()
 }

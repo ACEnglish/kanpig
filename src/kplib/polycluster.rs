@@ -1,4 +1,5 @@
 use ndarray::{Array, Array2, Axis};
+use rand::SeedableRng;
 
 use crate::kplib::{hp_sorter, metrics, Haplotype, MeanShift, PathScore};
 
@@ -129,11 +130,21 @@ pub fn perform_clustering(
 ) -> ClusterResult {
     // MeanShift to determine K
     let sizes: Vec<f64> = haplos.iter().map(|x| x.size as f64).collect();
-    let mut ms = MeanShift::new(&m_args);
+    let mut ms = MeanShift::new(m_args);
     let ms_result = ms.fit(&sizes);
 
+    // TODO: Experimental: try to make at most 2 like the regular GT does
     let k = ms_result.cluster_centers.len();
-    let (mut medoids, k) = if k > m_args.maxclust {
+    let (mut medoids, k) = if k == 1 {
+        // Single center, we can't trust the medoids?
+        let medoids = kmedoids::random_initialization(
+            haplos.len(),
+            2, // K
+            &mut rand::rngs::StdRng::seed_from_u64(21),
+        );
+
+        (medoids, 2)
+    } else if k > m_args.maxclust {
         // Only collect the highest covered medoids if MSk > maxclust
         let read_counts = count_reads(k, &vec![0; n_samps], &ms_result.labels, haplos);
 
@@ -189,18 +200,16 @@ pub fn perform_clustering(
     }
 }
 
-// Collapse haplotypes into their assigned cluster, updating HP tags when necessary
-// TODO: Work on a GenotypeResult instead of the gts; there's a
-// GenotypeResult.genotype.observed_alleles
 pub fn collapse_haplotypes(
     cluster_result: ClusterResult,
     haplos: Vec<Haplotype>,
-    gts: [[usize; 2]; 3],
+    gts: Vec<Vec<usize>>,
 ) -> Vec<Haplotype> {
     let mut clustered_haps: Vec<Haplotype> = cluster_result
         .medoids
         .iter()
-        .map(|i| haplos[*i].clear_clone())
+        .enumerate()
+        .map(|(idx, i)| haplos[*i].clear_clone(idx + 1))
         .collect();
 
     let mut hp_cnt = Array::<u16, _>::zeros((cluster_result.k, 3, 2));
@@ -229,7 +238,7 @@ pub fn collapse_haplotypes(
 
     // Set HP tag to the most common seen in the cluster
     for (i, m_hap) in clustered_haps.iter_mut().enumerate() {
-        for j in 0..3 {
+        for j in 0..gts.len() {
             if m_hap.meta.hp[j].is_some() {
                 let max_idx: u8 = hp_cnt
                     .slice(ndarray::s![i, j, ..])

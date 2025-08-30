@@ -128,11 +128,8 @@ fn task_thread(
                 debug!("Read Counts:\n {:?}", read_counts);
                 let gts = trio_genotyper(&read_counts, &cluster_result.quality);
 
-                let clustered_haps = polycluster::collapse_haplotypes(
-                    cluster_result,
-                    pileup_data.haplos,
-                    gts,
-                );
+                let clustered_haps =
+                    polycluster::collapse_haplotypes(cluster_result, pileup_data.haplos, gts);
 
                 let should_build = !clustered_haps.is_empty()
                     && !m_args.graph.one_to_one
