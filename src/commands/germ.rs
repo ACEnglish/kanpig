@@ -16,7 +16,7 @@ use crate::{
     },
 };
 fn task_thread(
-    m_args: GTCommand,
+    m_args: GermCommand,
     m_receiver: Receiver<ChannelInput>,
     m_result_sender: Sender<ChannelOutput>,
     m_ploidy: PloidyRegions,
@@ -77,7 +77,7 @@ fn task_thread(
     // This should give a result
 }
 #[derive(Parser, Debug, Clone)]
-pub struct GTCommand {
+pub struct GermCommand {
     #[command(flatten)]
     pub io: IOParams,
 
@@ -136,7 +136,7 @@ pub struct IOParams {
     pub debug: bool,
 }
 
-impl KanpigCommand for GTCommand {
+impl KanpigCommand for GermCommand {
     fn debug(&self) -> bool {
         self.io.debug
     }

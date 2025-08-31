@@ -7,8 +7,8 @@ pub trait KanpigCommand: std::fmt::Debug {
     fn run(&mut self);
 }
 
-pub mod genotype;
-use crate::commands::genotype::GTCommand;
+pub mod germ;
+use crate::commands::germ::GermCommand;
 
 pub mod plup;
 use crate::commands::plup::PlupCommand;
@@ -22,15 +22,15 @@ use crate::commands::mosaic::MosaicCommand;
 /// Set of commands
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
-    #[command(about = "Genotype SVs")]
-    Gt(GTCommand),
-
     #[command(about = "BAM/CRAM to Pileup Index")]
     Plup(PlupCommand),
 
-    #[command(about = "Trio Genotyping")]
+    #[command(about = "Germline SV Genotyping")]
+    Germ(GermCommand),
+
+    #[command(about = "Trio SV Genotyping")]
     Trio(TrioCommand),
 
-    #[command(about = "Mosaic Genotyping")]
+    #[command(about = "Mosaic SV Genotyping")]
     Mosaic(MosaicCommand),
 }

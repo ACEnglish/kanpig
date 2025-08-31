@@ -37,7 +37,7 @@ fn setup_logging(args: &impl KanpigCommand) {
 fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Gt(mut cmd) => {
+        Commands::Germ(mut cmd) => {
             setup_logging(&cmd);
             cmd.run()
         }
