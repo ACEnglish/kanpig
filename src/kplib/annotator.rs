@@ -25,6 +25,7 @@ type IntG = Vec<Option<i32>>;
 
 /// Struct representing genotype annotations.
 pub struct GenotypeAnno {
+    pub var_idx: NodeIndex,
     pub gt: String,
     pub filt: FiltFlags,
     pub sq: i32,
@@ -47,7 +48,7 @@ impl GenotypeAnno {
         sample_idx: usize, // For pulling the correct coverage from the PathScore.HaplotypeMeta
     ) -> Self {
         match ploidy {
-            Ploidy::Zero => zero(coverage),
+            Ploidy::Zero => zero(*var_idx, coverage),
             Ploidy::Haploid => haploid(var_idx, paths, coverage, neigh_group, sample_idx),
             _ => diploid(var_idx, paths, coverage, neigh_group, sample_idx),
         }
@@ -102,12 +103,13 @@ fn diploid(
         p => panic!("Unexpected number of paths for diploid region {:?}", p),
     };
 
-    finalize_annotation(handle, paths, coverage, neigh_group, sample_idx)
+    finalize_annotation(handle, paths, coverage, neigh_group, sample_idx, *var_idx)
 }
 
 /// Helper for zero ploidy regions.
-fn zero(coverage: u64) -> GenotypeAnno {
+fn zero(var_idx: NodeIndex, coverage: u64) -> GenotypeAnno {
     GenotypeAnno {
+        var_idx,
         gt: "./.".to_string(),
         filt: FiltFlags::PASS,
         sq: 0,
@@ -134,7 +136,7 @@ fn haploid(
             0 => (".", metrics::GTstate::Non, 0.0, true),
             _ => ("0", metrics::GTstate::Ref, 0.0, true),
         };
-        return finalize_annotation(handle, paths, coverage, neigh_group, sample_idx);
+        return finalize_annotation(handle, paths, coverage, neigh_group, sample_idx, *var_idx);
     }
 
     let path1 = &paths[0];
@@ -148,7 +150,7 @@ fn haploid(
         false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0, true),
         false => (".", metrics::GTstate::Non, 0.0, true),
     };
-    finalize_annotation(handle, paths, coverage, neigh_group, sample_idx)
+    finalize_annotation(handle, paths, coverage, neigh_group, sample_idx, *var_idx)
 }
 
 /// GT str, GTstate, alt_cov, is_fulltarget
@@ -226,6 +228,7 @@ fn finalize_annotation(
     coverage: u64,
     neigh_group: u64,
     sample_idx: usize,
+    var_idx: NodeIndex,
 ) -> GenotypeAnno {
     let (gt_str, gt_path, alt_cov, full_target) = handle;
     let ref_cov = coverage as f64 - alt_cov;
@@ -275,6 +278,7 @@ fn finalize_annotation(
     }
 
     GenotypeAnno {
+        var_idx,
         gt: gt_str.to_string(),
         filt,
         sq: sq.round() as i32,

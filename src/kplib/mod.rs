@@ -1,5 +1,5 @@
 mod annotator;
-pub use crate::kplib::annotator::GenotypeAnno;
+pub use crate::kplib::annotator::{GenotypeAnno, FiltFlags};
 
 mod bedparser;
 pub use crate::kplib::bedparser::BedParser;

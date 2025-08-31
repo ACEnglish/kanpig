@@ -13,6 +13,7 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
+        FiltFlags,
         build_region_tree, mosaic_genotyper,
         mosaic_genotyper::GenotypeHypothesis,
         open_reads, open_writer_thread,
@@ -21,8 +22,7 @@ use crate::{
         Variants, VcfChunker,
     },
 };
-/* HERE
- */
+
 fn separate_paths_by_vaf(
     paths: Vec<Vec<PathScore>>,
     gts: GenotypeHypothesis,
@@ -154,38 +154,32 @@ fn task_thread(
                     .filter(|p| *p != PathScore::default())
                     .collect();
 
-                // I have to work with the indices first
+                // Now, for each sample, separate the germline from the somatic
                 let separated_paths = polycluster::separate_paths_by_sample(paths, n_samples);
                 let (germline_paths, somatic_paths) =
                     separate_paths_by_vaf(separated_paths, gts.clone().unwrap().genotype);
-                /*let germ_anno_vars = m_graph.take_annotated(
-                    germline_paths.iter().map(|bin| bin.as_slice()).collect,
-                    pileup_data.coverages.to_vec(),
-                    vec![&ploidy; n_samples],
-                ;*/
-                // Now, for each sample, I need to separate the germline from the somatic
-                // And then I m_graph.take_annotated on the germline paths
-                // But then, for each Vec<RecordBuf, Vec<GenotypeAnno>, I need to
-                // potentially edit the GenotypeAnno to be mosaic if the record (idx) is in somatic
-                // paths.
-                // 1. What would I edit in GenotypeAnno
-                //      `anno.filt |= FiltFlags::SOMATIC`
-                //      `anno.ad[1]` increased by coverage?
-                // 2. How does take_annotated intersect the record to path.. need that logic
-                //      PathScore.path.contains(var_idx), which I believe var_idx will be
-                //      enumerate(variants), with maybe a +1 because of anchor Node
-                // 3. Remember you're making an infra::ChannelOutput to send back
-                let send_back = m_graph.take_annotated(
+
+                // And then m_graph.take_annotated on the germline paths
+                let mut send_back = m_graph.take_annotated(
                     germline_paths.iter().map(|bin| bin.as_slice()).collect(),
                     pileup_data.coverages.to_vec(),
                     vec![&ploidy; n_samples], // TODO: set this up for each
                 );
-                /*
-                 * Theres only one list of somatic_alleles. For each
-                for (idx, (record, annos)) in enumerate(send_back):
-                    for samp_index, (anno, sample) in enumerate(annos, somatic_paths):
-                        for each somatic_allele, if it
-                */
+
+                // Before updating the somatic in place
+                if let Some(ref mut send_back) = send_back {
+                    for (_record, annos) in send_back {
+                        for (sample_idx, (anno, sample_paths)) in annos.iter_mut().zip(&somatic_paths).enumerate() {
+                            for path in sample_paths {
+                                if path.path.contains(&anno.var_idx) {
+                                    anno.filt |= FiltFlags::SOMATIC;
+                                    // TODO: wrong for haploid regions?
+                                    *anno.ad[1].get_or_insert(0) += path.meta.coverage[sample_idx] as i32;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 m_result_sender.send(send_back).unwrap();
             }

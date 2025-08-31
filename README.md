@@ -58,6 +58,7 @@ Details of `FT`
 | 0x8    | The sample quality (SQ) is less than 5 (only present on non-ref variants) |
 | 0x16   | The number of reads supporting the alternate allele less than 5 (only present on non-ref variants) |
 | 0x32   | The best scoring path through the variant graph only used part of the haplotype. This may be indicative of a false-negative in the variant graph. |
+| 0x64   | The variant is somatic (mosaic mode only) |
 
 # 🔌 Compute Resources
 
