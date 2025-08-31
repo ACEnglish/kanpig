@@ -90,7 +90,7 @@ pub struct GenotypingResult {
    Uniform (no bias):
    alpha: 1.0, beta: 1.0   // Mean 50%, no preference
 */
-pub struct MultiAlleleGenotyper {
+pub struct MosaicGenotyper {
     pub error_rate: f64,
     pub somatic_vaf_prior_alpha: f64, // Beta prior parameters for somatic VAFs
     pub somatic_vaf_prior_beta: f64,
@@ -98,7 +98,7 @@ pub struct MultiAlleleGenotyper {
     pub min_depth_for_call: u32,
 }
 
-impl Default for MultiAlleleGenotyper {
+impl Default for MosaicGenotyper {
     fn default() -> Self {
         Self {
             error_rate: 0.001,            // don't know what these do
@@ -110,7 +110,7 @@ impl Default for MultiAlleleGenotyper {
     }
 }
 
-impl MultiAlleleGenotyper {
+impl MosaicGenotyper {
     pub fn new() -> Self {
         Self::default()
     }
@@ -388,12 +388,6 @@ impl MultiAlleleGenotyper {
     }
 }
 
-pub fn mosaic_genotyper(counts: &[u32]) -> Option<GenotypingResult> {
-    // TODO: Params to pass
-    let genotyper = MultiAlleleGenotyper::new();
-    genotyper.genotype(counts)
-}
-
 // Example usage and testing
 #[cfg(test)]
 mod tests {
@@ -401,7 +395,7 @@ mod tests {
 
     #[test]
     fn test_simple_heterozygous() {
-        let genotyper = MultiAlleleGenotyper::new();
+        let genotyper = MosaicGenotyper::new();
 
         // Simulate het with two alleles at ~50% each
         let counts = vec![45, 55, 2, 1]; // Two main alleles + noise
@@ -418,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_homozygous_with_somatic() {
-        let genotyper = MultiAlleleGenotyper::new();
+        let genotyper = MosaicGenotyper::new();
 
         // Simulate homozygous ref with somatic variants
         let counts = vec![90, 0, 8, 3]; // Dominant allele + somatic variants
@@ -433,7 +427,7 @@ mod tests {
 
     #[test]
     fn test_just_germline_het() {
-        let mut genotyper = MultiAlleleGenotyper::new();
+        let mut genotyper = MosaicGenotyper::new();
         genotyper.somatic_vaf_prior_beta = 0.15;
 
         let counts = vec![47, 22, 4]; // Het with a tiny bit of noise

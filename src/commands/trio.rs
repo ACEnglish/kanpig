@@ -97,7 +97,7 @@ fn task_thread(
                 // For zero, we don't have to waste time going into the bam
                 if ploidy == Ploidy::Zero {
                     m_result_sender
-                        .send(m_graph.take_annotated(vec![&[]], vec![0], vec![&ploidy]))
+                        .send(m_graph.take_annotated(vec![&[]], vec![0; 3], vec![&ploidy; 3]))
                         .unwrap();
                     continue;
                 }

@@ -13,8 +13,8 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, mosaic_genotyper,
-        mosaic_genotyper::GenotypeHypothesis,
+        build_region_tree,
+        mosaic_genotyper::{GenotypeHypothesis, MosaicGenotyper},
         open_reads, open_writer_thread,
         polycluster::{self, ToPolyCluParams},
         ChannelInput, ChannelOutput, FiltFlags, GraphParams, PathScore, Ploidy, PloidyRegions,
@@ -72,6 +72,13 @@ fn task_thread(
     // Then convert to mutable references when calling the function
 
     let pclu_params = m_args.to_polyclu_params();
+    let genotyper = MosaicGenotyper::with_params(
+        0.001, // This works fine enough, not worth it to tweak, probably
+        m_args.alpha,
+        m_args.beta,
+        m_args.soma_vaf,
+        m_args.mindp,
+    );
 
     loop {
         match m_receiver.recv() {
@@ -81,10 +88,13 @@ fn task_thread(
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam
-                // TODO: This doesn't work for multiple sample. Also broken in trio mode
                 if ploidy == Ploidy::Zero {
                     m_result_sender
-                        .send(m_graph.take_annotated(vec![&[]], vec![0], vec![&ploidy]))
+                        .send(m_graph.take_annotated(
+                            vec![&[]],
+                            vec![0; n_samples],
+                            vec![&ploidy; n_samples],
+                        ))
                         .unwrap();
                     continue;
                 }
@@ -117,7 +127,7 @@ fn task_thread(
                     .axis_iter(Axis(0)) // Iterate over cols
                     .map(|row| row.sum() as u32)
                     .collect();
-                let gts = mosaic_genotyper(&allele_support);
+                let gts = genotyper.genotype(&allele_support);
 
                 debug!("GTs; {:#?}", gts);
                 if gts.is_none() {
@@ -159,11 +169,10 @@ fn task_thread(
                     separate_paths_by_vaf(separated_paths, gts.clone().unwrap().genotype);
 
                 // And then m_graph.take_annotated on the germline paths
-                // TODO: not coverages, ref_coverage
                 let mut send_back = m_graph.take_annotated(
                     germline_paths.iter().map(|bin| bin.as_slice()).collect(),
                     pileup_data.coverages.to_vec(),
-                    vec![&ploidy; n_samples], // TODO: set this up for each
+                    vec![&ploidy; n_samples],
                 );
 
                 // Before updating the somatic in place
@@ -220,8 +229,24 @@ pub struct MosaicCommand {
     pub len_weight: f32,
 
     /// Minimum haplotype size difference for K estimation
-    #[arg(long, default_value_t = 5, help_heading = "Genotyping")]
+    #[arg(long, default_value_t = 2, help_heading = "Genotyping")]
     pub bandwidth: usize,
+
+    /// VAF prior alpha
+    #[arg(long, default_value_t = 1.0, help_heading = "Genotyping")]
+    pub alpha: f64,
+
+    /// VAF prior beta
+    #[arg(long, default_value_t = 15.0, help_heading = "Genotyping")]
+    pub beta: f64,
+
+    /// Max somatic VAF
+    #[arg(long, default_value_t = 0.20, help_heading = "Genotyping")]
+    pub soma_vaf: f64,
+
+    /// Minimum depth for call
+    #[arg(long, default_value_t = 1, help_heading = "Genotyping")]
+    pub mindp: u32,
 }
 
 impl ToPolyCluParams for MosaicCommand {
