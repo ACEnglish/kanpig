@@ -114,7 +114,7 @@ fn __genotype_quality<T>(posteriors: &[(T, f64)]) -> i32 {
     gq.round().min(100.0) as i32
 }
 
-/// Joint trio genotyping: returns best genotype tuple (child, father, mother)
+/// Joint trio genotyping: returns best genotypes (child, father, mother)
 pub fn trio_genotyper(read_counts: &Array2<usize>, qual: &[f64]) -> Vec<Vec<usize>> {
     let n_clusters = read_counts.nrows();
 

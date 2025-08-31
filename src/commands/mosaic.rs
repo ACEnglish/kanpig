@@ -184,7 +184,9 @@ fn task_thread(
                         {
                             for path in sample_paths {
                                 if path.path.contains(&anno.var_idx) {
-                                    anno.filt |= FiltFlags::SOMATIC;
+                                    if !anno.gt.contains("1") {
+                                        anno.filt |= FiltFlags::SOMATIC;
+                                    }
                                     // TODO: wrong for haploid regions?
                                     *anno.ad[1].get_or_insert(0) +=
                                         path.meta.coverage[sample_idx] as i32;
