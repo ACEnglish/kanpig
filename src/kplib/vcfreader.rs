@@ -1,4 +1,4 @@
-use crate::kplib::{ChannelOutput, GraphParams, KdpVcf, Regions};
+use crate::kplib::{vcftraits::KdpVcf, ChannelOutput, GraphParams, Regions};
 use crossbeam_channel::Sender;
 use noodles_vcf::{self as vcf, variant::RecordBuf};
 use std::io::BufRead;

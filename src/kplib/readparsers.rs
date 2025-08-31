@@ -1,5 +1,8 @@
 use crate::kplib::{
-    seq_to_kmer, GraphParams, Haplotype, HaplotypeMeta, PileupVariant, ReadPileup, Svtype,
+    pileup::{PileupVariant, ReadPileup},
+    seq_to_kmer,
+    vcftraits::Svtype,
+    GraphParams, Haplotype, HaplotypeMeta,
 };
 use indexmap::{IndexMap, IndexSet};
 use rust_htslib::faidx;

@@ -1,7 +1,7 @@
 use ndarray::{Array, Array2, Axis};
 use rand::SeedableRng;
 
-use crate::kplib::{hp_sorter, metrics, Haplotype, MeanShift, PathScore};
+use crate::kplib::{hp_sorter, meanshift::MeanShift, metrics, Haplotype, PathScore};
 
 // Put this trait on TrioCommand and Mosaic Command so we contain the copying
 pub trait ToPolyCluParams {

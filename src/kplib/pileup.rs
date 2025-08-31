@@ -1,5 +1,5 @@
 /// A pileup variant that's hashable / comparable
-use crate::kplib::Svtype;
+use crate::kplib::vcftraits::Svtype;
 use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::{
     fmt,

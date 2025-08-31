@@ -1,4 +1,4 @@
-use crate::kplib::{metrics, GraphParams, Haplotype, HaplotypeMeta, VarNode};
+use crate::kplib::{metrics, vargraph::VarNode, GraphParams, Haplotype, HaplotypeMeta};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::cmp::Ordering;
 

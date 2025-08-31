@@ -3,7 +3,7 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use std::{cmp::Ordering, collections::BinaryHeap};
 
-use crate::kplib::{GraphParams, Haplotype, PathScore, VarNode};
+use crate::kplib::{vargraph::VarNode, GraphParams, Haplotype, PathScore};
 
 #[derive(Clone, Eq)]
 pub struct PathNodeState {

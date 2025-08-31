@@ -13,8 +13,9 @@ use crate::{
     kplib::{
         build_region_tree, open_reads, open_writer_thread,
         polycluster::{self, ToPolyCluParams},
-        trio_genotyper, ChannelInput, ChannelOutput, GraphParams, Haplotype, PathScore, Ploidy,
-        PloidyRegions, ReadParser, Variants, VcfChunker,
+        trio_genotyper::trio_genotyper,
+        ChannelInput, ChannelOutput, GraphParams, Haplotype, PathScore, Ploidy, PloidyRegions,
+        ReadParser, Variants, VcfChunker,
     },
 };
 

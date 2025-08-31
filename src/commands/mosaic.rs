@@ -13,12 +13,13 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
+        annotator::FiltFlags,
         build_region_tree,
         mosaic_genotyper::{GenotypeHypothesis, MosaicGenotyper},
         open_reads, open_writer_thread,
         polycluster::{self, ToPolyCluParams},
-        ChannelInput, ChannelOutput, FiltFlags, GraphParams, PathScore, Ploidy, PloidyRegions,
-        ReadParser, Variants, VcfChunker,
+        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, ReadParser,
+        Variants, VcfChunker,
     },
 };
 

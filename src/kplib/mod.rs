@@ -1,5 +1,5 @@
-mod annotator;
-pub use crate::kplib::annotator::{FiltFlags, GenotypeAnno};
+pub mod annotator;
+pub use crate::kplib::annotator::GenotypeAnno;
 
 mod bedparser;
 pub use crate::kplib::bedparser::BedParser;
@@ -19,7 +19,6 @@ mod kmer;
 pub use crate::kplib::kmer::seq_to_kmer;
 
 pub mod meanshift;
-pub use crate::kplib::meanshift::{MeanShift, MeanShiftResult};
 
 pub mod metrics;
 
@@ -31,8 +30,7 @@ pub use crate::kplib::pathscore::PathScore;
 mod phasetags;
 pub use crate::kplib::phasetags::hp_sorter;
 
-mod pileup;
-pub use crate::kplib::pileup::{PileupVariant, ReadPileup};
+pub mod pileup;
 
 mod ploidy;
 pub use crate::kplib::ploidy::{Ploidy, PloidyRegions};
@@ -45,17 +43,14 @@ pub use crate::kplib::readparsers::{open_reads, PlupParser, ReadParser};
 mod regions;
 pub use crate::kplib::regions::{build_region_tree, Regions};
 
-mod traverse;
-pub use crate::kplib::traverse::brute_force_find_path;
+pub mod traverse;
 
-mod trio_genotyper;
-pub use crate::kplib::trio_genotyper::trio_genotyper;
+pub mod trio_genotyper;
 
-mod vargraph;
-pub use crate::kplib::vargraph::{VarNode, Variants};
+pub mod vargraph;
+pub use crate::kplib::vargraph::Variants;
 
-mod vcftraits;
-pub use crate::kplib::vcftraits::{KdpVcf, Svtype};
+pub mod vcftraits;
 
 mod vcfreader;
 pub use crate::kplib::vcfreader::VcfChunker;

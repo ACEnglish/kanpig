@@ -1,6 +1,6 @@
 use crate::kplib::{
-    brute_force_find_path, metrics::overlaps, traverse::get_one_to_one, ChannelOutput,
-    GenotypeAnno, GraphParams, Haplotype, KdpVcf, PathScore, Ploidy,
+    metrics::overlaps, traverse::brute_force_find_path, traverse::get_one_to_one,
+    vcftraits::KdpVcf, ChannelOutput, GenotypeAnno, GraphParams, Haplotype, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;

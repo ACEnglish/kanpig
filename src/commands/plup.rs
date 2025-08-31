@@ -1,4 +1,4 @@
-use crate::{commands::KanpigCommand, file_validators, kplib::ReadPileup};
+use crate::{commands::KanpigCommand, file_validators, kplib::pileup::ReadPileup};
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
