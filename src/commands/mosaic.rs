@@ -13,13 +13,12 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        FiltFlags,
         build_region_tree, mosaic_genotyper,
         mosaic_genotyper::GenotypeHypothesis,
         open_reads, open_writer_thread,
         polycluster::{self, ToPolyCluParams},
-        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, ReadParser,
-        Variants, VcfChunker,
+        ChannelInput, ChannelOutput, FiltFlags, GraphParams, PathScore, Ploidy, PloidyRegions,
+        ReadParser, Variants, VcfChunker,
     },
 };
 
@@ -160,6 +159,7 @@ fn task_thread(
                     separate_paths_by_vaf(separated_paths, gts.clone().unwrap().genotype);
 
                 // And then m_graph.take_annotated on the germline paths
+                // TODO: not coverages, ref_coverage
                 let mut send_back = m_graph.take_annotated(
                     germline_paths.iter().map(|bin| bin.as_slice()).collect(),
                     pileup_data.coverages.to_vec(),
@@ -169,12 +169,19 @@ fn task_thread(
                 // Before updating the somatic in place
                 if let Some(ref mut send_back) = send_back {
                     for (_record, annos) in send_back {
-                        for (sample_idx, (anno, sample_paths)) in annos.iter_mut().zip(&somatic_paths).enumerate() {
+                        for (sample_idx, (anno, sample_paths)) in
+                            annos.iter_mut().zip(&somatic_paths).enumerate()
+                        {
                             for path in sample_paths {
                                 if path.path.contains(&anno.var_idx) {
                                     anno.filt |= FiltFlags::SOMATIC;
                                     // TODO: wrong for haploid regions?
-                                    *anno.ad[1].get_or_insert(0) += path.meta.coverage[sample_idx] as i32;
+                                    *anno.ad[1].get_or_insert(0) +=
+                                        path.meta.coverage[sample_idx] as i32;
+                                    // Scary
+                                    *anno.ad[0].get_or_insert(0) = anno.ad[0]
+                                        .unwrap_or(0)
+                                        .saturating_sub(path.meta.coverage[sample_idx] as i32);
                                 }
                             }
                         }
