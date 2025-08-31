@@ -21,19 +21,14 @@ use crate::{
         Variants, VcfChunker,
     },
 };
-
+/* HERE
+ */
 fn separate_paths_by_vaf(
     paths: Vec<Vec<PathScore>>,
     gts: GenotypeHypothesis,
 ) -> (Vec<Vec<PathScore>>, Vec<Vec<PathScore>>) {
-    let mut germ = Vec::with_capacity(paths.len());
-    let mut soma = Vec::with_capacity(paths.len());
-
-    // Initialize empty vectors for each sample
-    for _ in 0..paths.len() {
-        germ.push(Vec::new());
-        soma.push(Vec::new());
-    }
+    let mut germ = vec![Vec::new(); paths.len()];
+    let mut soma = vec![Vec::new(); paths.len()];
 
     // Iterate through each sample's paths
     for (idx, sample_paths) in paths.into_iter().enumerate() {
@@ -160,7 +155,7 @@ fn task_thread(
                     .collect();
 
                 // I have to work with the indices first
-                let separated_paths = polycluster::separate_paths_by_sample(paths);
+                let separated_paths = polycluster::separate_paths_by_sample(paths, n_samples);
                 let (germline_paths, somatic_paths) =
                     separate_paths_by_vaf(separated_paths, gts.clone().unwrap().genotype);
                 /*let germ_anno_vars = m_graph.take_annotated(
@@ -180,13 +175,19 @@ fn task_thread(
                 //      PathScore.path.contains(var_idx), which I believe var_idx will be
                 //      enumerate(variants), with maybe a +1 because of anchor Node
                 // 3. Remember you're making an infra::ChannelOutput to send back
-                m_result_sender
-                    .send(m_graph.take_annotated(
-                        germline_paths.iter().map(|bin| bin.as_slice()).collect(),
-                        pileup_data.coverages.to_vec(),
-                        vec![&ploidy, &ploidy, &ploidy], // TODO: set this up for each
-                    ))
-                    .unwrap();
+                let send_back = m_graph.take_annotated(
+                    germline_paths.iter().map(|bin| bin.as_slice()).collect(),
+                    pileup_data.coverages.to_vec(),
+                    vec![&ploidy; n_samples], // TODO: set this up for each
+                );
+                /*
+                 * Theres only one list of somatic_alleles. For each
+                for (idx, (record, annos)) in enumerate(send_back):
+                    for samp_index, (anno, sample) in enumerate(annos, somatic_paths):
+                        for each somatic_allele, if it
+                */
+
+                m_result_sender.send(send_back).unwrap();
             }
         }
     }

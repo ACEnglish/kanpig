@@ -142,7 +142,7 @@ fn task_thread(
                     .filter(|p| *p != PathScore::default())
                     .collect();
 
-                let separated_paths = polycluster::separate_paths_by_sample(paths);
+                let separated_paths = polycluster::separate_paths_by_sample(paths, 3);
 
                 m_result_sender
                     .send(m_graph.take_annotated(

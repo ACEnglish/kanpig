@@ -258,12 +258,11 @@ pub fn collapse_haplotypes(
     clustered_haps
 }
 
-pub fn separate_paths_by_sample(paths: Vec<PathScore>) -> Vec<Vec<PathScore>> {
-    const NUM_SAMPLES: usize = 3;
-    let mut separated_paths: Vec<Vec<PathScore>> = vec![Vec::new(); NUM_SAMPLES];
+pub fn separate_paths_by_sample(paths: Vec<PathScore>, n_samples: usize) -> Vec<Vec<PathScore>> {
+    let mut separated_paths: Vec<Vec<PathScore>> = vec![Vec::new(); n_samples];
 
     for path in paths {
-        for (bit, s_paths) in separated_paths.iter_mut().enumerate().take(NUM_SAMPLES) {
+        for (bit, s_paths) in separated_paths.iter_mut().enumerate().take(n_samples) {
             if (path.meta.samples_flag & (1 << bit)) != 0 {
                 let mut p = path.clone();
                 p.meta.samples_flag = bit;
