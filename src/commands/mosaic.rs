@@ -9,7 +9,6 @@ use std::{
 };
 
 use crate::{
-    commands::trio::collect_pileup_data,
     commands::KanpigCommand,
     file_validators,
     kplib::{
@@ -17,6 +16,7 @@ use crate::{
         build_region_tree,
         mosaic_genotyper::{GenotypeHypothesis, MosaicGenotyper},
         open_reads, open_writer_thread,
+        pileup::collect_pileup_data,
         polycluster::{self, ToPolyCluParams},
         ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, ReadParser,
         Variants, VcfChunker,
@@ -187,7 +187,7 @@ fn task_thread(
                                     if !anno.gt.contains("1") {
                                         anno.filt |= FiltFlags::SOMATIC;
                                     }
-                                    // TODO: wrong for haploid regions?
+                                    // TODO: wrong for haploid regions
                                     *anno.ad[1].get_or_insert(0) +=
                                         path.meta.coverage[sample_idx] as i32;
                                     // Scary
@@ -389,6 +389,7 @@ impl KanpigCommand for MosaicCommand {
 
         let tree = build_region_tree(&m_contigs, &self.io.bed);
 
+        // TODO: start ploidy here.. probably easier to just move into threads?
         let ploidy = PloidyRegions::new(&self.io.ploidy_bed);
 
         // Create channels for communication between threads

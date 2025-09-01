@@ -1,5 +1,5 @@
 /// A pileup variant that's hashable / comparable
-use crate::kplib::vcftraits::Svtype;
+use crate::kplib::{vcftraits::Svtype, Haplotype, ReadParser, Variants};
 use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::{
     fmt,
@@ -397,5 +397,35 @@ impl std::fmt::Debug for PileupVariant {
             .field("sequence", &seq)
             // Exclude kfeat from the debug output
             .finish()
+    }
+}
+
+// Data structure to hold pileup information from multiple samples
+#[derive(Clone)]
+pub struct PileupData {
+    pub haplos: Vec<Haplotype>,
+    pub ref_coverage: Vec<usize>,
+    pub coverages: Vec<u64>,
+}
+
+// Collect pileup data from all samples
+pub fn collect_pileup_data(
+    samples: &mut Vec<Box<dyn ReadParser>>,
+    m_graph: &Variants,
+) -> PileupData {
+    let mut ref_coverage = Vec::<usize>::with_capacity(samples.len());
+    let mut coverages = Vec::<u64>::with_capacity(samples.len());
+    let mut haplos = Vec::<Haplotype>::new();
+    for samp in samples.iter_mut() {
+        let (haps, cov) = samp.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+        ref_coverage.push(cov as usize - haps.len());
+        coverages.push(cov);
+        haplos.extend(haps);
+    }
+
+    PileupData {
+        haplos,
+        ref_coverage,
+        coverages,
     }
 }

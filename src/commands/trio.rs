@@ -12,42 +12,13 @@ use crate::{
     file_validators,
     kplib::{
         build_region_tree, open_reads, open_writer_thread,
+        pileup::collect_pileup_data,
         polycluster::{self, ToPolyCluParams},
         trio_genotyper::trio_genotyper,
-        ChannelInput, ChannelOutput, GraphParams, Haplotype, PathScore, Ploidy, PloidyRegions,
-        ReadParser, Variants, VcfChunker,
+        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, Variants,
+        VcfChunker,
     },
 };
-
-// Data structure to hold pileup information
-#[derive(Clone)]
-pub struct PileupData {
-    pub haplos: Vec<Haplotype>,
-    pub ref_coverage: Vec<usize>,
-    pub coverages: Vec<u64>,
-}
-
-// Collect pileup data from all three samples
-pub fn collect_pileup_data(
-    samples: &mut Vec<Box<dyn ReadParser>>,
-    m_graph: &Variants,
-) -> PileupData {
-    let mut ref_coverage = Vec::<usize>::with_capacity(samples.len());
-    let mut coverages = Vec::<u64>::with_capacity(samples.len());
-    let mut haplos = Vec::<Haplotype>::new();
-    for samp in samples.iter_mut() {
-        let (haps, cov) = samp.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-        ref_coverage.push(cov as usize - haps.len());
-        coverages.push(cov);
-        haplos.extend(haps);
-    }
-
-    PileupData {
-        haplos,
-        ref_coverage,
-        coverages,
-    }
-}
 
 fn task_thread(
     m_args: TrioCommand,
