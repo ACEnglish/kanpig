@@ -70,8 +70,6 @@ fn task_thread(
         })
         .collect();
 
-    // Then convert to mutable references when calling the function
-
     let pclu_params = m_args.to_polyclu_params();
     let genotyper = MosaicGenotyper::with_params(
         0.001, // This works fine enough, not worth it to tweak, probably
@@ -131,22 +129,24 @@ fn task_thread(
                 let gts = genotyper.genotype(&allele_support);
 
                 debug!("GTs; {:#?}", gts);
-                if gts.is_none() {
-                    m_result_sender
-                        .send(m_graph.take_annotated(
-                            vec![&[]; n_samples],
-                            pileup_data.coverages.to_vec(),
-                            vec![&ploidy; n_samples],
-                        ))
-                        .unwrap();
-                    continue;
-                }
+                let gts = match gts {
+                    Some(g) => g,
+                    None => {
+                        m_result_sender
+                            .send(m_graph.take_annotated(
+                                vec![&[]; n_samples],
+                                pileup_data.coverages.to_vec(),
+                                vec![&ploidy; n_samples],
+                            ))
+                            .unwrap();
+                        continue;
+                    }
+                };
 
-                // Assuming gts is Some
                 let clustered_haps = polycluster::collapse_haplotypes(
                     cluster_result,
                     pileup_data.haplos,
-                    vec![gts.clone().unwrap().genotype.observed_alleles; n_samples],
+                    vec![gts.genotype.observed_alleles.clone(); n_samples],
                 );
 
                 debug!("Haps: {:#?}", clustered_haps);
@@ -156,7 +156,7 @@ fn task_thread(
                     && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
                 m_graph.build(should_build);
 
-                // I think I need to put an id on the haplotype/PathScore so we can still tie it
+                // An id is put on the pathscore.meta so we can still tie it
                 // back to the gt.genotype.observed_alleles
                 let paths: Vec<PathScore> = clustered_haps
                     .into_iter()
@@ -167,7 +167,7 @@ fn task_thread(
                 // Now, for each sample, separate the germline from the somatic
                 let separated_paths = polycluster::separate_paths_by_sample(paths, n_samples);
                 let (germline_paths, somatic_paths) =
-                    separate_paths_by_vaf(separated_paths, gts.clone().unwrap().genotype);
+                    separate_paths_by_vaf(separated_paths, gts.genotype);
 
                 // And then m_graph.take_annotated on the germline paths
                 let mut send_back = m_graph.take_annotated(
@@ -190,7 +190,10 @@ fn task_thread(
                                     // TODO: wrong for haploid regions
                                     *anno.ad[1].get_or_insert(0) +=
                                         path.meta.coverage[sample_idx] as i32;
-                                    // Scary
+                                    // Logic here is that the germline reference allele
+                                    // coverage is inflated during GenotypeAnno calculation
+                                    // so we're moving it to the alternate as part of the
+                                    // somatic support
                                     *anno.ad[0].get_or_insert(0) = anno.ad[0]
                                         .unwrap_or(0)
                                         .saturating_sub(path.meta.coverage[sample_idx] as i32);
