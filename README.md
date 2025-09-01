@@ -80,19 +80,10 @@ While genotyping against a plup file is usually faster, bam to plup conversion i
 
 # 🔧 Core Parameter Details
 
-The default parameters are tuned to work generally well for genotyping a single sample's VCF, meaning the variants are
-all expected to be present in the sample. For a multi-sample VCF (a.k.a. a project-level VCF), the optimal parameters
-are still being determined and will likely be dependent on things such as number of samples in the VCF, merging strategy 
-of the variants, and sequencing technology.
+The default parameters are tuned to work generally well for genotyping a single sample's VCF. For a multi-sample VCF (a.k.a.
+a project-level VCF), the optimal parameters will be dependent on things such as number of samples in the VCF and the merging
+strategy of the variants.
 
-### `--bed`
-A sorted bed file (`bedtools sort`) that restricts kanpig to only analyzing variants with starts and ends within a single bed entry.
-
-### `--ploidy-bed`
-This bed file informs kanpig of special regions within chromosomes that should have non-diploid genotypes. For example, a female
-human sample shouldn't have any genotypes on chrY. A male human sample should have hemizygous genotypes on chrY and the
-non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEnglish/kanpig/tree/develop/ploidy_beds) directory 
-has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
 ### `--neighdist`
 Kanpig will build local variant graphs from groups of variants in a 'neighborhood'. These neighborhoods are determined by making the maximum end position
@@ -150,9 +141,19 @@ with fewer nodes are preferred over paths with a consistent representation to th
 for multi-sample VCFs where consistency between variants' genotypes is more important than preserving the exact set of
 variants that best reflect those described by the alignments.
 
-# 🧬 Genotyping Mode
+# 🛏️ Bed Files
 
-These parameters have a varying effect on the results and are not guaranteed to be stable across releases. 
+### `--bed`
+A sorted bed file (`bedtools sort`) that restricts kanpig to only analyzing variants with starts and ends within a single bed entry.
+
+### `--ploidy-bed`
+This bed file informs kanpig of special regions within chromosomes that should have non-diploid genotypes. For example, a female
+human sample shouldn't have any genotypes on chrY. A male human sample should have hemizygous genotypes on chrY and the
+non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEnglish/kanpig/tree/develop/ploidy_beds) directory 
+has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
+
+
+# 🧬 Genotyping Mode
 
 ### `--hapsim`
 After performing kmedoid clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
@@ -171,28 +172,46 @@ from different HPs have a higher distance inside the matrix sent to kmedoid clus
 
 # 👪 Trio Mode
 
-A proband along with its mother and father can be joint genotyped simultaneously with `kanpig trio`. This command is
-currently in development and therefore should be used with caution. The goal of a separate module is to increase
-genotyping accuracy in the proband as well as consistently applying shared haplotypes to the same paths through the
-variant graph, thus decreasing mendelian errors and more precisely identifying de novo SVs. 
+A proband along with its mother and father can be joint genotyped simultaneously with `kanpig trio`.The goal of a 
+separate module is to increase genotyping accuracy in the proband as well as consistently applying shared haplotypes
+to the same paths through the variant graph, thus decreasing mendelian errors and more precisely identifying de novo SVs. 
 
-Instead of running kmedoid clustering on a set value of K, multiple are attempted (1 through 4) in order to find the
-optimal clustering of alternate haplotypes. In order to prevent spurious clusters, at least 3 reads must be present in
-all clusters for a K to be considered valid. Additionally, reads from a sample can only be found in up to two clusters.
-
-Missing features which should eventually be added include leveraging ploidy beds, `--hapsim` simplification, `--ab`
-enforcement.
+This mode works by running a MeanShift clustering on haplotype lengths to determine the value of K for Kmedoids clustering.
+After the haplotypes are clustered, the genotyper tests the liklihood of all possible inheritance patterns given each
+haplotype's coverage.
 
 ### `--msmin`
 When performing MeanShift clustering, the `min_bin_freq` controls the minimum number of reads to create a bin.
+
+### `--maxclust`
+The maximum number of clusters (i.e. highest K) allowed. This defaults to 5 to allow for the possibility of two parental
+haplotypes and one denovo variant in the proband.
 
 ### `--hps-weight` & `--len-weight`
 When building the distance matrix for kmedoid clustering, reads with different haplotagging HPs or in different
 MeanShift clusters will have the distance increased by `*= 1+weight`.
 
 ### `--lengthonly`
-Only cluster haplotypes based on lengths with MeanShift. This is ~3x faster, but comes at a cost to genotyping accuracy
-and mendelian consistency rate.
+(Experimental) Only cluster haplotypes based on lengths with MeanShift. This is ~3x faster, but comes at a cost to
+genotyping accuracy and mendelian consistency rate.
+
+# 🎨 Mosaic Mode
+
+Reads of samples from a single individual are pooled together and genotyped with the expectation that germline and
+somatic alleles are present. The germline variants will be genotyped as heterozygous or homozygous alt whereas the
+somatic variants will have the `FMT/FT` SOMATIC flag (0x64) populated. If multiple sets of input reads are provided
+(e.g. multiple tissues across a single individual), each sample will have an output `SAMPLE` column. However, all 
+reads are pooled together during the clustering and up to `--maxclust` allowed. 
+
+### `--bandwidth`
+When performing MeanShift clustering, length-based clusters must be at least `--bandwidth` base-pairs different in
+length.
+
+### `--alpha`, `--beta`, & `--soma-vaf`
+These parameters are for the modeling of somatic events. The defaults work well for benchmarking against the artificial
+HapMap Mix provided by the SMaHT network and their MIMS SV benchmark. In practical samples, with different VAF
+distributions of somatic events, these parameters may need to be tweaked. See XYZ for a detailed tutorial on how to
+these parameters impact the modeling.
 
 # 🐍 Python bindings
 Minimal python bindings are available for plup parsing. These can be installed via `maturin develop --features python`

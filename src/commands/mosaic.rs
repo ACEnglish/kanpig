@@ -76,7 +76,7 @@ fn task_thread(
         m_args.alpha,
         m_args.beta,
         m_args.soma_vaf,
-        m_args.mindp,
+        1,
     );
 
     loop {
@@ -249,10 +249,6 @@ pub struct MosaicCommand {
     /// Max somatic VAF
     #[arg(long, default_value_t = 0.20, help_heading = "Genotyping")]
     pub soma_vaf: f64,
-
-    /// Minimum depth for call
-    #[arg(long, default_value_t = 1, help_heading = "Genotyping")]
-    pub mindp: u32,
 }
 
 impl ToPolyCluParams for MosaicCommand {

@@ -255,7 +255,9 @@ impl MosaicGenotyper {
         let mut optimized_hypothesis = hypothesis.clone();
 
         // Simple optimization: try different VAF values for each somatic allele
-        let vaf_candidates: Vec<f64> = (1..=20).map(|i| (i as f64) * 0.01).collect(); // 0.01 to 0.20
+        let vaf_candidates: Vec<f64> = (1..=((self.max_somatic_vaf * 100.0).floor() as u32))
+            .map(|i| (i as f64) * 0.01)
+            .collect();
 
         // Get all somatic allele indices first to avoid borrowing issues
         let somatic_allele_indices: Vec<usize> = hypothesis.somatic_vafs.keys().copied().collect();
