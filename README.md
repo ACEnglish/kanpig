@@ -191,10 +191,6 @@ haplotypes and one denovo variant in the proband.
 When building the distance matrix for kmedoid clustering, reads with different haplotagging HPs or in different
 MeanShift clusters will have the distance increased by `*= 1+weight`.
 
-### `--lengthonly`
-(Experimental) Only cluster haplotypes based on lengths with MeanShift. This is ~3x faster, but comes at a cost to
-genotyping accuracy and mendelian consistency rate.
-
 # 🎨 Mosaic Mode
 
 Reads of samples from a single individual are pooled together and genotyped with the expectation that germline and

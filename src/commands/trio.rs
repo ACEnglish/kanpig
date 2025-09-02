@@ -151,7 +151,7 @@ pub struct TrioCommand {
     pub len_weight: f32,
 
     /// Only cluster on haplotype lengths
-    #[arg(long, default_value_t = false, help_heading = "Genotyping")]
+    #[arg(long, default_value_t = false, help_heading = "Genotyping", hide=true)]
     pub lengthonly: bool,
 }
 
