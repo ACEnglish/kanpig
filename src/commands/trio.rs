@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use noodles_vcf::{self as vcf};
 use std::{
@@ -24,7 +24,7 @@ fn task_thread(
     m_args: TrioCommand,
     m_receiver: Receiver<ChannelInput>,
     m_result_sender: Sender<ChannelOutput>,
-    m_ploidy: PloidyRegions,
+    m_ploidy: Vec<PloidyRegions>,
 ) {
     let pro_reads = open_reads(
         m_args.io.proband.clone(),
@@ -65,14 +65,11 @@ fn task_thread(
             Ok(Some(chunk)) => {
                 let mut m_graph = Variants::new(chunk, m_args.graph.kmer);
 
-                let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
-                // For zero, we don't have to waste time going into the bam
-                if ploidy == Ploidy::Zero {
-                    m_result_sender
-                        .send(m_graph.take_annotated(vec![&[]], vec![0; 3], vec![&ploidy; 3]))
-                        .unwrap();
-                    continue;
-                }
+                let ploidy_owned: Vec<Ploidy> = m_ploidy
+                    .iter()
+                    .map(|p| p.get_ploidy(&m_graph.chrom, m_graph.start))
+                    .collect();
+                let ploidy: Vec<&Ploidy> = ploidy_owned.iter().collect();
 
                 let pileup_data = collect_pileup_data(&mut reads, &m_graph);
 
@@ -81,7 +78,7 @@ fn task_thread(
                         .send(m_graph.take_annotated(
                             vec![&[], &[], &[]],
                             pileup_data.coverages.to_vec(),
-                            vec![&ploidy, &ploidy, &ploidy],
+                            ploidy,
                         ))
                         .unwrap();
                     continue;
@@ -120,7 +117,7 @@ fn task_thread(
                     .send(m_graph.take_annotated(
                         separated_paths.iter().map(|bin| bin.as_slice()).collect(),
                         pileup_data.coverages.to_vec(),
-                        vec![&ploidy, &ploidy, &ploidy], // TODO: set this up for each
+                        ploidy,
                     ))
                     .unwrap();
             }
@@ -172,6 +169,13 @@ impl ToPolyCluParams for TrioCommand {
     }
 }
 
+#[derive(Copy, Clone, Debug, ValueEnum)]
+pub enum Karyotype {
+    XX,
+    XY,
+}
+
+#[allow(non_snake_case)]
 #[derive(clap::Args, Clone, Debug)]
 pub struct IOParams {
     /// VCF to genotype
@@ -214,12 +218,17 @@ pub struct IOParams {
     #[arg(long, default_value = "MAT", help_heading = "I/O")]
     pub mother_sample: String,
 
-    // TODO: XYploidy_bed
-    // XXploidy_bed
-    // proband_karyotype XY or XX, which will then just point to whatever ploidy bed
-    /// Bed file of non-diploid regions
+    /// Bed file of XY karyotype
     #[arg(long, help_heading = "I/O")]
-    pub ploidy_bed: Option<PathBuf>,
+    pub XYploidy_bed: Option<PathBuf>,
+
+    /// Bed file of XX karyotype
+    #[arg(long, help_heading = "I/O")]
+    pub XXploidy_bed: Option<PathBuf>,
+
+    /// Proband karyotype
+    #[arg(long, help_heading = "I/O")]
+    pub karyotype: Karyotype,
 
     /// Regions to analyze
     #[arg(long, help_heading = "I/O")]
@@ -310,7 +319,12 @@ impl KanpigCommand for TrioCommand {
 
         let tree = build_region_tree(&m_contigs, &self.io.bed);
 
-        let ploidy = PloidyRegions::new(&self.io.ploidy_bed);
+        let xy_ploidy = PloidyRegions::new(&self.io.XYploidy_bed);
+        let xx_ploidy = PloidyRegions::new(&self.io.XXploidy_bed);
+        let pro_ploidy = match self.io.karyotype {
+            Karyotype::XY => xy_ploidy.clone(),
+            Karyotype::XX => xx_ploidy.clone(),
+        };
 
         // Create channels for communication between threads
         let (task_sender, task_receiver): (Sender<ChannelInput>, Receiver<ChannelInput>) =
@@ -324,10 +338,17 @@ impl KanpigCommand for TrioCommand {
                 let m_args = self.clone();
                 let m_receiver = task_receiver.clone();
                 let m_result_sender = result_sender.clone();
-                let m_ploidy = ploidy.clone();
+                let m_pro_ploidy = pro_ploidy.clone();
+                let m_xy_ploidy = xy_ploidy.clone();
+                let m_xx_ploidy = xx_ploidy.clone();
 
                 thread::spawn(move || {
-                    task_thread(m_args, m_receiver, m_result_sender, m_ploidy);
+                    task_thread(
+                        m_args,
+                        m_receiver,
+                        m_result_sender,
+                        vec![m_pro_ploidy, m_xy_ploidy, m_xx_ploidy],
+                    );
                 })
             })
             .collect();
