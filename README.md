@@ -153,7 +153,9 @@ non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEng
 has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
 
-# 🧬 Genotyping Mode
+# 🧬 Germline Mode
+
+Published usage for single sample SV Genotyping.
 
 ### `--hapsim`
 After performing kmedoid clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
@@ -172,7 +174,7 @@ from different HPs have a higher distance inside the matrix sent to kmedoid clus
 
 # 👪 Trio Mode
 
-A proband along with its mother and father can be joint genotyped simultaneously with `kanpig trio`.The goal of a 
+A proband along with their mother and father can be joint genotyped simultaneously with `kanpig trio`.The goal of a 
 separate module is to increase genotyping accuracy in the proband as well as consistently applying shared haplotypes
 to the same paths through the variant graph, thus decreasing mendelian errors and more precisely identifying de novo SVs. 
 
