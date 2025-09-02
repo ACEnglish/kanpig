@@ -175,7 +175,6 @@ pub enum Karyotype {
     XY,
 }
 
-#[allow(non_snake_case)]
 #[derive(clap::Args, Clone, Debug)]
 pub struct IOParams {
     /// VCF to genotype
@@ -219,12 +218,12 @@ pub struct IOParams {
     pub mother_sample: String,
 
     /// Bed file of XY karyotype
-    #[arg(long, help_heading = "I/O")]
-    pub XYploidy_bed: Option<PathBuf>,
+    #[arg(long = "XYploidy-bed", help_heading = "I/O")]
+    pub xyploidy_bed: Option<PathBuf>,
 
     /// Bed file of XX karyotype
-    #[arg(long, help_heading = "I/O")]
-    pub XXploidy_bed: Option<PathBuf>,
+    #[arg(long = "XXploidy-bed", help_heading = "I/O")]
+    pub xxploidy_bed: Option<PathBuf>,
 
     /// Proband karyotype
     #[arg(long, help_heading = "I/O")]
@@ -319,8 +318,8 @@ impl KanpigCommand for TrioCommand {
 
         let tree = build_region_tree(&m_contigs, &self.io.bed);
 
-        let xy_ploidy = PloidyRegions::new(&self.io.XYploidy_bed);
-        let xx_ploidy = PloidyRegions::new(&self.io.XXploidy_bed);
+        let xy_ploidy = PloidyRegions::new(&self.io.xyploidy_bed);
+        let xx_ploidy = PloidyRegions::new(&self.io.xxploidy_bed);
         let pro_ploidy = match self.io.karyotype {
             Karyotype::XY => xy_ploidy.clone(),
             Karyotype::XX => xx_ploidy.clone(),
