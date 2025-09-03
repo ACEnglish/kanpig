@@ -347,7 +347,7 @@ impl KanpigCommand for TrioCommand {
         let pro_ploidy = match self.io.karyotype {
             Some(Karyotype::XY) => xy_ploidy.clone(),
             Some(Karyotype::XX) => xx_ploidy.clone(),
-            _ => xx_ploidy.clone(), // Assuming, but there's a path here
+            _ => PloidyRegions::new(&None),
         };
 
         // Create channels for communication between threads

@@ -291,9 +291,6 @@ pub struct IOParams {
     #[arg(long, default_value = "SAMPLE", help_heading = "I/O", action = ArgAction::Append)]
     pub sample: Vec<String>,
 
-    // TODO: XYploidy_bed
-    // XXploidy_bed
-    // proband_karyotype XY or XX, which will then just point to whatever ploidy bed
     /// Bed file of non-diploid regions
     #[arg(long, help_heading = "I/O")]
     pub ploidy_bed: Option<PathBuf>,
@@ -321,8 +318,6 @@ impl KanpigCommand for MosaicCommand {
             is_ok &= file_validators::validate_reads(i, &self.graph);
         }
 
-        // TODO: one sample per bam. If no samples, just name them S1,S2 etc
-        // If any, must provide all
         is_ok &= file_validators::validate_reference(&self.io.reference);
 
         if let Some(bed_file) = &self.io.bed {
@@ -382,13 +377,27 @@ impl KanpigCommand for MosaicCommand {
 
         let input_header = input_vcf.read_header().expect("Unable to parse vcf header");
 
-        info!("Setting samples to {:?}", self.io.sample);
+        // Validate --reads / --samples
+        if self.io.sample.len() != self.io.reads.len() {
+            if self.io.sample.is_empty() {
+                self.io.sample = (0..self.io.reads.len())
+                    .map(|i| format!("SAMPLE{}", i))
+                    .collect();
+                info!("Setting samples to {}", self.io.sample.join(", "));
+            } else {
+                error!(
+                    "Expected one --sample for each --read, got {} and {}",
+                    self.io.sample.len(),
+                    self.io.reads.len()
+                );
+                std::process::exit(1);
+            }
+        }
 
         let m_contigs = input_header.contigs().clone();
 
         let tree = build_region_tree(&m_contigs, &self.io.bed);
 
-        // TODO: start ploidy here.. probably easier to just move into threads?
         let ploidy = PloidyRegions::new(&self.io.ploidy_bed);
 
         // Create channels for communication between threads
