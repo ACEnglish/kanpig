@@ -151,7 +151,12 @@ pub struct TrioCommand {
     pub len_weight: f32,
 
     /// Only cluster on haplotype lengths
-    #[arg(long, default_value_t = false, help_heading = "Genotyping", hide=true)]
+    #[arg(
+        long,
+        default_value_t = false,
+        help_heading = "Genotyping",
+        hide = true
+    )]
     pub lengthonly: bool,
 }
 
@@ -170,6 +175,7 @@ impl ToPolyCluParams for TrioCommand {
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
+#[clap(rename_all = "UPPER")]
 pub enum Karyotype {
     XX,
     XY,
@@ -227,7 +233,7 @@ pub struct IOParams {
 
     /// Proband karyotype
     #[arg(long, help_heading = "I/O")]
-    pub karyotype: Karyotype,
+    pub karyotype: Option<Karyotype>,
 
     /// Regions to analyze
     #[arg(long, help_heading = "I/O")]
@@ -255,6 +261,24 @@ impl KanpigCommand for TrioCommand {
         if let Some(bed_file) = &self.io.bed {
             is_ok &= file_validators::validate_file(bed_file, "--bed");
         }
+
+        is_ok &= match (
+            &self.io.xxploidy_bed,
+            &self.io.xyploidy_bed,
+            &self.io.karyotype,
+        ) {
+            (Some(b1), Some(b2), Some(_k)) => {
+                file_validators::validate_file(b1, "--XXploidy-bed")
+                    && file_validators::validate_file(b2, "--XYploidy-bed")
+            }
+            (None, None, None) => true,
+            _ => {
+                warn!(
+                    "--karyotype, --XXploidy-bed, and --XYploidy-bed must all or none be specified"
+                );
+                false
+            }
+        };
 
         if self.graph.sizemin < 10 {
             warn!("--sizemin is recommended to be at least 10");
@@ -321,8 +345,9 @@ impl KanpigCommand for TrioCommand {
         let xy_ploidy = PloidyRegions::new(&self.io.xyploidy_bed);
         let xx_ploidy = PloidyRegions::new(&self.io.xxploidy_bed);
         let pro_ploidy = match self.io.karyotype {
-            Karyotype::XY => xy_ploidy.clone(),
-            Karyotype::XX => xx_ploidy.clone(),
+            Some(Karyotype::XY) => xy_ploidy.clone(),
+            Some(Karyotype::XX) => xx_ploidy.clone(),
+            _ => xx_ploidy.clone(), // Assuming, but there's a path here
         };
 
         // Create channels for communication between threads
