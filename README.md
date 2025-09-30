@@ -18,7 +18,7 @@ cargo build --release
 
 # 🚀 Quick Start
 ```
-kanpig gt --input variant.vcf.gz --reads alignments.bam --reference ref.fa --out output.vcf
+kanpig germ --input variant.vcf.gz --reads alignments.bam --reference ref.fa --out output.vcf
 ```
 See `kanpig -h` for all available parameters, most of which are detailed below.
 
@@ -29,6 +29,8 @@ for long-term projects or multiple reanalysis operations like N+1 for a cohort.
 kanpig plup --bam alignments.bam | bedtools sort -header | bgzip > alignments.plup.gz
 tabix -p bed alignments.plup.gz
 ```
+
+Other available genotyping modes are `kanpig trio` and `kanpig somatic`.
 
 # ⚠️ Current Limitations
 * Kanpig expects sequence resolved SVs. Variants with symbolic alts (e.g. `<DEL>`) and BNDs are not parsed.
