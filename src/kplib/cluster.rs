@@ -49,7 +49,7 @@ pub fn diploid_haplotypes(
     ab: f32,
     params: &GraphParams,
 ) -> Vec<Haplotype> {
-    if coverage == 0 || haplos.is_empty() {
+    if coverage == 0 || haplos.len() < params.mincoverage || haplos.len() > params.maxcoverage {
         return vec![];
     };
 

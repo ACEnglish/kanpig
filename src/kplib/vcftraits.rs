@@ -52,7 +52,7 @@ impl KdpVcf for RecordBuf {
         let m_ret: Vec<_> = m_alt
             .iter()
             .zip(m_ref.iter())
-            .map(|(&x, &y)| (x - y))
+            .map(|(&x, &y)| x - y)
             .collect();
 
         (m_ret, size)

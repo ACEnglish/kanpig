@@ -73,7 +73,8 @@ fn task_thread(
 
                 let pileup_data = collect_pileup_data(&mut reads, &m_graph);
 
-                if pileup_data.haplos.len() <= 1 {
+                let n_haps = pileup_data.haplos.len();
+                if n_haps < m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
                     m_result_sender
                         .send(m_graph.take_annotated(
                             vec![&[], &[], &[]],
