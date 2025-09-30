@@ -74,6 +74,14 @@ pub struct GraphParams {
     /// Restrict to 1-to-1 haplotype/node matching
     #[arg(long, default_value_t = false, help_heading = "Graph")]
     pub one_to_one: bool,
+
+    /// Minimum coverage to attempt building haplotypes
+    #[arg(long, default_value_t = 1, help_heading = "Graph")]
+    pub mincoverage: usize,
+
+    /// Maximum coverage to attempt building haplotypes
+    #[arg(long, default_value_t = 1000, help_heading = "Graph")]
+    pub maxcoverage: usize,
 }
 
 impl Default for GraphParams {
@@ -97,6 +105,8 @@ impl Default for GraphParams {
             fnmax: 3,
             squish: false,
             one_to_one: false,
+            mincoverage: 1,
+            maxcoverage: 1000,
         }
     }
 }

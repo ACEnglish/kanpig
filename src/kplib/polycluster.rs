@@ -135,7 +135,7 @@ pub fn perform_clustering(
 
     // TODO: Experimental: try to make at most 2 like the regular GT does
     let k = ms_result.cluster_centers.len();
-    let (mut medoids, k) = if k == 1 {
+    let (mut medoids, k) = if k == 1 && k >= haplos.len() {
         // Single center, we can't trust the medoids?
         let medoids = kmedoids::random_initialization(
             haplos.len(),
