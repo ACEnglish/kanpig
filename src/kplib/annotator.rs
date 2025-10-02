@@ -118,8 +118,8 @@ fn haploid(
 ) -> GenotypeAnno {
     if paths.is_empty() {
         let handle = match coverage {
-            0 => (".", metrics::GTstate::Non, 0.0, true),
-            _ => ("0", metrics::GTstate::Ref, 0.0, true),
+            0 => (".", metrics::GTstate::Non, 0, true),
+            _ => ("0", metrics::GTstate::Ref, 0, true),
         };
         return finalize_annotation(entry, handle, paths, coverage, neigh_group);
     }
@@ -129,23 +129,23 @@ fn haploid(
         true => (
             "1",
             metrics::GTstate::Hom,
-            path1.coverage.unwrap_or(0) as f64,
+            path1.coverage.unwrap_or(0),
             true,
         ),
-        false if coverage != 0 => ("0", metrics::GTstate::Ref, 0.0, true),
-        false => (".", metrics::GTstate::Non, 0.0, true),
+        false if coverage != 0 => ("0", metrics::GTstate::Ref, 0, true),
+        false => (".", metrics::GTstate::Non, 0, true),
     };
     finalize_annotation(entry, handle, paths, coverage, neigh_group)
 }
 
 /// GT str, GTstate, alt_cov, is_fulltarget
-type HandleReturn<'a> = (&'a str, metrics::GTstate, f64, bool);
+type HandleReturn<'a> = (&'a str, metrics::GTstate, u64, bool);
 
 fn handle_diploid_no_paths<'a>(coverage: u64) -> HandleReturn<'a> {
     if coverage != 0 {
-        ("0|0", metrics::GTstate::Ref, 0.0, true)
+        ("0|0", metrics::GTstate::Ref, 0, true)
     } else {
-        ("./.", metrics::GTstate::Non, 0.0, true)
+        ("./.", metrics::GTstate::Non, 0, true)
     }
 }
 
@@ -155,10 +155,10 @@ fn handle_diploid_single_path<'a>(
     coverage: u64,
 ) -> HandleReturn<'a> {
     if !path.path.contains(var_idx) {
-        ("0|0", metrics::GTstate::Ref, 0.0, true)
+        ("0|0", metrics::GTstate::Ref, 0, true)
     } else {
-        let alt_cov = path.coverage.unwrap() as f64;
-        let ref_cov = (coverage as f64) - alt_cov;
+        let alt_cov = path.coverage.unwrap();
+        let ref_cov = coverage - alt_cov;
         let (genotype, state) = match metrics::genotyper(ref_cov, alt_cov) {
             metrics::GTstate::Ref | metrics::GTstate::Het => {
                 let gt = match path.hp {
@@ -185,23 +185,23 @@ fn handle_diploid_two_paths<'a>(
         (true, true) => (
             "1|1",
             metrics::GTstate::Hom,
-            (path1.coverage.unwrap() + path2.coverage.unwrap()) as f64,
+            (path1.coverage.unwrap() + path2.coverage.unwrap()),
             path1.full_target || path2.full_target,
         ),
         (true, false) => (
             "1|0",
             metrics::GTstate::Het,
-            path1.coverage.unwrap() as f64,
+            path1.coverage.unwrap(),
             path1.full_target,
         ),
         (false, true) => (
             "0|1",
             metrics::GTstate::Het,
-            path2.coverage.unwrap() as f64,
+            path2.coverage.unwrap(),
             path2.full_target,
         ),
-        (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0.0, true),
-        (false, false) => ("./.", metrics::GTstate::Non, 0.0, true),
+        (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0, true),
+        (false, false) => ("./.", metrics::GTstate::Non, 0, true),
     }
 }
 
@@ -213,7 +213,7 @@ fn finalize_annotation(
     neigh_group: u64,
 ) -> GenotypeAnno {
     let (gt_str, gt_path, alt_cov, full_target) = handle;
-    let ref_cov = coverage as f64 - alt_cov;
+    let ref_cov = coverage - alt_cov;
 
     let gt_obs = metrics::genotyper(ref_cov, alt_cov);
 
@@ -246,7 +246,7 @@ fn finalize_annotation(
         if sq < 5.0 {
             filt |= FiltFlags::LOWSQ;
         }
-        if alt_cov < 5.0 {
+        if alt_cov < 5 {
             filt |= FiltFlags::LOWALT;
         }
     }

@@ -1,4 +1,5 @@
 use ordered_float::OrderedFloat;
+use rv::prelude::*;
 
 /// Computes the Canberra distance similarity between two featurized k-mer vectors.
 /// The similarity is calculated as 1 minus the Canberra distance, providing a measure of similarity between 0 and 1.
@@ -87,16 +88,16 @@ pub enum GTstate {
 /// If both coverage values are zero, the state is `Non`.
 ///
 /// # Parameters
-/// - `alt1_cov`: The coverage value for the first alternate allele as a floating-point number.
-/// - `alt2_cov`: The coverage value for the second alternate allele as a floating-point number.
+/// - `alt1_cov`: The coverage value for the first alternate allele.
+/// - `alt2_cov`: The coverage value for the second alternate allele.
 ///
 /// # Returns
 /// A `GTstate` enum value representing the genotype state
 ///
 /// # Panics
 /// This function will panic if an invalid state is encountered, which should be impossible under normal circumstances.
-pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
-    if (alt1_cov + alt2_cov) == 0.0 {
+pub fn genotyper(alt1_cov: u64, alt2_cov: u64) -> GTstate {
+    if (alt1_cov + alt2_cov) == 0 {
         return GTstate::Non;
     }
     let ret = match genotype_scores(alt1_cov, alt2_cov)
@@ -119,30 +120,64 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
 /// The scores are adjusted based on the total coverage to account for lower coverage scenarios.
 ///
 /// # Parameters
-/// - `alt1_cov`: The coverage value for the first alternate allele as a floating-point number.
-/// - `alt2_cov`: The coverage value for the second alternate allele as a floating-point number.
+/// - `alt1_cov`: The coverage value for the first alternate allele.
+/// - `alt2_cov`: The coverage value for the second alternate allele.
 ///
 /// # Returns
 /// An array of three floating-point values representing the log-probabilities for each genotype:
 /// - The first value corresponds to the reference genotype.
 /// - The second value corresponds to the heterozygous genotype.
 /// - The third value corresponds to the homozygous genotype.
-fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
-    // Needs to be more pure for lower coverage
-    let p_alt: &[f64] = if alt1_cov + alt2_cov < 10.0 {
-        &[1e-3, 0.55, 0.95]
+fn genotype_scores(alt1_cov: u64, alt2_cov: u64) -> [f64; 3] {
+//    RE-IMPL OF OLD BINOMIAL MODEL, TIES OUT WITH ORIGINAL KANPIG IMPL
+//
+//    let frac: &[f64] = &[1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0];
+//
+//    // Needs to be more pure for lower coverage
+//    let p_alt: &[f64] = if alt1_cov + alt2_cov < 10 {
+//        &[1e-3, 0.55, 0.95]
+//    } else {
+//        &[1e-3, 0.50, 0.90]
+//    };
+//
+//    let total = alt1_cov + alt2_cov;
+//    if total == 0 {
+//        [1.0, 1.0, 1.0]
+//    } else {
+//        let binom_homref = Binomial::new(total, p_alt[0]).unwrap();
+//        let binom_het = Binomial::new(total, p_alt[1]).unwrap();
+//        let binom_homalt = Binomial::new(total, p_alt[2]).unwrap();
+//
+//        [
+//            frac[0].ln() + binom_homref.ln_pmf(&alt2_cov),
+//            frac[1].ln() + binom_het.ln_pmf(&alt2_cov),
+//            frac[2].ln() + binom_homalt.ln_pmf(&alt2_cov)
+//        ]
+//    }
+
+    // IMPL OF BETA-BINOMIAL MODEL, TIES OUT WITH PYRO BETA-BINOMIAL IMPL WHEN HYPERPARAMETERS ARE SET CLOSE TO PYRO-FIT VALUES
+    // TODO expose these as CLI parameters
+    // for now, roughly set to typical values seen in HPRC samples fit with pyro implementation
+    let frac: &[f64] = &[0.2, 0.6, 0.2];     // mixture weights
+    let mu: &[f64] = &[0.005, 0.49, 0.99];   // beta-binomial means
+    let nu: &[f64] = &[5.0, 50.0, 5.0];      // beta-binomial precisions
+    let alpha: Vec<f64> = mu.iter().zip(nu.iter()).map(|(m, n)| m * n).collect();
+    let beta: Vec<f64> = mu.iter().zip(nu.iter()).map(|(m, n)| (1.0 - m) * n).collect();
+
+    let total = (alt1_cov + alt2_cov) as u32;
+    if total == 0 {
+        [1.0, 1.0, 1.0]     // keep flat prior for missing GT to keep previous GQ < 5 threshold for LOWGQ filter
     } else {
-        &[1e-3, 0.50, 0.90]
-    };
+        let beta_binom_homref = BetaBinomial::new(total, alpha[0], beta[0]).unwrap();
+        let beta_binom_het = BetaBinomial::new(total, alpha[1], beta[1]).unwrap();
+        let beta_binom_homalt = BetaBinomial::new(total, alpha[2], beta[2]).unwrap();
 
-    let total = alt1_cov + alt2_cov;
-    let log_combo = log_choose(total, alt2_cov);
-
-    [
-        log_combo + alt2_cov * p_alt[0].log10() + alt1_cov * (1.0 - p_alt[0]).log10(),
-        log_combo + alt2_cov * p_alt[1].log10() + alt1_cov * (1.0 - p_alt[1]).log10(),
-        log_combo + alt2_cov * p_alt[2].log10() + alt1_cov * (1.0 - p_alt[2]).log10(),
-    ]
+        [
+            frac[0].ln() + beta_binom_homref.ln_pmf(&alt2_cov),
+            frac[1].ln() + beta_binom_het.ln_pmf(&alt2_cov),
+            frac[2].ln() + beta_binom_homalt.ln_pmf(&alt2_cov)
+        ]
+    }
 }
 
 /// Calculates genotype quality (GQ) and sample quality (SQ) based on the coverage values for reference and alternate alleles.
@@ -155,8 +190,9 @@ fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
 /// A tuple containing two floating-point values:
 /// - The first value is the genotype quality (GQ).
 /// - The second value is the sample quality (SQ).
-pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
+pub fn genotype_quals(ref_cov: u64, alt_cov: u64) -> (f64, f64) {
     let mut gt_lplist = genotype_scores(ref_cov, alt_cov);
+    gt_lplist.iter_mut().for_each(|gt_lp| *gt_lp /= 10.0_f64.ln());
 
     let mut gt_sum = 0.0;
     for gt in &gt_lplist {
@@ -171,52 +207,4 @@ pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
     let gq = f64::min(-10.0 * (second_best - best), 100.0);
 
     (gq, sq)
-}
-
-/// Helper function for genotype_scores
-const FACTORIAL_LIMIT: usize = 100;
-lazy_static::lazy_static! {
-    static ref LOG_FACTORIALS: Vec<f64> = {
-        let mut log_factorials = vec![0.0; FACTORIAL_LIMIT + 1];
-        let mut log_n_fact = 0.0;
-        for (n, item) in log_factorials.iter_mut().enumerate().take(FACTORIAL_LIMIT + 1).skip(1) {
-            log_n_fact += (n as f64).ln();
-            *item = log_n_fact;
-        }
-        log_factorials
-    };
-}
-
-fn log_choose(n: f64, k: f64) -> f64 {
-    if n.is_infinite() || k.is_infinite() || n.is_nan() || k.is_nan() {
-        return f64::NAN;
-    }
-
-    if k > n || k < 0.0 {
-        return 0.0;
-    }
-
-    /*if k * 2.0 > n {
-        k = n - k;
-    }*/
-
-    if n <= FACTORIAL_LIMIT as f64 {
-        return LOG_FACTORIALS[n as usize]
-            - LOG_FACTORIALS[k as usize]
-            - LOG_FACTORIALS[(n - k) as usize];
-    }
-
-    let mut r = 0.0;
-    let mut n = n;
-    let mut k = k;
-    if k * 2.0 > n {
-        k = n - k;
-    }
-    for d in 1..((k + 1.0) as i32) {
-        r += n.log10();
-        r -= d as f64;
-        n -= 1.0;
-    }
-
-    r
 }
