@@ -315,6 +315,10 @@ impl KanpigCommand for MosaicCommand {
 
         // Per-Bam
         is_ok &= file_validators::validate_file(&self.io.input, "--input");
+        if self.io.reads.is_empty() {
+            warn!("No `--reads` provided");
+            is_ok = false;
+        }
         for i in self.io.reads.iter() {
             is_ok &= file_validators::validate_reads(i, &self.graph);
         }

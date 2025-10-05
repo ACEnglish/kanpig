@@ -18,6 +18,20 @@ use std::{
 type InputType = Option<(String, u64, u64)>;
 type OutputType = Option<Vec<ReadPileup>>;
 
+/// Open an optionally remote bam file
+fn open_bam(bam_path: &PathBuf) -> Result<IndexedReader, Box<dyn std::error::Error>> {
+    let path_str = bam_path.to_str().ok_or("Invalid UTF-8 in path")?;
+
+    let reader = if path_str.contains("://") {
+        let url = url::Url::parse(path_str)?;
+        IndexedReader::from_url(&url)?
+    } else {
+        IndexedReader::from_path(bam_path)?
+    };
+
+    Ok(reader)
+}
+
 /// Processes a specified region in a BAM file, filtering reads based on user-defined parameters and returning the results.
 ///
 /// # Parameters
@@ -114,7 +128,7 @@ fn process_bam_region(
 /// }
 /// ```
 fn split_into_regions(bam_path: &PathBuf, chunk_size: usize) -> Vec<(String, u64, u64)> {
-    let reader = IndexedReader::from_path(bam_path).expect("Failed to open BAM file");
+    let reader = open_bam(bam_path).expect("BAM already checked");
     let header = reader.header().to_owned();
 
     (0..header.target_count())
@@ -182,15 +196,16 @@ impl KanpigCommand for PlupCommand {
     fn validate(&self) -> bool {
         let mut is_ok = true;
 
-        is_ok &= file_validators::validate_file(&self.bam, "--bam");
-        is_ok &= file_validators::validate_bam(self.bam.to_str().unwrap_or_default());
+        is_ok &= open_bam(&self.bam)
+            .inspect_err(|e| error!("Can't open BAM file: {}", e))
+            .is_ok();
 
         if let Some(ref_path) = &self.reference {
             is_ok &= file_validators::validate_reference(ref_path);
         }
 
         if self.sizemin < 20 {
-            warn!("--sizemin is recommended to be at least 20");
+            warn!("--sizemin is recommended to be at least 20.");
         }
 
         is_ok
@@ -255,8 +270,7 @@ impl KanpigCommand for PlupCommand {
                 let m_receiver = task_receiver.clone();
                 let m_result_sender = result_sender.clone();
                 thread::spawn(move || {
-                    let mut m_bam =
-                        IndexedReader::from_path(&m_args.bam).expect("Failed to open BAM file");
+                    let mut m_bam = open_bam(&m_args.bam).expect("BAM already checked");
                     if let Some(ref ref_name) = m_args.reference {
                         let _ = m_bam.set_reference(ref_name);
                     }
