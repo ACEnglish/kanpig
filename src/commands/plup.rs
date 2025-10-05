@@ -1,4 +1,8 @@
-use crate::{commands::KanpigCommand, file_validators, kplib::pileup::ReadPileup};
+use crate::{
+    commands::KanpigCommand,
+    file_validators,
+    kplib::{open_bam, pileup::ReadPileup},
+};
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
@@ -17,20 +21,6 @@ use std::{
 
 type InputType = Option<(String, u64, u64)>;
 type OutputType = Option<Vec<ReadPileup>>;
-
-/// Open an optionally remote bam file
-fn open_bam(bam_path: &PathBuf) -> Result<IndexedReader, Box<dyn std::error::Error>> {
-    let path_str = bam_path.to_str().ok_or("Invalid UTF-8 in path")?;
-
-    let reader = if path_str.contains("://") {
-        let url = url::Url::parse(path_str)?;
-        IndexedReader::from_url(&url)?
-    } else {
-        IndexedReader::from_path(bam_path)?
-    };
-
-    Ok(reader)
-}
 
 /// Processes a specified region in a BAM file, filtering reads based on user-defined parameters and returning the results.
 ///
@@ -196,9 +186,7 @@ impl KanpigCommand for PlupCommand {
     fn validate(&self) -> bool {
         let mut is_ok = true;
 
-        is_ok &= open_bam(&self.bam)
-            .inspect_err(|e| error!("Can't open BAM file: {}", e))
-            .is_ok();
+        is_ok &= file_validators::validate_bam(&self.bam);
 
         if let Some(ref_path) = &self.reference {
             is_ok &= file_validators::validate_reference(ref_path);

@@ -47,7 +47,7 @@ impl BamParser {
         sample_count: usize,
         params: GraphParams,
     ) -> Self {
-        let mut bam = IndexedReader::from_path(bam_name).unwrap();
+        let mut bam = open_bam(&bam_name).expect("BAM already checked");
         let _ = bam.set_reference(ref_name.clone());
         Self {
             bam,
@@ -243,6 +243,20 @@ impl ReadParser for PlupParser {
     fn get_sample_count(&self) -> usize {
         self.sample_count
     }
+}
+
+/// Open an optionally remote bam file
+pub fn open_bam(bam_path: &PathBuf) -> Result<IndexedReader, Box<dyn std::error::Error>> {
+    let path_str = bam_path.to_str().ok_or("Invalid UTF-8 in path")?;
+
+    let reader = if path_str.contains("://") {
+        let url = url::Url::parse(path_str)?;
+        IndexedReader::from_url(&url)?
+    } else {
+        IndexedReader::from_path(bam_path)?
+    };
+
+    Ok(reader)
 }
 
 /// Factory function for opening either a bam or a plup

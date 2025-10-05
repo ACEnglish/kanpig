@@ -1,4 +1,7 @@
-use crate::{commands::plup::PlupCommand, kplib::GraphParams};
+use crate::{
+    commands::plup::PlupCommand,
+    kplib::{open_bam, GraphParams},
+};
 use rust_htslib::tbx::{self, Read as TbxRead};
 use std::path::Path;
 
@@ -15,27 +18,10 @@ pub fn validate_file(path: &Path, label: &str) -> bool {
     true
 }
 
-pub fn validate_bam(file_path: &str) -> bool {
-    let mut is_ok = true;
-    if file_path.ends_with(".bam") || file_path.ends_with(".cram") {
-        let index_extensions = [".bai", ".crai", ".csi"];
-        let index_exists = index_extensions.iter().any(|ext| {
-            let index_path = format!("{}{}", file_path, ext);
-            let p = Path::new(&index_path);
-            p.exists() & p.is_file()
-        });
-
-        if !index_exists {
-            error!(
-                "bam/cram index ({}) does not exist",
-                index_extensions.join(", ")
-            );
-            is_ok = false;
-        }
-    } else {
-        is_ok = false;
-    }
-    is_ok
+pub fn validate_bam(file_path: &Path) -> bool {
+    open_bam(&file_path.to_path_buf())
+        .inspect_err(|e| error!("Can't open BAM file: {}", e))
+        .is_ok()
 }
 
 pub fn validate_plup(file_path: &str, params: &GraphParams) -> bool {
@@ -96,14 +82,23 @@ pub fn validate_plup(file_path: &str, params: &GraphParams) -> bool {
 }
 /// Helper function to validate reads (.bam, .cram, or .plup.gz)
 pub fn validate_reads(reads: &Path, params: &GraphParams) -> bool {
-    let mut is_ok = validate_file(reads, "--reads");
     let file_path = reads.to_str().unwrap_or_default();
-    let bam_ok = validate_bam(file_path);
-    let plup_ok = validate_plup(file_path, params);
-    if !(bam_ok || plup_ok) {
+    let bam_ok = validate_bam(reads);
+
+    let plup_ok = if !bam_ok {
+        let mut is_ok = validate_file(reads, "--reads");
+        is_ok &= validate_plup(file_path, params);
+        is_ok
+    } else {
+        false // If it's a valid BAM, it's not a pileup
+    };
+
+    let is_ok = bam_ok || plup_ok;
+
+    if !is_ok {
         error!("Unsupported file type: {}", file_path);
-        is_ok = false;
     }
+
     is_ok
 }
 

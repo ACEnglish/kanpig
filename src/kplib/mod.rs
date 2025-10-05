@@ -38,7 +38,7 @@ pub use crate::kplib::ploidy::{Ploidy, PloidyRegions};
 pub mod polycluster;
 
 mod readparsers;
-pub use crate::kplib::readparsers::{open_reads, PlupParser, ReadParser};
+pub use crate::kplib::readparsers::{open_bam, open_reads, PlupParser, ReadParser};
 
 mod regions;
 pub use crate::kplib::regions::{build_region_tree, Regions};
