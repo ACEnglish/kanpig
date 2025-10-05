@@ -80,20 +80,26 @@ pub fn validate_plup(file_path: &str, params: &GraphParams) -> bool {
     }
     is_ok
 }
+
 /// Helper function to validate reads (.bam, .cram, or .plup.gz)
 pub fn validate_reads(reads: &Path, params: &GraphParams) -> bool {
     let file_path = reads.to_str().unwrap_or_default();
-    let bam_ok = validate_bam(reads);
 
-    let plup_ok = if !bam_ok {
+    // Check pileup first
+    let plup_ok = {
         let mut is_ok = validate_file(reads, "--reads");
         is_ok &= validate_plup(file_path, params);
         is_ok
-    } else {
-        false // If it's a valid BAM, it's not a pileup
     };
 
-    let is_ok = bam_ok || plup_ok;
+    // Only check BAM if it's not a valid pileup
+    let bam_ok = if !plup_ok {
+        validate_bam(reads)
+    } else {
+        false // If it's a valid pileup, it's not a BAM
+    };
+
+    let is_ok = plup_ok || bam_ok;
 
     if !is_ok {
         error!("Unsupported file type: {}", file_path);
@@ -101,6 +107,7 @@ pub fn validate_reads(reads: &Path, params: &GraphParams) -> bool {
 
     is_ok
 }
+
 
 /// Checks reference and its .fai index
 pub fn validate_reference(reference: &Path) -> bool {
