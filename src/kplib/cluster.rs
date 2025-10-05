@@ -137,8 +137,8 @@ pub fn diploid_haplotypes(
     // Now we figure out if the we need two alt alleles or not
     // The reason this takes two steps is the above code is just trying to figure out if
     // there's 1 or 2 alts. Now we figure out if its Het/Hom
-    let applied_coverage = (hap1.meta.coverage[sample_idx] + hap2.meta.coverage[sample_idx]) as f64;
-    let remaining_coverage = coverage as f64 - applied_coverage;
+    let applied_coverage = hap1.meta.coverage[sample_idx] + hap2.meta.coverage[sample_idx];
+    let remaining_coverage = coverage - applied_coverage;
     match metrics::genotyper(remaining_coverage, applied_coverage) {
         // We need the one higher covered alt
         metrics::GTstate::Ref | metrics::GTstate::Het => {

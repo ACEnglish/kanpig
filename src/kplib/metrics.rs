@@ -95,8 +95,8 @@ pub enum GTstate {
 ///
 /// # Panics
 /// This function will panic if an invalid state is encountered, which should be impossible under normal circumstances.
-pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
-    if (alt1_cov + alt2_cov) == 0.0 {
+pub fn genotyper(alt1_cov: u64, alt2_cov: u64) -> GTstate {
+    if (alt1_cov + alt2_cov) == 0 {
         return GTstate::Non;
     }
     let ret = match genotype_scores(alt1_cov, alt2_cov)
@@ -127,8 +127,10 @@ pub fn genotyper(alt1_cov: f64, alt2_cov: f64) -> GTstate {
 /// - The first value corresponds to the reference genotype.
 /// - The second value corresponds to the heterozygous genotype.
 /// - The third value corresponds to the homozygous genotype.
-fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
+fn genotype_scores(alt1_cov: u64, alt2_cov: u64) -> [f64; 3] {
     // Needs to be more pure for lower coverage
+    let alt1_cov = alt1_cov as f64;
+    let alt2_cov = alt2_cov as f64;
     let p_alt: &[f64] = if alt1_cov + alt2_cov < 10.0 {
         &[1e-3, 0.55, 0.95]
     } else {
@@ -155,7 +157,7 @@ fn genotype_scores(alt1_cov: f64, alt2_cov: f64) -> [f64; 3] {
 /// A tuple containing two floating-point values:
 /// - The first value is the genotype quality (GQ).
 /// - The second value is the sample quality (SQ).
-pub fn genotype_quals(ref_cov: f64, alt_cov: f64) -> (f64, f64) {
+pub fn genotype_quals(ref_cov: u64, alt_cov: u64) -> (f64, f64) {
     let mut gt_lplist = genotype_scores(ref_cov, alt_cov);
 
     let mut gt_sum = 0.0;
