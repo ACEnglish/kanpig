@@ -24,23 +24,24 @@ pub struct GenotypeResult {
 /// If both coverage values are zero, the state is `Non`.
 ///
 /// # Parameters
-/// - `alt1_cov`: The coverage value for the reference allele.
-/// - `alt2_cov`: The coverage value for the second alternate allele.
+/// - `ref_cov`: The coverage value for the reference allele.
+/// - `alt_cov`: The coverage value for the alternate allele.
 ///
 /// # Returns
 /// A `GTstate` enum value representing the genotype state
 ///
 /// # Panics
 /// This function will panic if an invalid state is encountered, which should be impossible under normal circumstances.
-pub fn genotyper(alt1_cov: u64, alt2_cov: u64) -> GenotypeResult {
-    if (alt1_cov + alt2_cov) == 0 {
+pub fn genotyper(ref_cov: u64, alt_cov: u64) -> GenotypeResult {
+    let tot_cov = ref_cov + alt_cov;
+    if tot_cov == 0 {
         return GenotypeResult {
             state: GTstate::Non,
             gq: 0.0,
             sq: 0.0,
         };
     }
-    let scores = genotype_scores(alt1_cov, alt2_cov);
+    let scores = genotype_scores(ref_cov, alt_cov);
     let state = match scores
         .iter()
         .enumerate()
@@ -52,7 +53,7 @@ pub fn genotyper(alt1_cov: u64, alt2_cov: u64) -> GenotypeResult {
         Some(2) => GTstate::Hom,
         _ => panic!("not possible"),
     };
-    let (gq, sq) = genotype_quals(scores);
+    let (gq, sq) = genotype_quals(scores, tot_cov);
     GenotypeResult { state, gq, sq }
 }
 
@@ -61,8 +62,8 @@ pub fn genotyper(alt1_cov: u64, alt2_cov: u64) -> GenotypeResult {
 /// The scores are adjusted based on the total coverage to account for lower coverage scenarios.
 ///
 /// # Parameters
-/// - `alt1_cov`: The coverage value for the reference allele.
-/// - `alt2_cov`: The coverage value for the second alternate allele.
+/// - `ref_cov`: The coverage value for the reference allele.
+/// - `alt_cov`: The coverage value for the alternate allele.
 ///
 /// # Returns
 /// An array of three floating-point values representing the log-probabilities for each genotype:
@@ -70,7 +71,7 @@ pub fn genotyper(alt1_cov: u64, alt2_cov: u64) -> GenotypeResult {
 /// - The second value corresponds to the heterozygous genotype.
 /// - The third value corresponds to the homozygous genotype.
 fn genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
-    let error_rate = 0.01;
+    let error_rate = 0.10;
 
     // Prior probabilities (in log space)
     let prior_homref = 0.001_f64.ln();
@@ -100,7 +101,7 @@ fn genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     ]
 }
 
-fn __beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
+fn beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
     let k = k as f64;
     let n = n as f64;
 
@@ -116,7 +117,7 @@ fn __beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
     log_binom_coef + log_beta_num - log_beta_denom
 }
 
-fn __experimental_genotype_scores(alt1_cov: u64, alt2_cov: u64) -> [f64; 3] {
+fn __betabinom_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     // IMPL OF BETA-BINOMIAL MODEL, TIES OUT WITH PYRO BETA-BINOMIAL IMPL WHEN HYPERPARAMETERS ARE SET CLOSE TO PYRO-FIT VALUES
     // TODO expose these as CLI parameters
     // for now, roughly set to typical values seen in HPRC samples fit with pyro implementation
@@ -126,10 +127,10 @@ fn __experimental_genotype_scores(alt1_cov: u64, alt2_cov: u64) -> [f64; 3] {
     // let p_het = 2.0 * af * (1.0 - af);   // 0.42 = 42% of sites
     // let p_homalt = af.powi(2);           // 0.09 = 9% of sites
     //let frac: &[f64] = &[0.2, 0.6, 0.2]; // mixture weights
+
     let frac: &[f64] = &[0.001, 0.75, 0.249]; // mixture weights
     let mu: &[f64] = &[0.005, 0.49, 0.99]; // beta-binomial means
-                                           //let nu: &[f64] = &[5.0, 50.0, 5.0]; // beta-binomial precisions
-    let nu: &[f64] = &[100.0, 50.0, 10.0]; // beta-binomial precisions
+    let nu: &[f64] = &[30.0, 81.76, 11.74]; // beta-binomial precisions
     let alpha: Vec<f64> = mu.iter().zip(nu.iter()).map(|(m, n)| m * n).collect();
     let beta: Vec<f64> = mu
         .iter()
@@ -137,15 +138,15 @@ fn __experimental_genotype_scores(alt1_cov: u64, alt2_cov: u64) -> [f64; 3] {
         .map(|(m, n)| (1.0 - m) * n)
         .collect();
 
-    let total = alt1_cov + alt2_cov;
+    let total = ref_cov + alt_cov;
     if total == 0 {
         return [1.0, 1.0, 1.0]; // keep flat prior for missing GT to keep previous GQ < 5 threshold for LOWGQ filter
     }
 
     [
-        frac[0].ln() + __beta_binomial_ln_pmf(alt2_cov, total, alpha[0], beta[0]),
-        frac[1].ln() + __beta_binomial_ln_pmf(alt2_cov, total, alpha[1], beta[1]),
-        frac[2].ln() + __beta_binomial_ln_pmf(alt2_cov, total, alpha[2], beta[2]),
+        frac[0].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[0], beta[0]),
+        frac[1].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[1], beta[1]),
+        frac[2].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[2], beta[2]),
     ]
 }
 
@@ -158,7 +159,7 @@ fn __experimental_genotype_scores(alt1_cov: u64, alt2_cov: u64) -> [f64; 3] {
 /// A tuple containing two floating-point values:
 /// - The first value is the genotype quality (GQ).
 /// - The second value is the sample quality (SQ).
-fn genotype_quals(mut gt_lplist: [f64; 3]) -> (f64, f64) {
+fn genotype_quals(mut gt_lplist: [f64; 3], total_cov: u64) -> (f64, f64) {
     // Convert from ln to log10
     gt_lplist
         .iter_mut()
@@ -173,7 +174,8 @@ fn genotype_quals(mut gt_lplist: [f64; 3]) -> (f64, f64) {
 
     // GQ: quality of best genotype call
     let best_prob = probs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let prob_wrong = (total - best_prob) / total;
+    // Flat error rate for calibrating GQ based
+    let prob_wrong = (total - best_prob) / total; // + 0.000001
     let gq = f64::min(-10.0 * prob_wrong.log10(), 100.0);
 
     (gq, sq)
