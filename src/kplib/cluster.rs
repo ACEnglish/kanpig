@@ -1,4 +1,4 @@
-use crate::kplib::{metrics, GraphParams, Haplotype};
+use crate::kplib::{germ_genotyper, metrics, GraphParams, Haplotype};
 use ndarray::Array2;
 use rand::SeedableRng;
 use std::collections::HashMap;
@@ -139,13 +139,14 @@ pub fn diploid_haplotypes(
     // there's 1 or 2 alts. Now we figure out if its Het/Hom
     let applied_coverage = hap1.meta.coverage[sample_idx] + hap2.meta.coverage[sample_idx];
     let remaining_coverage = coverage - applied_coverage;
-    match metrics::genotyper(remaining_coverage, applied_coverage) {
+    let gt = germ_genotyper::genotyper(remaining_coverage, applied_coverage);
+    match gt.state {
         // We need the one higher covered alt
-        metrics::GTstate::Ref | metrics::GTstate::Het => {
+        germ_genotyper::GTstate::Ref | germ_genotyper::GTstate::Het => {
             hap2.meta.coverage[sample_idx] += hap1.meta.coverage[sample_idx];
             vec![hap2]
         }
-        metrics::GTstate::Hom => {
+        germ_genotyper::GTstate::Hom => {
             if (hap1.meta.coverage[sample_idx] as f32
                 / (remaining_coverage + applied_coverage) as f32)
                 < ab

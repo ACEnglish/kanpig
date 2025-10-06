@@ -1,4 +1,4 @@
-use crate::kplib::{metrics::GTstate, ChannelOutput, GenotypeAnno, Ploidy};
+use crate::kplib::{germ_genotyper::GTstate, ChannelOutput, GenotypeAnno, Ploidy};
 use crossbeam_channel::Receiver;
 use indicatif::{ProgressBar, ProgressStyle};
 use petgraph::graph::NodeIndex;

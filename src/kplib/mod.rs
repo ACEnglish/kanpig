@@ -6,6 +6,8 @@ pub use crate::kplib::bedparser::BedParser;
 
 mod cluster;
 
+mod germ_genotyper;
+
 mod graphparams;
 pub use crate::kplib::graphparams::GraphParams;
 

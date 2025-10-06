@@ -1,4 +1,4 @@
-use crate::kplib::{metrics, PathScore, Ploidy};
+use crate::kplib::{germ_genotyper, PathScore, Ploidy};
 use bitflags::bitflags;
 use noodles_vcf::{
     header::record::value::map::format,
@@ -34,7 +34,7 @@ pub struct GenotypeAnno {
     pub dp: i32,
     pub ad: IntG,
     pub ks: IntG,
-    pub gt_state: metrics::GTstate,
+    pub gt_state: germ_genotyper::GTstate,
 }
 
 impl GenotypeAnno {
@@ -118,7 +118,7 @@ fn zero(var_idx: NodeIndex, coverage: u64) -> GenotypeAnno {
         dp: coverage as i32,
         ad: vec![None],
         ks: vec![None],
-        gt_state: metrics::GTstate::Non,
+        gt_state: germ_genotyper::GTstate::Non,
     }
 }
 
@@ -133,8 +133,8 @@ fn haploid(
 ) -> GenotypeAnno {
     if paths.is_empty() {
         let handle = match coverage {
-            0 => (".", metrics::GTstate::Non, 0, true),
-            _ => ("0", metrics::GTstate::Ref, 0, true),
+            0 => (".", germ_genotyper::GTstate::Non, 0, true),
+            _ => ("0", germ_genotyper::GTstate::Ref, 0, true),
         };
         return finalize_annotation(handle, paths, coverage, neigh_group, sample_idx, *var_idx);
     }
@@ -143,24 +143,24 @@ fn haploid(
     let handle = match path1.path.contains(var_idx) {
         true => (
             "1",
-            metrics::GTstate::Hom,
+            germ_genotyper::GTstate::Hom,
             path1.meta.coverage[sample_idx],
             true,
         ),
-        false if coverage != 0 => ("0", metrics::GTstate::Ref, 0, true),
-        false => (".", metrics::GTstate::Non, 0, true),
+        false if coverage != 0 => ("0", germ_genotyper::GTstate::Ref, 0, true),
+        false => (".", germ_genotyper::GTstate::Non, 0, true),
     };
     finalize_annotation(handle, paths, coverage, neigh_group, sample_idx, *var_idx)
 }
 
 /// GT str, GTstate, alt_cov, is_fulltarget
-type HandleReturn<'a> = (&'a str, metrics::GTstate, u64, bool);
+type HandleReturn<'a> = (&'a str, germ_genotyper::GTstate, u64, bool);
 
 fn handle_diploid_no_paths<'a>(coverage: u64) -> HandleReturn<'a> {
     if coverage != 0 {
-        ("0|0", metrics::GTstate::Ref, 0, true)
+        ("0|0", germ_genotyper::GTstate::Ref, 0, true)
     } else {
-        ("./.", metrics::GTstate::Non, 0, true)
+        ("./.", germ_genotyper::GTstate::Non, 0, true)
     }
 }
 
@@ -171,20 +171,20 @@ fn handle_diploid_single_path<'a>(
     sample_idx: usize,
 ) -> HandleReturn<'a> {
     if !path.path.contains(var_idx) {
-        ("0|0", metrics::GTstate::Ref, 0, true)
+        ("0|0", germ_genotyper::GTstate::Ref, 0, true)
     } else {
         let alt_cov = path.meta.coverage[sample_idx];
         let ref_cov = coverage - alt_cov;
-        let (genotype, state) = match metrics::genotyper(ref_cov, alt_cov) {
-            metrics::GTstate::Ref | metrics::GTstate::Het => {
+        let (genotype, state) = match germ_genotyper::genotyper(ref_cov, alt_cov).state {
+            germ_genotyper::GTstate::Ref | germ_genotyper::GTstate::Het => {
                 let gt = match path.meta.hp[sample_idx] {
                     None => "0|1",
                     Some(1) => "0|1",
                     _ => "1|0",
                 };
-                (gt, metrics::GTstate::Het)
+                (gt, germ_genotyper::GTstate::Het)
             }
-            metrics::GTstate::Hom => ("1|1", metrics::GTstate::Hom),
+            germ_genotyper::GTstate::Hom => ("1|1", germ_genotyper::GTstate::Hom),
             _ => panic!("Cannot happen here"),
         };
         (genotype, state, alt_cov, path.full_target)
@@ -201,24 +201,24 @@ fn handle_diploid_two_paths<'a>(
     match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
         (true, true) => (
             "1|1",
-            metrics::GTstate::Hom,
+            germ_genotyper::GTstate::Hom,
             (path1.meta.coverage[sample_idx] + path2.meta.coverage[sample_idx]),
             path1.full_target || path2.full_target,
         ),
         (true, false) => (
             "1|0",
-            metrics::GTstate::Het,
+            germ_genotyper::GTstate::Het,
             path1.meta.coverage[sample_idx],
             path1.full_target,
         ),
         (false, true) => (
             "0|1",
-            metrics::GTstate::Het,
+            germ_genotyper::GTstate::Het,
             path2.meta.coverage[sample_idx],
             path2.full_target,
         ),
-        (false, false) if coverage != 0 => ("0|0", metrics::GTstate::Ref, 0, true),
-        (false, false) => ("./.", metrics::GTstate::Non, 0, true),
+        (false, false) if coverage != 0 => ("0|0", germ_genotyper::GTstate::Ref, 0, true),
+        (false, false) => ("./.", germ_genotyper::GTstate::Non, 0, true),
     }
 }
 
@@ -233,11 +233,9 @@ fn finalize_annotation(
     let (gt_str, gt_path, alt_cov, full_target) = handle;
     let ref_cov = coverage - alt_cov;
 
-    let gt_obs = metrics::genotyper(ref_cov, alt_cov);
+    let gt_obs = germ_genotyper::genotyper(ref_cov, alt_cov);
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
-    let (gq, sq) = metrics::genotype_quals(ref_cov, alt_cov);
-
     // Either use haplotagging PS or NE
     let ps = paths
         .first()
@@ -252,11 +250,11 @@ fn finalize_annotation(
         .collect();
 
     let mut filt = FiltFlags::PASS;
-    if gt_obs != gt_path {
+    if gt_obs.state != gt_path {
         filt |= FiltFlags::GTMISMATCH;
     }
 
-    if gq < 5.0 {
+    if gt_obs.gq < 5.0 {
         filt |= FiltFlags::LOWGQ;
     }
 
@@ -264,8 +262,8 @@ fn finalize_annotation(
         filt |= FiltFlags::LOWCOV;
     }
 
-    if gt_path != metrics::GTstate::Ref {
-        if sq < 5.0 {
+    if gt_path != germ_genotyper::GTstate::Ref {
+        if gt_obs.sq < 5.0 {
             filt |= FiltFlags::LOWSQ;
         }
         if alt_cov < 5 {
@@ -281,8 +279,8 @@ fn finalize_annotation(
         var_idx,
         gt: gt_str.to_string(),
         filt,
-        sq: sq.round() as i32,
-        gq: gq.round() as i32,
+        sq: gt_obs.sq.round() as i32,
+        gq: gt_obs.gq.round() as i32,
         ps,
         dp: coverage as i32,
         ad,
