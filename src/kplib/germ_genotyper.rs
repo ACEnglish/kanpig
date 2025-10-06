@@ -41,7 +41,7 @@ pub fn genotyper(ref_cov: u64, alt_cov: u64) -> GenotypeResult {
             sq: 0.0,
         };
     }
-    let scores = genotype_scores(ref_cov, alt_cov);
+    let scores = bino_genotype_scores(ref_cov, alt_cov);
     let state = match scores
         .iter()
         .enumerate()
@@ -70,7 +70,7 @@ pub fn genotyper(ref_cov: u64, alt_cov: u64) -> GenotypeResult {
 /// - The first value corresponds to the reference genotype.
 /// - The second value corresponds to the heterozygous genotype.
 /// - The third value corresponds to the homozygous genotype.
-fn genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
+fn bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     let error_rate = 0.10;
 
     // Prior probabilities (in log space)
@@ -117,7 +117,7 @@ fn beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
     log_binom_coef + log_beta_num - log_beta_denom
 }
 
-fn __betabinom_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
+fn beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     // IMPL OF BETA-BINOMIAL MODEL, TIES OUT WITH PYRO BETA-BINOMIAL IMPL WHEN HYPERPARAMETERS ARE SET CLOSE TO PYRO-FIT VALUES
     // TODO expose these as CLI parameters
     // for now, roughly set to typical values seen in HPRC samples fit with pyro implementation
@@ -128,9 +128,17 @@ fn __betabinom_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     // let p_homalt = af.powi(2);           // 0.09 = 9% of sites
     //let frac: &[f64] = &[0.2, 0.6, 0.2]; // mixture weights
 
+    let total = ref_cov + alt_cov;
+
     let frac: &[f64] = &[0.001, 0.75, 0.249]; // mixture weights
-    let mu: &[f64] = &[0.005, 0.49, 0.99]; // beta-binomial means
-    let nu: &[f64] = &[30.0, 81.76, 11.74]; // beta-binomial precisions
+    let mu = &[0.005, 0.49, 0.99]; // beta-binomial means
+    let nu = &[100.0, 46.90, 7.25]; // beta-binomial precisions
+
+    // let coverage_factor = (total as f64 / 5.0).min(1.0);
+    // let nu: Vec<f64> = nu_base.iter()
+    // .map(|n| n * coverage_factor.max(0.2) * 0.50) // Minimum 20% of base nu
+    // .collect();
+
     let alpha: Vec<f64> = mu.iter().zip(nu.iter()).map(|(m, n)| m * n).collect();
     let beta: Vec<f64> = mu
         .iter()
@@ -138,7 +146,6 @@ fn __betabinom_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
         .map(|(m, n)| (1.0 - m) * n)
         .collect();
 
-    let total = ref_cov + alt_cov;
     if total == 0 {
         return [1.0, 1.0, 1.0]; // keep flat prior for missing GT to keep previous GQ < 5 threshold for LOWGQ filter
     }
@@ -165,8 +172,13 @@ fn genotype_quals(mut gt_lplist: [f64; 3], total_cov: u64) -> (f64, f64) {
         .iter_mut()
         .for_each(|gt_lp| *gt_lp /= 10.0_f64.ln());
 
-    // Convert to linear probabilities
-    let probs: Vec<f64> = gt_lplist.iter().map(|&lp| 10.0_f64.powf(lp)).collect();
+    //let probs: Vec<f64> = gt_lplist.iter().map(|&lp| 10.0_f64.powf(lp)).collect();
+    //let total: f64 = probs.iter().sum();
+    let max_lp = gt_lplist.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let probs: Vec<f64> = gt_lplist
+        .iter()
+        .map(|&lp| (lp - max_lp).exp()) // safe exponentiation
+        .collect();
     let total: f64 = probs.iter().sum();
 
     // SQ: quality that it's not homref
@@ -174,7 +186,6 @@ fn genotype_quals(mut gt_lplist: [f64; 3], total_cov: u64) -> (f64, f64) {
 
     // GQ: quality of best genotype call
     let best_prob = probs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    // Flat error rate for calibrating GQ based
     let prob_wrong = (total - best_prob) / total; // + 0.000001
     let gq = f64::min(-10.0 * prob_wrong.log10(), 100.0);
 
