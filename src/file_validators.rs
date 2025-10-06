@@ -108,7 +108,6 @@ pub fn validate_reads(reads: &Path, params: &GraphParams) -> bool {
     is_ok
 }
 
-
 /// Checks reference and its .fai index
 pub fn validate_reference(reference: &Path) -> bool {
     let mut is_ok = validate_file(reference, "--reference");

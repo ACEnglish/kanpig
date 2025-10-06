@@ -1,4 +1,5 @@
 use ordered_float::OrderedFloat;
+use rv::prelude::*;
 
 /// Computes the Canberra distance similarity between two featurized k-mer vectors.
 /// The similarity is calculated as 1 minus the Canberra distance, providing a measure of similarity between 0 and 1.
@@ -128,23 +129,30 @@ pub fn genotyper(alt1_cov: u64, alt2_cov: u64) -> GTstate {
 /// - The second value corresponds to the heterozygous genotype.
 /// - The third value corresponds to the homozygous genotype.
 fn genotype_scores(alt1_cov: u64, alt2_cov: u64) -> [f64; 3] {
-    // Needs to be more pure for lower coverage
-    let alt1_cov = alt1_cov as f64;
-    let alt2_cov = alt2_cov as f64;
-    let p_alt: &[f64] = if alt1_cov + alt2_cov < 10.0 {
-        &[1e-3, 0.55, 0.95]
+    let frac: &[f64] = &[0.2, 0.6, 0.2]; // mixture weights
+    let mu: &[f64] = &[0.005, 0.49, 0.99]; // beta-binomial means
+    let nu: &[f64] = &[5.0, 50.0, 5.0]; // beta-binomial precisions
+    let alpha: Vec<f64> = mu.iter().zip(nu.iter()).map(|(m, n)| m * n).collect();
+    let beta: Vec<f64> = mu
+        .iter()
+        .zip(nu.iter())
+        .map(|(m, n)| (1.0 - m) * n)
+        .collect();
+
+    let total = (alt1_cov + alt2_cov) as u32;
+    if total == 0 {
+        [1.0, 1.0, 1.0] // keep flat prior for missing GT to keep previous GQ < 5 threshold for LOWGQ filter
     } else {
-        &[1e-3, 0.50, 0.90]
-    };
+        let beta_binom_homref = BetaBinomial::new(total, alpha[0], beta[0]).unwrap();
+        let beta_binom_het = BetaBinomial::new(total, alpha[1], beta[1]).unwrap();
+        let beta_binom_homalt = BetaBinomial::new(total, alpha[2], beta[2]).unwrap();
 
-    let total = alt1_cov + alt2_cov;
-    let log_combo = log_choose(total, alt2_cov);
-
-    [
-        log_combo + alt2_cov * p_alt[0].log10() + alt1_cov * (1.0 - p_alt[0]).log10(),
-        log_combo + alt2_cov * p_alt[1].log10() + alt1_cov * (1.0 - p_alt[1]).log10(),
-        log_combo + alt2_cov * p_alt[2].log10() + alt1_cov * (1.0 - p_alt[2]).log10(),
-    ]
+        [
+            frac[0].ln() + beta_binom_homref.ln_pmf(&alt2_cov),
+            frac[1].ln() + beta_binom_het.ln_pmf(&alt2_cov),
+            frac[2].ln() + beta_binom_homalt.ln_pmf(&alt2_cov),
+        ]
+    }
 }
 
 /// Calculates genotype quality (GQ) and sample quality (SQ) based on the coverage values for reference and alternate alleles.
@@ -173,52 +181,4 @@ pub fn genotype_quals(ref_cov: u64, alt_cov: u64) -> (f64, f64) {
     let gq = f64::min(-10.0 * (second_best - best), 100.0);
 
     (gq, sq)
-}
-
-/// Helper function for genotype_scores
-const FACTORIAL_LIMIT: usize = 100;
-lazy_static::lazy_static! {
-    static ref LOG_FACTORIALS: Vec<f64> = {
-        let mut log_factorials = vec![0.0; FACTORIAL_LIMIT + 1];
-        let mut log_n_fact = 0.0;
-        for (n, item) in log_factorials.iter_mut().enumerate().take(FACTORIAL_LIMIT + 1).skip(1) {
-            log_n_fact += (n as f64).ln();
-            *item = log_n_fact;
-        }
-        log_factorials
-    };
-}
-
-fn log_choose(n: f64, k: f64) -> f64 {
-    if n.is_infinite() || k.is_infinite() || n.is_nan() || k.is_nan() {
-        return f64::NAN;
-    }
-
-    if k > n || k < 0.0 {
-        return 0.0;
-    }
-
-    /*if k * 2.0 > n {
-        k = n - k;
-    }*/
-
-    if n <= FACTORIAL_LIMIT as f64 {
-        return LOG_FACTORIALS[n as usize]
-            - LOG_FACTORIALS[k as usize]
-            - LOG_FACTORIALS[(n - k) as usize];
-    }
-
-    let mut r = 0.0;
-    let mut n = n;
-    let mut k = k;
-    if k * 2.0 > n {
-        k = n - k;
-    }
-    for d in 1..((k + 1.0) as i32) {
-        r += n.log10();
-        r -= d as f64;
-        n -= 1.0;
-    }
-
-    r
 }
