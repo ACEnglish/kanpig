@@ -670,7 +670,6 @@ dependencies = [
  "indicatif",
  "itertools",
  "kmedoids",
- "lazy_static",
  "log",
  "ndarray",
  "noodles-vcf",

@@ -23,8 +23,6 @@ pub struct VcfWriter {
     header: vcf::Header,
     keys: Keys,
     pub gtcounts: Vec<HashMap<GTstate, usize>>,
-    pub iupac_fixed: bool,
-    buf: Vec<u8>,
 }
 
 impl VcfWriter {
@@ -76,8 +74,6 @@ impl VcfWriter {
             sample_count: sample_names.len(),
             keys: Keys::from_iter(new_fmts),
             gtcounts: vec![HashMap::new(); sample_names.len()],
-            iupac_fixed: false,
-            buf: vec![],
         }
     }
 
@@ -93,7 +89,6 @@ impl VcfWriter {
             });
         }
 
-        // TODO: This is broken... gtcounts will need to be done per-sample
         for (gtcount_map, annot) in self.gtcounts.iter_mut().zip(annots.iter()) {
             *gtcount_map.entry(annot.gt_state).or_insert(0) += 1;
         }
@@ -101,15 +96,7 @@ impl VcfWriter {
         let out_fields: Vec<_> = annots.iter().map(|a| a.make_fields()).collect();
         *entry.samples_mut() = Samples::new(self.keys.clone(), out_fields);
 
-        self.buf.clear();
-        let mut tmp = vcf::io::Writer::new(&mut self.buf);
-        if tmp.write_variant_record(&self.header, &entry).is_err() {
-            let changed = replace_iupac_inplace(entry.reference_bases_mut());
-            self.iupac_fixed |= changed;
-            if let Err(error) = self.writer.write_variant_record(&self.header, &entry) {
-                panic!("Couldn't write record {:?}", error);
-            }
-        } else if let Err(error) = self.writer.get_mut().write_all(&self.buf) {
+        if let Err(error) = self.writer.write_variant_record(&self.header, &entry) {
             panic!("Couldn't write record {:?}", error);
         }
     }
@@ -162,9 +149,6 @@ pub fn open_writer_thread(
                 }
             }
         }
-        if m_writer.iupac_fixed {
-            warn!("Some IUPAC codes in REF sequences have been fixed in output");
-        }
         info!("genotype counts: {:#?}", m_writer.gtcounts);
     })
 }
@@ -180,35 +164,4 @@ fn create_format(
     *fmt.type_mut() = ty;
     *fmt.description_mut() = desc.to_string();
     fmt
-}
-
-lazy_static::lazy_static! {
-    static ref IUPAC: [u8; 128] = {
-        let mut arr = [0u8; 128];
-        for &(iupac, replacement) in &[
-            (b'R', b'A'), (b'Y', b'C'), (b'S', b'C'), (b'W', b'A'),
-            (b'K', b'G'), (b'M', b'A'), (b'B', b'C'), (b'D', b'A'),
-            (b'H', b'A'), (b'V', b'A'), (b'r', b'a'), (b'y', b'c'),
-            (b's', b'c'), (b'w', b'a'), (b'k', b'g'), (b'm', b'a'),
-            (b'b', b'c'), (b'd', b'a'), (b'h', b'a'), (b'v', b'a'),
-        ] {
-            arr[iupac as usize] = replacement;
-        }
-        arr
-    };
-}
-
-fn replace_iupac_inplace(sequence: &mut str) -> bool {
-    let mut any_change = false;
-    unsafe {
-        let bytes = sequence.as_bytes_mut();
-        bytes.iter_mut().for_each(|b| {
-            let t = IUPAC[*b as usize];
-            if t != 0u8 {
-                any_change = true;
-                *b = t;
-            }
-        });
-    }
-    any_change
 }
