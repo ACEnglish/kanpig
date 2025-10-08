@@ -94,7 +94,7 @@ impl KdpVcf for RecordBuf {
     /// Alternate sequence isn't '.' or '*' or bnd or symbolic
     fn valid_alt(&self) -> bool {
         let alt = self.get_alt();
-        alt != "." && alt != "*" && !alt.contains(':') && !alt.contains('<')
+        alt != "." && alt != "*" && !alt.contains(':') && (!alt.contains('<') || alt == "<DEL>")
     }
 
     /// Returns the first alternate allele or a blank string with '.' if there isn't any

@@ -262,6 +262,7 @@ impl KanpigCommand for GermCommand {
             input_vcf,
             input_header.clone(),
             tree,
+            &self.io.reference,
             self.graph.clone(),
             result_sender.clone(),
         );

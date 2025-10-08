@@ -53,7 +53,7 @@ pub fn genotyper(ref_cov: u64, alt_cov: u64) -> GenotypeResult {
         Some(2) => GTstate::Hom,
         _ => panic!("not possible"),
     };
-    let (gq, sq) = genotype_quals(scores, tot_cov);
+    let (gq, sq) = genotype_quals(scores);
     GenotypeResult { state, gq, sq }
 }
 
@@ -101,7 +101,7 @@ fn bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     ]
 }
 
-fn beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
+fn __beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
     let k = k as f64;
     let n = n as f64;
 
@@ -117,7 +117,7 @@ fn beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
     log_binom_coef + log_beta_num - log_beta_denom
 }
 
-fn beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
+fn __beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     // IMPL OF BETA-BINOMIAL MODEL, TIES OUT WITH PYRO BETA-BINOMIAL IMPL WHEN HYPERPARAMETERS ARE SET CLOSE TO PYRO-FIT VALUES
     // TODO expose these as CLI parameters
     // for now, roughly set to typical values seen in HPRC samples fit with pyro implementation
@@ -151,9 +151,9 @@ fn beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     }
 
     [
-        frac[0].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[0], beta[0]),
-        frac[1].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[1], beta[1]),
-        frac[2].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[2], beta[2]),
+        frac[0].ln() + __beta_binomial_ln_pmf(alt_cov, total, alpha[0], beta[0]),
+        frac[1].ln() + __beta_binomial_ln_pmf(alt_cov, total, alpha[1], beta[1]),
+        frac[2].ln() + __beta_binomial_ln_pmf(alt_cov, total, alpha[2], beta[2]),
     ]
 }
 
@@ -166,7 +166,7 @@ fn beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
 /// A tuple containing two floating-point values:
 /// - The first value is the genotype quality (GQ).
 /// - The second value is the sample quality (SQ).
-fn genotype_quals(mut gt_lplist: [f64; 3], total_cov: u64) -> (f64, f64) {
+fn genotype_quals(mut gt_lplist: [f64; 3]) -> (f64, f64) {
     // Convert from ln to log10
     gt_lplist
         .iter_mut()
@@ -185,9 +185,16 @@ fn genotype_quals(mut gt_lplist: [f64; 3], total_cov: u64) -> (f64, f64) {
     let sq = f64::min(-10.0 * (probs[0] / total).log10(), 100.0);
 
     // GQ: quality of best genotype call
-    let best_prob = probs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let prob_wrong = (total - best_prob) / total; // + 0.000001
-    let gq = f64::min(-10.0 * prob_wrong.log10(), 100.0);
+    // let best_prob = probs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    // probability the score is wrong
+    //let prob_wrong = (total - best_prob) / total; // + 0.000001
+    //let gq = f64::min(-10.0 * prob_wrong.log10(), 100.0);
+
+    // Relative differences
+    let mut sorted = gt_lplist;
+    sorted.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    let delta = sorted[0] - sorted[1];
+    let gq = f64::min(10.0 * delta / 10f64.ln(), 100.0);
 
     (gq, sq)
 }

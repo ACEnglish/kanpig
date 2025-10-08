@@ -4,7 +4,7 @@
 /// # Parameters
 /// - `a`: A slice of floating-point numbers representing the first k-mer vector.
 /// - `b`: A slice of floating-point numbers representing the second k-mer vector.
-/// - `mink`: A floating-point threshold below which differences are ignored.
+/// - `mink`: Threshold for minimum number of observations across vectors.
 ///
 /// # Returns
 /// A floating-point value representing the similarity between the two vectors:
