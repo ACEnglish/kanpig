@@ -200,6 +200,8 @@ pub fn perform_clustering(
     }
 }
 
+/// Given a cluster result, all observed haplotypes, and a vector of observed haplotypes ids
+/// per-sample a.k.a. vec of vec
 pub fn collapse_haplotypes(
     cluster_result: ClusterResult,
     haplos: Vec<Haplotype>,
@@ -212,7 +214,7 @@ pub fn collapse_haplotypes(
         .map(|(idx, i)| haplos[*i].clear_clone(idx + 1))
         .collect();
 
-    let mut hp_cnt = Array::<u16, _>::zeros((cluster_result.k, 3, 2));
+    let mut hp_cnt = Array::<u16, _>::zeros((cluster_result.k, gts.len(), 2));
 
     cluster_result
         .assignments

@@ -18,7 +18,10 @@ cargo build --release
 
 # 🚀 Quick Start
 ```
-kanpig germ --input variant.vcf.gz --reads alignments.bam --reference ref.fa --out output.vcf
+kanpig germ --input variants.vcf.gz \
+            --reads alignments.bam \
+            --reference genome.fa \
+            --out output.vcf
 ```
 See `kanpig -h` for all available parameters, most of which are detailed below.
 
@@ -33,9 +36,10 @@ tabix -p bed alignments.plup.gz
 Other available genotyping modes are `kanpig trio` and `kanpig somatic`.
 
 # ⚠️ Current Limitations
-* Kanpig expects sequence resolved SVs. Variants with symbolic alts (e.g. `<DEL>`) and BNDs are not parsed.
+* Kanpig expects sequence resolved or `<DEL>` SVs. Other SVs with symbolic alts (e.g. `<DUP>`) and BNDs are not parsed.
 * Kanpig only looks at read pileups and does not consider split or soft-clipped alignment information. This means
-  variants above ~10kbp should be skipped with the `--sizemax` parameter.
+  variants above ~10kbp should be skipped with the `--sizemax` parameter unless you have reason to believe the reads are
+  aligned continuously over larger SVs (e.g. genotyping from assembly alignments).
 
 # 📝 Annotations
 

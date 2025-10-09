@@ -57,6 +57,13 @@ impl GenotypeAnno {
     /// Generates fields for the `GenotypeAnno` used by `VcfWriter`.
     /// Edits to these must be sync'd with make_fmt_definitions
     pub fn make_fields(&self) -> Vec<Option<Value>> {
+        // KS can sometimes be an empty array, so we have to set it to None
+        let ks = if self.ks.is_empty() {
+            None
+        } else {
+            Some(Value::Array(Array::Integer(self.ks.clone())))
+        };
+
         vec![
             Some(Value::Genotype(
                 self.gt.parse().expect("GT string parsing failed"),
@@ -67,7 +74,7 @@ impl GenotypeAnno {
             self.ps.map(|ps| Value::Integer(ps as i32)),
             Some(Value::Integer(self.dp)),
             Some(Value::Array(Array::Integer(self.ad.clone()))),
-            Some(Value::Array(Array::Integer(self.ks.clone()))),
+            ks,
         ]
     }
 
