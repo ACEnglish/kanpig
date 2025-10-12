@@ -218,5 +218,5 @@ distributions of somatic events, these parameters may need to be tweaked. See XY
 these parameters impact the modeling.
 
 # 🐍 Python bindings
-Minimal python bindings are available for plup parsing. These can be installed via `maturin develop --features python`
+Minimal python bindings are available for plup parsing. These can be installed via `maturin develop --release --features python`
 and used from python with `import kanpig`.

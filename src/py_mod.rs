@@ -1,7 +1,5 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
-use pyo3::types::PyList;
 
 use rust_htslib::faidx;
 
@@ -20,125 +18,14 @@ pub fn cansim(a: &PyAny, b: &PyAny, mink: f32) -> PyResult<f32> {
 /// Input: `sequence: bytes`, `kmer: int`, `negative: bool`, `maxhom: int`
 /// Output: list of floats
 #[pyfunction]
-fn seq_to_kmer(
-    py: Python<'_>,
-    sequence: String,
-    kmer: u8,
-    negative: bool,
-    maxhom: usize,
-) -> PyResult<Vec<f32>> {
+fn seq_to_kmer(_py: Python<'_>, sequence: String, kmer: u8, negative: bool) -> PyResult<Vec<f32>> {
     // Convert Python bytes -> Rust &[u8]
     let seq: &[u8] = sequence.as_bytes();
 
     // Call your existing Rust function
-    let result = crate::kplib::seq_to_kmer(seq, kmer, negative, maxhom);
+    let result = crate::kplib::seq_to_kmer(seq, kmer, negative);
 
     Ok(result)
-}
-
-#[pyclass(name = "KDParams", unsendable)]
-#[derive(Clone)]
-pub struct PyKDParams {
-    pub inner: crate::kplib::KDParams,
-}
-
-#[pymethods]
-impl PyKDParams {
-    #[new]
-    pub fn new(
-        passonly: Option<bool>,
-        neighdist: Option<u64>,
-        sizemin: Option<u32>,
-        sizemax: Option<u32>,
-        mapq: Option<u8>,
-        mapflag: Option<u16>,
-        hps_weight: Option<f32>,
-        seqsim: Option<f32>,
-        sizesim: Option<f32>,
-        hapsim: Option<f32>,
-        gpenalty: Option<f32>,
-        fpenalty: Option<f32>,
-        kmer: Option<u8>,
-        minkfreq: Option<u64>,
-        maxnodes: Option<usize>,
-        maxpaths: Option<u64>,
-        pileupmax: Option<usize>,
-        fnmax: Option<usize>,
-        ab: Option<f32>,
-        squish: Option<bool>,
-        one_to_one: Option<bool>,
-        maxhom: Option<usize>,
-    ) -> Self {
-        let mut params = crate::kplib::KDParams::default();
-        if let Some(v) = passonly {
-            params.passonly = v;
-        }
-        if let Some(v) = neighdist {
-            params.neighdist = v;
-        }
-        if let Some(v) = sizemin {
-            params.sizemin = v;
-        }
-        if let Some(v) = sizemax {
-            params.sizemax = v;
-        }
-        if let Some(v) = mapq {
-            params.mapq = v;
-        }
-        if let Some(v) = mapflag {
-            params.mapflag = v;
-        }
-        if let Some(v) = hps_weight {
-            params.hps_weight = v;
-        }
-        if let Some(v) = seqsim {
-            params.seqsim = v;
-        }
-        if let Some(v) = sizesim {
-            params.sizesim = v;
-        }
-        if let Some(v) = hapsim {
-            params.hapsim = v;
-        }
-        if let Some(v) = gpenalty {
-            params.gpenalty = v;
-        }
-        if let Some(v) = fpenalty {
-            params.fpenalty = v;
-        }
-        if let Some(v) = kmer {
-            params.kmer = v;
-        }
-        if let Some(v) = minkfreq {
-            params.minkfreq = v;
-        }
-        if let Some(v) = maxnodes {
-            params.maxnodes = v;
-        }
-        if let Some(v) = maxpaths {
-            params.maxpaths = v;
-        }
-        if let Some(v) = pileupmax {
-            params.pileupmax = v;
-        }
-        if let Some(v) = fnmax {
-            params.fnmax = v;
-        }
-        if let Some(v) = ab {
-            params.ab = v;
-        }
-        if let Some(v) = squish {
-            params.squish = v;
-        }
-        if let Some(v) = one_to_one {
-            params.one_to_one = v;
-        }
-        if let Some(v) = maxhom {
-            params.maxhom = v;
-        }
-
-        Self { inner: params }
-    }
 }
 
 #[pyclass(name = "PlupParser", unsendable)]
@@ -161,7 +48,7 @@ impl PyPlupParser {
         let reference = faidx::Reader::from_path(reference_path)
             .map_err(|e| PyValueError::new_err(format!("Failed to open reference: {}", e)))?;
 
-        let params = crate::kplib::KDParams::default();
+        let params = crate::kplib::GraphParams::default();
 
         Ok(PyPlupParser {
             inner: crate::kplib::PlupParser::new(
@@ -328,6 +215,41 @@ impl PyHaplotypeMeta {
     }
 }
 
+use crate::kplib::germ_genotyper::{GTstate, GenotypeResult};
+#[pyclass(name = "GenotypeResult", unsendable)]
+pub struct PyGenotypeResult {
+    pub inner: GenotypeResult,
+}
+
+#[pymethods]
+impl PyGenotypeResult {
+    #[getter]
+    pub fn state(&self) -> String {
+        match self.inner.state {
+            GTstate::Ref => "REF".to_string(),
+            GTstate::Het => "HET".to_string(),
+            GTstate::Hom => "HOM".to_string(),
+            GTstate::Non => "NON".to_string(),
+        }
+    }
+
+    #[getter]
+    pub fn gq(&self) -> f64 {
+        self.inner.gq
+    }
+
+    #[getter]
+    pub fn sq(&self) -> f64 {
+        self.inner.sq
+    }
+}
+
+#[pyfunction] //
+fn genotyper(_py: Python<'_>, ref_cov: u64, alt_cov: u64) -> PyResult<PyGenotypeResult> {
+    let result = crate::kplib::germ_genotyper::genotyper(ref_cov, alt_cov);
+    Ok(PyGenotypeResult { inner: result })
+}
+
 /// Define the Python module
 #[pymodule]
 fn kanpig(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
@@ -337,6 +259,9 @@ fn kanpig(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPlupParser>()?;
     m.add_class::<PyHaplotypeMeta>()?;
     m.add_class::<PyHaplotype>()?;
+
+    m.add_function(wrap_pyfunction!(genotyper, m)?)?;
+    m.add_class::<PyGenotypeResult>()?;
 
     Ok(())
 }
