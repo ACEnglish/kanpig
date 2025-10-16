@@ -18,10 +18,10 @@ cargo build --release
 
 # 🚀 Quick Start
 ```
-kanpig germ --input variants.vcf.gz \
-            --reads alignments.bam \
-            --reference genome.fa \
-            --out output.vcf
+kanpig gt --input variants.vcf.gz \
+          --reads alignments.bam \
+          --reference genome.fa \
+          --out output.vcf
 ```
 See `kanpig -h` for all available parameters, most of which are detailed below.
 
@@ -33,7 +33,7 @@ kanpig plup --bam alignments.bam | bedtools sort -header | bgzip > alignments.pl
 tabix -p bed alignments.plup.gz
 ```
 
-Other available genotyping modes are `kanpig trio` and `kanpig somatic`.
+Other available genotyping modes are `kanpig trio` and `kanpig mosaic`.
 
 # ⚠️ Current Limitations
 * Kanpig expects sequence resolved or `<DEL>` SVs. Other SVs with symbolic alts (e.g. `<DUP>`) and BNDs are not parsed.
@@ -86,10 +86,9 @@ While genotyping against a plup file is usually faster, bam to plup conversion i
 
 # 🔧 Core Parameter Details
 
-The default parameters are tuned to work generally well for genotyping a single sample's VCF. For a multi-sample VCF (a.k.a.
-a project-level VCF), the optimal parameters will be dependent on things such as number of samples in the VCF and the merging
-strategy of the variants.
-
+These parameters are universal to all the genotyping modes and handle how variant graphs are built or how haplotypes are
+applied to the built graphs. The default parameters work generally well for most use cases. The optimal parameters for a
+particular experiment will depend on things such as number of samples in the VCF and the merging strategy of the variants.
 
 ### `--neighdist`
 Kanpig will build local variant graphs from groups of variants in a 'neighborhood'. These neighborhoods are determined by making the maximum end position
@@ -158,10 +157,9 @@ human sample shouldn't have any genotypes on chrY. A male human sample should ha
 non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEnglish/kanpig/tree/develop/ploidy_beds) directory 
 has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
 
-
 # 🧬 Germline Mode
 
-Published usage for single sample SV Genotyping.
+Original use case of SV Genotyping.
 
 ### `--hapsim`
 After performing kmedoid clustering on reads to determine the two haplotypes, if the two haplotypes have a size similarity 
@@ -180,12 +178,12 @@ from different HPs have a higher distance inside the matrix sent to kmedoid clus
 
 # 👪 Trio Mode
 
-A proband along with their mother and father can be joint genotyped simultaneously with `kanpig trio`.The goal of a 
+A proband along with their mother and father can be joint genotyped simultaneously with `kanpig trio`. The goal of a 
 separate module is to increase genotyping accuracy in the proband as well as consistently applying shared haplotypes
 to the same paths through the variant graph, thus decreasing mendelian errors and more precisely identifying de novo SVs. 
 
 This mode works by running a MeanShift clustering on haplotype lengths to determine the value of K for Kmedoids clustering.
-After the haplotypes are clustered, the genotyper tests the liklihood of all possible inheritance patterns given each
+After the haplotypes are clustered, the genotyper tests the likelihood of all possible inheritance patterns given each
 haplotype's coverage.
 
 ### `--msmin`

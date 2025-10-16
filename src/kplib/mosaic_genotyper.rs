@@ -56,7 +56,8 @@ pub struct GenotypingResult {
 
 /*
 * Beta Distribution Basics
-   The Beta distribution with parameters α (alpha) and β (beta) is defined on the interval [0, 1], making it perfect for modeling proportions like VAFs.
+   The Beta distribution with parameters α (alpha) and β (beta) is defined on the interval [0, 1],
+   making it perfect for modeling proportions like VAFs.
    How Alpha and Beta Shape the Distribution
 
    Mean: α / (α + β)
@@ -101,11 +102,11 @@ pub struct MosaicGenotyper {
 impl Default for MosaicGenotyper {
     fn default() -> Self {
         Self {
-            error_rate: 0.001,            // don't know what these do
-            somatic_vaf_prior_alpha: 1.0, // TODO: maybe a parameter
-            somatic_vaf_prior_beta: 15.0, // Prior favoring low VAFs
-            max_somatic_vaf: 0.2,         // TODO: Probably need this as a param
-            min_depth_for_call: 1,        // TODO: I don't know if I need this as a param
+            error_rate: 0.001,
+            somatic_vaf_prior_alpha: 1.0,
+            somatic_vaf_prior_beta: 15.0,
+            max_somatic_vaf: 0.2,
+            min_depth_for_call: 1,
         }
     }
 }

@@ -26,7 +26,7 @@ pub enum Commands {
     Plup(PlupCommand),
 
     #[command(about = "Germline SV Genotyping")]
-    Germ(GermCommand),
+    GT(GermCommand),
 
     #[command(about = "Trio SV Genotyping")]
     Trio(TrioCommand),
