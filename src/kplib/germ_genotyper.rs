@@ -183,86 +183,10 @@ fn genotype_quals(mut gt_lplist: [f64; 3]) -> (f64, f64) {
         .map(|&lp| f64::min(lp - log10_sum_exp, 0.0))
         .collect();
 
-    // Convert to linear probabilities for finding best genotype
-    //let linear_probs: Vec<f64> = norm_log10_probs
-    //.iter()
-    //.map(|&log_p| 10.0_f64.powf(log_p))
-    //.collect();
-
-    // QUAL: Phred-scaled probability of homref
-    // Since GL_P[0] = 10^(norm_log10_probs[0]), log10(GL_P[0]) = norm_log10_probs[0]
     let sq = f64::min((-10.0 * norm_log10_probs[0]).abs(), 1000.0);
 
-    // GQ: Phred-scaled difference between best and second-best
-    //let mut sorted = norm_log10_probs;
     norm_log10_probs.sort_by(|a, b| b.partial_cmp(a).unwrap());
     let gq = f64::min(-10.0 * (norm_log10_probs[1] - norm_log10_probs[0]), 1000.0) / 10.0;
-
-    // GQ: max of "probability it's NOT each genotype"
-    //let gq_if_homref = -10.0 * (linear_probs[1] + linear_probs[2]).log10();
-    //let gq_if_het = -10.0 * (linear_probs[0] + linear_probs[2]).log10();
-    //let gq_if_homalt = -10.0 * (linear_probs[0] + linear_probs[1]).log10();
-
-    // GQ: Use log-sum-exp to avoid underflow
-    // For each genotype, compute log10(sum of other two probabilities)
-    //let log_sum_not_homref = {
-    //let m = norm_log10_probs[1].max(norm_log10_probs[2]);
-    //let s = 10.0_f64.powf(norm_log10_probs[1] - m) + 10.0_f64.powf(norm_log10_probs[2] - m);
-    //m + s.log10()
-    //};
-
-    //let log_sum_not_het = {
-    //let m = norm_log10_probs[0].max(norm_log10_probs[2]);
-    //let s = 10.0_f64.powf(norm_log10_probs[0] - m) + 10.0_f64.powf(norm_log10_probs[2] - m);
-    //m + s.log10()
-    //};
-
-    //let log_sum_not_homalt = {
-    //let m = norm_log10_probs[0].max(norm_log10_probs[1]);
-    //let s = 10.0_f64.powf(norm_log10_probs[0] - m) + 10.0_f64.powf(norm_log10_probs[1] - m);
-    //m + s.log10()
-    //};
-
-    //let gq_if_homref = -10.0 * log_sum_not_homref;
-    //let gq_if_het = -10.0 * log_sum_not_het;
-    //let gq_if_homalt = -10.0 * log_sum_not_homalt;
-
-    //let gq = f64::min(gq_if_homref.max(gq_if_het).max(gq_if_homalt), 1000.0) / 10.0;
-
-    (gq, sq)
-}
-
-fn __genotype_quals(mut gt_lplist: [f64; 3]) -> (f64, f64) {
-    // Convert from ln to log10
-    gt_lplist
-        .iter_mut()
-        .for_each(|gt_lp| *gt_lp /= 10.0_f64.ln());
-
-    // Numerical stability: subtract max before exponentiating
-    let max_lp = gt_lplist.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let probs: Vec<f64> = gt_lplist
-        .iter()
-        .map(|&lp| 10.0_f64.powf(lp - max_lp))
-        .collect();
-    let total: f64 = probs.iter().sum();
-
-    let norm_probs: Vec<f64> = probs.iter().map(|p| p / total).collect();
-    // SQ: Phred-scaled quality that it's not homref
-    let sq = f64::min(-10.0 * (probs[0] / total).log10(), 100.0);
-
-    // GQ: Phred-scaled difference between best and second-best
-    // let mut sorted = gt_lplist;
-    // sorted.sort_by(|a, b| b.partial_cmp(a).unwrap());
-    // let delta = sorted[0] - sorted[1]; // Already in log10 space
-    // let gq = f64::min(10.0 * delta, 100.0); // Just multiply by 10 for Phred
-
-    // GQ: Maximum of "probability it's NOT each genotype"
-    // For each genotype, sum the probabilities of the other two
-    let gq_if_homref = -10.0 * (norm_probs[1] + norm_probs[2]).max(1e-10).log10();
-    let gq_if_het = -10.0 * (norm_probs[0] + norm_probs[2]).max(1e-10).log10();
-    let gq_if_homalt = -10.0 * (norm_probs[0] + norm_probs[1]).max(1e-10).log10();
-
-    let gq = f64::max(gq_if_homref.max(gq_if_het).max(gq_if_homalt), 100.0);
 
     (gq, sq)
 }
