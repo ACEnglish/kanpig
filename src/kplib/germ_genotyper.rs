@@ -71,9 +71,9 @@ pub fn genotyper(ref_cov: u64, alt_cov: u64) -> GenotypeResult {
 /// - The second value corresponds to the heterozygous genotype.
 /// - The third value corresponds to the homozygous genotype.
 fn bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
-    let error_rate = 0.01;
+    let error_rate = 0.03;
 
-    // Prior probabilities (in log space)
+    // Prior probabilities
     let prior_homref = 0.001_f64.ln();
     let prior_het = 0.75_f64.ln();
     let prior_homalt = 0.249_f64.ln();
@@ -86,14 +86,14 @@ fn bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     // Create binomial distributions for each genotype
     let binom_homref = Binomial::new(error_rate, n).unwrap();
     let binom_het = Binomial::new(0.5, n).unwrap();
-    let binom_homalt = Binomial::new(1.0 - error_rate, n).unwrap();
+    let binom_homalt = Binomial::new(1.0 - error_rate * 2.0, n).unwrap();
 
     // Calculate log-likelihoods
     let ll_homref = binom_homref.ln_pmf(alt_cov);
     let ll_het = binom_het.ln_pmf(alt_cov);
     let ll_homalt = binom_homalt.ln_pmf(alt_cov);
 
-    // Posterior = Prior + Likelihood (in log space)
+    // Posterior = Prior + Likelihood
     [
         prior_homref + ll_homref,
         prior_het + ll_het,
@@ -135,8 +135,8 @@ fn __beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     }
 
     let frac: &[f64] = &[0.001, 0.75, 0.249]; // mixture weights
-    let mu = &[0.005, 0.49, 0.99]; // beta-binomial means
-    let nu = &[100.0, 46.90, 7.25]; // beta-binomial precisions
+    let mu = &[0.03, 0.50, 0.97]; // beta-binomial means
+    let nu = &[100.0, 46.90, 50.25]; // beta-binomial precisions
 
     // let coverage_factor = (total as f64 / 5.0).min(1.0);
     // let nu: Vec<f64> = nu_base.iter()

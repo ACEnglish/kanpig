@@ -95,6 +95,16 @@ pub struct GermCommand {
     /// Minimum allele balance for compound het lower VAF (off=0)
     #[arg(long, default_value_t = 0.0, help_heading = "Genotyping")]
     pub ab: f32,
+    
+    /*
+    /// Error Rate Prior
+    #[arg(long, default_value_t = 0.03, help_heading = "Genotyping")]
+    pub err: f32,
+
+    /// Genotype Priors (ref,het,hom)
+    #[arg(long, default_value_t = "0.001,0.74,0.249", help_heading = "Genotyping")]
+    pub priors: Option<String>
+    */
 }
 
 #[derive(clap::Args, Clone, Debug)]
