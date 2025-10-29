@@ -95,7 +95,6 @@ pub struct GermCommand {
     /// Minimum allele balance for compound het lower VAF (off=0)
     #[arg(long, default_value_t = 0.0, help_heading = "Genotyping")]
     pub ab: f32,
-    
     /*
     /// Error Rate Prior
     #[arg(long, default_value_t = 0.03, help_heading = "Genotyping")]

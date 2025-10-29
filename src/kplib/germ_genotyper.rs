@@ -57,6 +57,127 @@ pub fn genotyper(ref_cov: u64, alt_cov: u64) -> GenotypeResult {
     GenotypeResult { state, gq, sq }
 }
 
+pub fn phased_genotyper(ref_cov: u64, alt1_cov: u64, alt2_cov: u64) -> GenotypeResult {
+    let tot_cov = ref_cov + alt1_cov + alt2_cov;
+    if tot_cov == 0 {
+        return GenotypeResult {
+            state: GTstate::Non,
+            gq: 0.0,
+            sq: 0.0,
+        };
+    }
+    let scores = phased_genotype_scores(ref_cov, alt1_cov, alt2_cov);
+    let state = match scores
+        .iter()
+        .enumerate()
+        .max_by_key(|&(_, &x)| OrderedFloat(x))
+        .map(|(i, _)| i)
+    {
+        Some(0) => GTstate::Ref,
+        Some(1) => GTstate::Het,
+        Some(2) => GTstate::Hom,
+        _ => panic!("not possible"),
+    };
+    let (gq, sq) = genotype_quals(scores);
+    GenotypeResult { state, gq, sq }
+}
+
+fn phased_genotype_scores(
+    ref_reads: u64,     // Reads supporting reference allele
+    allele1_reads: u64, // Reads supporting allele1 (haplotype 1)
+    allele2_reads: u64, // Reads supporting allele2 (haplotype 2)
+) -> [f64; 3] {
+    // Returns unphased: [0/0, 0/1, 1/1]
+
+    let error_rate = 0.03;
+
+    // Prior probabilities
+    let prior_homref = 0.001_f64.ln();
+    let prior_het = 0.75_f64.ln();
+    let prior_homalt = 0.249_f64.ln();
+
+    let total = ref_reads + allele1_reads + allele2_reads;
+    if total == 0 {
+        return [0.0, 0.0, 0.0];
+    }
+
+    // 0/0: Both haplotypes are REF
+    // Expect: mostly ref_reads, few allele1/allele2 (from errors)
+    let ll_00 = {
+        let binom = Binomial::new(1.0 - 2.0 * error_rate, total).unwrap();
+        binom.ln_pmf(ref_reads)
+    };
+
+    // 0/1: One haplotype REF, one haplotype carries allele1
+    // Possibility A: hap1=REF, hap2=allele1
+    // Expect: ~50% ref_reads, ~50% allele1_reads, ~0% allele2_reads
+    let ll_01_a = {
+        // Model as trinomial, but use sequential binomials
+        // First: P(allele2_reads | should be ~0)
+        let p_error_allele2 = error_rate;
+        let ll_allele2 = if total > 0 {
+            Binomial::new(p_error_allele2, total)
+                .unwrap()
+                .ln_pmf(allele2_reads)
+        } else {
+            0.0
+        };
+
+        // Second: P(allele1_reads | remaining reads should split ~50/50 with ref)
+        let remaining = ref_reads + allele1_reads;
+        let ll_allele1 = if remaining > 0 {
+            Binomial::new(0.5, remaining).unwrap().ln_pmf(allele1_reads)
+        } else {
+            0.0
+        };
+
+        ll_allele2 + ll_allele1
+    };
+
+    // Possibility B: hap1=REF, hap2=allele2
+    //   Expect: ~50% ref_reads, ~0% allele1_reads, ~50% allele2_reads
+    let ll_02_b = {
+        let p_error_allele1 = error_rate;
+        let ll_allele1 = if total > 0 {
+            Binomial::new(p_error_allele1, total)
+                .unwrap()
+                .ln_pmf(allele1_reads)
+        } else {
+            0.0
+        };
+
+        let remaining = ref_reads + allele2_reads;
+        let ll_allele2 = if remaining > 0 {
+            Binomial::new(0.5, remaining).unwrap().ln_pmf(allele2_reads)
+        } else {
+            0.0
+        };
+
+        ll_allele1 + ll_allele2
+    };
+
+    // Marginalize over which allele is on which haplotype
+    let max_het = ll_01_a.max(ll_02_b);
+    let ll_01 = max_het + ((ll_01_a - max_het).exp() + (ll_02_b - max_het).exp()).ln();
+
+    // 1/1: Both haplotypes carry alt alleles
+    // This is tricky: could be allele1|allele1, allele2|allele2, or allele1|allele2
+    // For simplicity, assuming both alleles are the "same" variant (just phased differently)
+    // Expect: mostly alt reads (allele1 + allele2), few ref_reads
+    let ll_11 = {
+        let alt_reads = allele1_reads + allele2_reads;
+        let binom = Binomial::new(1.0 - error_rate, total).unwrap();
+        binom.ln_pmf(alt_reads)
+    };
+
+    // Posterior = Prior + Likelihood
+    [
+        prior_homref + ll_00,
+        prior_het + ll_01,
+        prior_homalt + ll_11,
+    ]
+}
+
 /// Calculates genotype scores for three possible genotypes (reference, heterozygous, homozygous)
 /// based on the coverage values for two alternate alleles.
 /// The scores are adjusted based on the total coverage to account for lower coverage scenarios.
@@ -86,7 +207,7 @@ fn bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     // Create binomial distributions for each genotype
     let binom_homref = Binomial::new(error_rate, n).unwrap();
     let binom_het = Binomial::new(0.5, n).unwrap();
-    let binom_homalt = Binomial::new(1.0 - error_rate * 2.0, n).unwrap();
+    let binom_homalt = Binomial::new(0.98, n).unwrap();
 
     // Calculate log-likelihoods
     let ll_homref = binom_homref.ln_pmf(alt_cov);
