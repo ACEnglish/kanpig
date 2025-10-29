@@ -87,8 +87,6 @@ fn phased_genotype_scores(
     allele1_reads: u64, // Reads supporting allele1 (haplotype 1)
     allele2_reads: u64, // Reads supporting allele2 (haplotype 2)
 ) -> [f64; 3] {
-    // Returns unphased: [0/0, 0/1, 1/1]
-
     let error_rate = 0.03;
 
     // Prior probabilities
