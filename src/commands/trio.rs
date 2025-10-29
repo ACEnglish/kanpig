@@ -75,6 +75,10 @@ fn task_thread(
 
                 let n_haps = pileup_data.haplos.len();
                 if n_haps < m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
+                    debug!(
+                        "Region skipped extreme coverage {}x @ {}:{}-{}",
+                        n_haps, m_graph.chrom, m_graph.start, m_graph.end
+                    );
                     m_result_sender
                         .send(m_graph.take_annotated(
                             vec![&[], &[], &[]],
@@ -239,6 +243,14 @@ pub struct IOParams {
     /// Regions to analyze
     #[arg(long, help_heading = "I/O")]
     pub bed: Option<PathBuf>,
+
+    /// Minimum coverage of a region to analyze
+    #[arg(long, default_value_t = 1, help_heading = "I/O")]
+    pub min_coverage: usize,
+
+    /// Maximum coverage of a region to analyze
+    #[arg(long, default_value_t = 1000, help_heading = "I/O")]
+    pub max_coverage: usize,
 
     /// Verbose logging
     #[arg(long, default_value_t = false)]
