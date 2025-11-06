@@ -161,8 +161,6 @@ fn phased_genotype_scores(
     let ll_01 = max_het + ((ll_01_a - max_het).exp() + (ll_02_b - max_het).exp()).ln();
 
     // 1/1: Both haplotypes carry alt alleles
-    // This is tricky: could be allele1|allele1, allele2|allele2, or allele1|allele2
-    // For simplicity, assuming both alleles are the "same" variant (just phased differently)
     // Expect: mostly alt reads (allele1 + allele2), few ref_reads
     let ll_11 = {
         let alt_reads = allele1_reads + allele2_reads;

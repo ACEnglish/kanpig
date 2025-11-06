@@ -247,11 +247,11 @@ fn finalize_annotation(
     let gt_obs = germ_genotyper::phased_genotyper(ref_cov, alt_cov1, alt_cov2);
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
-    // Either use haplotagging PS or NE
+    // Either use haplotagging PS or NE (+1 for 1-based like in the VCF)
     let ps = paths
         .first()
         .and_then(|p| p.meta.ps.get(sample_idx).copied())
-        .unwrap_or(Some(neigh_group as u32));
+        .unwrap_or(Some((neigh_group + 1) as u32));
 
     let ad = vec![Some(ref_cov as i32), Some((alt_cov1 + alt_cov2) as i32)];
 
