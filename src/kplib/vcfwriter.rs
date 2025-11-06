@@ -51,8 +51,8 @@ impl VcfWriter {
         // Comment line for version/params
         //let command = env::args().skip(1).collect::<Vec<String>>().join(" ");
         let command = env::args().collect::<Vec<String>>().join(" ");
-        let comment = format!("{} v{} {}", PKG_NAME, VERSION, command);
-        let _ = header.insert("source".parse().unwrap(), Value::String(comment));
+        let comment = format!("<version='v{}',command='{}'>", VERSION, command);
+        let _ = header.insert(PKG_NAME.parse().expect("const"), Value::String(comment));
 
         // Setup FORMAT header definitions
         let all_formats = header.formats_mut();
