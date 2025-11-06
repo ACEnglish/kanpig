@@ -179,12 +179,15 @@ fn task_thread(
 
                 // Before updating the somatic in place
                 if let Some(ref mut send_back) = send_back {
-                    for (_record, annos) in send_back {
+                    for (_record, annos) in &mut *send_back {
                         for (sample_idx, (anno, sample_paths)) in
                             annos.iter_mut().zip(&somatic_paths).enumerate()
                         {
                             for path in sample_paths {
                                 if path.path.contains(&anno.var_idx) {
+                                    if !anno.gt.contains("1") {
+                                        anno.gq = gts.quality_score.round() as i32;
+                                    }
                                     anno.filt |= FiltFlags::SOMATIC;
                                     // TODO: wrong for haploid regions
                                     *anno.ad[1].get_or_insert(0) +=
@@ -196,6 +199,24 @@ fn task_thread(
                                     *anno.ad[0].get_or_insert(0) = anno.ad[0]
                                         .unwrap_or(0)
                                         .saturating_sub(path.meta.coverage[sample_idx] as i32);
+                                }
+                            }
+                        }
+                    }
+
+                    // Recalculate GQ/SQ given the updated coverages
+                    for (_record, annos) in &mut *send_back {
+                        for anno in annos {
+                            if anno.gt.contains("1") && (anno.filt.contains(FiltFlags::SOMATIC)) {
+                                if let (Some(rcov), Some(acov)) = (anno.ad[0], anno.ad[1]) {
+                                    let ngt = crate::kplib::germ_genotyper::genotyper(
+                                        rcov as u64,
+                                        acov as u64,
+                                    );
+                                    anno.sq = ngt.sq as i32;
+                                    if !anno.gt.contains("1") {
+                                        anno.gq = ngt.gq.round() as i32;
+                                    }
                                 }
                             }
                         }
