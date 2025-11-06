@@ -70,7 +70,6 @@ impl MeanShift {
         let labels = self.assign_labels(data, &unique_centers);
 
         // Get the index of points closest to the unique_centers
-        // Get the index of points closest to the unique_centers
         let medoids: Vec<usize> = unique_centers
             .iter()
             .map(|&center| {
@@ -205,7 +204,6 @@ pub struct MeanShiftResult {
 ///
 /// This function estimates the bandwidth by computing pairwise distances
 /// and returning the specified quantile of these distances.
-/// This version more closely matches scikit-learn's implementation.
 ///
 /// # Arguments
 /// * `data` - Input 1D data points

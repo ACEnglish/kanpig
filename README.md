@@ -35,12 +35,6 @@ tabix -p bed alignments.plup.gz
 
 Other available genotyping modes are `kanpig trio` and `kanpig mosaic`.
 
-# ⚠️ Current Limitations
-* Kanpig expects sequence resolved or `<DEL>` SVs. Other SVs with symbolic alts (e.g. `<DUP>`) and BNDs are not parsed.
-* Kanpig only looks at read pileups and does not consider split or soft-clipped alignment information. This means
-  variants above ~10kbp should be skipped with the `--sizemax` parameter unless you have reason to believe the reads are
-  aligned continuously over larger SVs (e.g. genotyping from assembly alignments).
-
 # 📝 Annotations
 
 The `SAMPLE` column fields populated by kanpig are:
@@ -64,7 +58,7 @@ Details of `FT`
 | 0x8    | The sample quality (SQ) is less than 5 (only present on non-ref variants) |
 | 0x16   | The number of reads supporting the alternate allele less than 5 (only present on non-ref variants) |
 | 0x32   | The best scoring path through the variant graph only used part of the haplotype. This may be indicative of a false-negative in the variant graph. |
-| 0x64   | The variant is somatic (mosaic mode only) |
+| 0x64   | The variant is supported by reads from a non-germline haplotype clustering (mosaic mode only) |
 
 # 🔌 Compute Resources
 
@@ -77,7 +71,7 @@ VCF. As a example of kanpig's resource usage with 16 cores available, genotyping
 sample VCF (4.3 million SVs) took 13 minutes with a maximum memory usage of 12GB. Converting the bam to a plup file took
 4 minutes (8GB of memory) and genotyping with this plup file took 3 minutes (12GB memory). 
 
-Note that kanpig `gt` is predominantly I/O limited and may not benefit more than ~4-8 cores.
+Note that kanpig is predominantly I/O limited and may not benefit more than ~4-8 cores.
 
 While genotyping against a plup file is usually faster, bam to plup conversion is most useful for:
 * genotyping a large VCF or super-high (>50x) coverage bam.
@@ -87,7 +81,7 @@ While genotyping against a plup file is usually faster, bam to plup conversion i
 # 🔧 Core Parameter Details
 
 These parameters are universal to all the genotyping modes and handle how variant graphs are built or how haplotypes are
-applied to the built graphs. The default parameters work generally well for most use cases. The optimal parameters for a
+applied to the graphs. The default parameters work generally well for most use cases. The optimal parameters for a
 particular experiment will depend on things such as number of samples in the VCF and the merging strategy of the variants.
 
 ### `--neighdist`
@@ -103,10 +97,15 @@ too large of a value may create long neighborhoods with many SVs which are also 
 ### `--sizemin` and `--sizemax`
 Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of variants not within the size boundaries are set to missing (`./.`).
 
+Read pileups also must be within this sizemin and sizemax. Some SVs with sizes around these thresholds may not be
+consistent between alignments/varaints. For example, the VCF may describe a 50bp variant while the alignments have a
+10bp and 40bp split variant. These problematic regions can sometimes benefit from a lower `--sizemin`, however this is
+not a magic fix for all cases.
+
 ### `--sizesim` and `--seqsim`
-When applying a haplotype to a variant graph, only paths above these two thresholds are allowed. If there are multiple
+When applying a haplotype to a variant graph, only path above these two thresholds are allowed. If there are multiple
 paths above the threshold, the one with the highest score is kept. Generally, `0.90` is well balanced
-whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds. 
+whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds.
 
 ### `--gpenalty` and `--fpenalty`
 The similarity of a path to the graph is used to to compute a score and the highest score kept. The scoring formula is
@@ -127,10 +126,9 @@ speed up runtime but may come at a cost of recall. A higher `maxpaths` is slower
 specificity.
 
 ### `--maxnodes`
-If a neighborhood has too many variants, its graph will become large in memory and slow to traverse This parameter 
-will turn off path-finding in favor of `--one-to-one` haplotype to variant comparison (see Experimental Parameters 
-below), reducing runtime and memory usage. This may reduce recall in regions with many SVs, but these regions are
-problematic anyway.
+If a neighborhood has too many variants, its graph will become large in memory and slow to traverse. This parameter 
+will turn off path-finding in favor of `--one-to-one` haplotype to variant comparison, reducing runtime and memory usage. 
+This may reduce recall in regions with many SVs, but these regions are problematic anyway.
 
 ### `--one-to-one`
 Instead of performing the path-finding algorithm to apply a haplotype to the variant graph, perform a 1-to-1 
@@ -149,13 +147,15 @@ variants that best reflect those described by the alignments.
 # 🛏️ Bed Files
 
 ### `--bed`
-A sorted bed file (`bedtools sort`) that restricts kanpig to only analyzing variants with starts and ends within a single bed entry.
+A sorted bed file (`bedtools sort`) that restricts kanpig to only analyzing variants with starts and ends within a 
+single bed entry.
 
 ### `--ploidy-bed`
-This bed file informs kanpig of special regions within chromosomes that should have non-diploid genotypes. For example, a female
-human sample shouldn't have any genotypes on chrY. A male human sample should have hemizygous genotypes on chrY and the
-non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEnglish/kanpig/tree/develop/ploidy_beds) directory 
-has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are assumed to be diploid.
+This bed file informs kanpig of special regions within chromosomes that should have non-diploid genotypes. For example, 
+a female human sample shouldn't have any genotypes on chrY. A male human sample should have hemizygous genotypes on chrY 
+and the non-pseudoautosomal regions of chrX. The [ploidy_beds/](https://github.com/ACEnglish/kanpig/tree/develop/ploidy_beds)
+directory  has example bed files for GRCh38. All regions not within the `--ploidy-bed` (or if no bed is provided) are 
+assumed to be diploid.
 
 # 🧬 Germline Mode
 
@@ -187,11 +187,11 @@ After the haplotypes are clustered, the genotyper tests the likelihood of all po
 haplotype's coverage.
 
 ### `--msmin`
-When performing MeanShift clustering, the `min_bin_freq` controls the minimum number of reads to create a bin.
+When performing MeanShift clustering, this controls the minimum number of reads inside each bin.
 
 ### `--maxclust`
-The maximum number of clusters (i.e. highest K) allowed. This defaults to 5 to allow for the possibility of two parental
-haplotypes and one denovo variant in the proband.
+The maximum number of clusters (i.e. highest K) allowed. This defaults to 5 to allow for the possibility of compound
+heterozygous in both parents and one denovo variant in the proband.
 
 ### `--hps-weight` & `--len-weight`
 When building the distance matrix for kmedoid clustering, reads with different haplotagging HPs or in different
@@ -205,15 +205,28 @@ somatic variants will have the `FMT/FT` SOMATIC flag (0x64) populated. If multip
 (e.g. multiple tissues across a single individual), each sample will have an output `SAMPLE` column. However, all 
 reads are pooled together during the clustering and up to `--maxclust` allowed. 
 
+Some of mosaic mode's parameters are shared with trio mode and documented above.
+
 ### `--bandwidth`
 When performing MeanShift clustering, length-based clusters must be at least `--bandwidth` base-pairs different in
-length.
+length. This defaults to 2bp, which will attempt to build clusters which are at least 2bp different in length.
 
 ### `--alpha`, `--beta`, & `--soma-vaf`
 These parameters are for the modeling of somatic events. The defaults work well for benchmarking against the artificial
 HapMap Mix provided by the SMaHT network and their MIMS SV benchmark. In practical samples, with different VAF
 distributions of somatic events, these parameters may need to be tweaked. See XYZ for a detailed tutorial on how to
 these parameters impact the modeling.
+
+# ⚠️ Current Limitations
+* Kanpig expects sequence resolved or `<DEL>` SVs. Other SVs with symbolic alts (e.g. `<DUP>`) and BNDs are not parsed.
+* Kanpig only looks at read pileups and does not consider split or soft-clipped alignment information. This means
+  variants above ~10kbp should be skipped with the `--sizemax` parameter unless you have reason to believe the reads are
+  aligned continuously over larger SVs (e.g. genotyping from assembly alignments).
+* As a VCF becomes more complex (e.g. a project-level VCF), kanpig's precision may drop. This is because as more
+  SVs/neighborhoods are added to the graph, the chances of spurious reads in a given sample being picked up
+  and applied to the graph increase. One way to counter this is to [post-filter genotypes](https://github.com/ACEnglish/kanpig/wiki/Filtering-Genotypes)
+  by their read support. Additionally, genotyping results in regions with an absurd number of SV candidates caused by 
+  limitations of alignment-based SV discovery should generally not be trusted.
 
 # 🐍 Python bindings
 Minimal python bindings are available for plup parsing. These can be installed via `maturin develop --release --features python`
