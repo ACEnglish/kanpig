@@ -4,6 +4,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use petgraph::graph::NodeIndex;
 use std::{
     collections::HashMap,
+    env,
     fs::File,
     io::{BufWriter, Write},
     path::PathBuf,
@@ -11,11 +12,16 @@ use std::{
 
 use noodles_vcf::{
     self as vcf,
-    header::record::value::map::format,
-    header::record::value::Map,
+    header::record::{
+        value::{map::format, Map},
+        Value,
+    },
     variant::io::Write as vcfWrite,
     variant::record_buf::samples::{keys::Keys, Samples},
 };
+
+const PKG_NAME: &str = env!("CARGO_PKG_NAME");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub struct VcfWriter {
     writer: vcf::io::Writer<Box<dyn Write>>,
@@ -42,6 +48,11 @@ impl VcfWriter {
         for i in sample_names {
             header.sample_names_mut().insert(i.to_owned());
         }
+        // Comment line for version/params
+        //let command = env::args().skip(1).collect::<Vec<String>>().join(" ");
+        let command = env::args().collect::<Vec<String>>().join(" ");
+        let comment = format!("{} v{} {}", PKG_NAME, VERSION, command);
+        let _ = header.insert("source".parse().unwrap(), Value::String(comment));
 
         // Setup FORMAT header definitions
         let all_formats = header.formats_mut();

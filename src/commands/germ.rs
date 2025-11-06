@@ -34,7 +34,13 @@ fn task_thread(
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
                 let mut m_graph = Variants::new(chunk, m_args.graph.kmer);
-                debug!("Chunk {:?}:{:?}-{:?} w/ {}", m_graph.chrom, m_graph.start, m_graph.end, m_graph.node_indices.len() - 2);
+                debug!(
+                    "Chunk {:?}:{:?}-{:?} w/ {}",
+                    m_graph.chrom,
+                    m_graph.start,
+                    m_graph.end,
+                    m_graph.node_indices.len() - 2
+                );
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam
                 if ploidy == Ploidy::Zero {
