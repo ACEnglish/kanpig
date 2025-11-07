@@ -96,7 +96,7 @@ This is an important parameter because too small of a `neighdist` may not recrui
 Similarly, too large of a value may create long neighborhoods for reads to fully-span or with many SVs.
 
 ### `--sizemin` and `--sizemax`
-Variant sizes are determined by `abs(length(ALT) - length(REF))` or `END - POS` for `<DEL>. Genotypes of variants not 
+Variant sizes are determined by `abs(length(ALT) - length(REF))` or `END - POS` for `<DEL>`. Genotypes of variants not 
 within the size boundaries are set to missing (`./.`).
 
 Read pileups also must be within this sizemin and sizemax. Some SVs with sizes around these thresholds may not be
