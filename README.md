@@ -66,12 +66,12 @@ Kanpig is highly parallelized and will fully utilize all threads it is given. Ho
 help and therefore the number of threads should probably be limited to the number of physical processors available. For
 memory, giving kanpig 2GB per-core is usually more than enough.
 
+Note that kanpig is predominantly I/O limited and may not benefit more than ~4-8 cores.
+
 The actual runtime and memory usage of kanpig run will depend on the read coverage and the number of SVs in the input
 VCF. As a example of kanpig's resource usage with 16 cores available, genotyping a 30x long-read bam against a 2,199
 sample VCF (4.3 million SVs) took 13 minutes with a maximum memory usage of 12GB. Converting the bam to a plup file took
 4 minutes (8GB of memory) and genotyping with this plup file took 3 minutes (12GB memory). 
-
-Note that kanpig is predominantly I/O limited and may not benefit more than ~4-8 cores.
 
 While genotyping against a plup file is usually faster, bam to plup conversion is most useful for:
 * genotyping a large VCF or super-high (>50x) coverage bam.
@@ -85,25 +85,27 @@ applied to the graphs. The default parameters work generally well for most use c
 particular experiment will depend on things such as number of samples in the VCF and the merging strategy of the variants.
 
 ### `--neighdist`
-Kanpig will build local variant graphs from groups of variants in a 'neighborhood'. These neighborhoods are determined by making the maximum end position
-of an upstream neighborhood's variants at least `neighdist` base-pairs away from the next neighborhood's variants' minimum start position.
+Kanpig will build local variant graphs from groups of variants in a 'neighborhood'. These neighborhoods are determined by 
+making the maximum end position of an upstream neighborhood's variants at least `neighdist` base-pairs away from the next 
+neighborhood's variants' minimum start position.
 
 This distance also determines the region over which read pileups are generated. Only reads with at least `mapq` mapping quality, 
 passing the `mapflag` filter, and which fully span the neighborhood are considered.
 
-This is an important parameter because too small of a `neighdist` may not recruit distant read pileups which support variants. Similarly, 
-too large of a value may create long neighborhoods with many SVs which are also too large for reads to fully-span.
+This is an important parameter because too small of a `neighdist` may not recruit distant read pileups which support variants.
+Similarly, too large of a value may create long neighborhoods for reads to fully-span or with many SVs.
 
 ### `--sizemin` and `--sizemax`
-Variant sizes are determined by `abs(length(ALT) - length(REF))`. Genotypes of variants not within the size boundaries are set to missing (`./.`).
+Variant sizes are determined by `abs(length(ALT) - length(REF))` or `END - POS` for `<DEL>. Genotypes of variants not 
+within the size boundaries are set to missing (`./.`).
 
 Read pileups also must be within this sizemin and sizemax. Some SVs with sizes around these thresholds may not be
-consistent between alignments/varaints. For example, the VCF may describe a 50bp variant while the alignments have a
-10bp and 40bp split variant. These problematic regions can sometimes benefit from a lower `--sizemin`, however this is
+consistent between alignments/variants. For example, the VCF may describe a 50bp variant while the alignments have a
+49bp or split 10bp and 40bp variant. These problematic regions can sometimes benefit from a lower `--sizemin`, however this is
 not a magic fix for all cases.
 
 ### `--sizesim` and `--seqsim`
-When applying a haplotype to a variant graph, only path above these two thresholds are allowed. If there are multiple
+When applying a haplotype to a variant graph, only paths above these two thresholds are allowed. If there are multiple
 paths above the threshold, the one with the highest score is kept. Generally, `0.90` is well balanced
 whereas lower thresholds will boost recall at the cost of precision and vice versa for higher thresholds.
 
@@ -209,7 +211,7 @@ Some of mosaic mode's parameters are shared with trio mode and documented above.
 
 ### `--bandwidth`
 When performing MeanShift clustering, length-based clusters must be at least `--bandwidth` base-pairs different in
-length. This defaults to 2bp, which will attempt to build clusters which are at least 2bp different in length.
+length. 
 
 ### `--alpha`, `--beta`, & `--soma-vaf`
 These parameters are for the modeling of somatic events. The defaults work well for benchmarking against the artificial
@@ -225,7 +227,7 @@ these parameters impact the modeling.
 * As a VCF becomes more complex (e.g. a project-level VCF), kanpig's precision may drop. This is because as more
   SVs/neighborhoods are added to the graph, the chances of spurious reads in a given sample being picked up
   and applied to the graph increase. One way to counter this is to [post-filter genotypes](https://github.com/ACEnglish/kanpig/wiki/Filtering-Genotypes)
-  by their read support. Additionally, genotyping results in regions with an absurd number of SV candidates caused by 
+  for minimum read support. Additionally, genotyping results in regions with an absurd number of candidates SVs caused by 
   limitations of alignment-based SV discovery should generally not be trusted.
 
 # 🐍 Python bindings
