@@ -193,9 +193,9 @@ fn bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     let error_rate = 0.03;
 
     // Prior probabilities
-    let prior_homref = 0.001_f64.ln();
-    let prior_het = 0.75_f64.ln();
-    let prior_homalt = 0.249_f64.ln();
+    let prior_homref = 0.33_f64.ln();
+    let prior_het = 0.34_f64.ln();
+    let prior_homalt = 0.33_f64.ln();
 
     let n = ref_cov + alt_cov;
     if n == 0 {

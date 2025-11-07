@@ -97,7 +97,6 @@ pub struct MosaicGenotyper {
     pub somatic_vaf_prior_beta: f64,
     pub max_somatic_vaf: f64,
     pub min_depth_for_call: u32,
-    pub allele_frequencies: Option<Vec<f64>>, // Population allele frequencies
 }
 
 impl Default for MosaicGenotyper {
@@ -108,7 +107,6 @@ impl Default for MosaicGenotyper {
             somatic_vaf_prior_beta: 15.0,
             max_somatic_vaf: 0.2,
             min_depth_for_call: 1,
-            allele_frequencies: None,
         }
     }
 }
@@ -131,13 +129,7 @@ impl MosaicGenotyper {
             somatic_vaf_prior_beta: somatic_beta,
             max_somatic_vaf,
             min_depth_for_call,
-            allele_frequencies: None,
         }
-    }
-
-    pub fn with_allele_frequencies(mut self, frequencies: Vec<f64>) -> Self {
-        self.allele_frequencies = Some(frequencies);
-        self
     }
 
     /// Generate all possible genotype hypotheses
@@ -239,32 +231,14 @@ impl MosaicGenotyper {
             }
         }
 
-        // Germline prior based on allele frequencies or uniform
-        log_prior += if let Some(ref freqs) = self.allele_frequencies {
-            match hypothesis.germline_alleles.len() {
-                1 => {
-                    // Homozygous: P(A/A) = f_A^2
-                    let idx = hypothesis.germline_alleles[0];
-                    2.0 * freqs[idx].max(0.001).ln()
-                }
-                2 => {
-                    // Heterozygous: P(A/B) = 2 * f_A * f_B
-                    let idx1 = hypothesis.germline_alleles[0];
-                    let idx2 = hypothesis.germline_alleles[1];
-                    (2.0 * freqs[idx1].max(0.001) * freqs[idx2].max(0.001)).ln()
-                }
-                _ => f64::NEG_INFINITY,
+        // Germline prior based
+        log_prior += match hypothesis.germline_alleles.len() {
+            1 => -(num_alleles as f64).ln(),
+            2 => {
+                let n_het = (num_alleles * (num_alleles - 1)) / 2;
+                -(n_het as f64).ln()
             }
-        } else {
-            // Uniform prior
-            match hypothesis.germline_alleles.len() {
-                1 => -(num_alleles as f64).ln(),
-                2 => {
-                    let n_het = (num_alleles * (num_alleles - 1)) / 2;
-                    -(n_het as f64).ln()
-                }
-                _ => f64::NEG_INFINITY,
-            }
+            _ => f64::NEG_INFINITY,
         };
 
         log_prior
