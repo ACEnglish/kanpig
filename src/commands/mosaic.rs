@@ -102,6 +102,10 @@ fn task_thread(
 
                 let n_haps = pileup_data.haplos.len();
                 if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
+                    debug!(
+                        "Region skipped extreme coverage {}x @ {}:{}-{}",
+                        n_haps, m_graph.chrom, m_graph.start, m_graph.end
+                    );
                     m_result_sender
                         .send(m_graph.take_annotated(
                             vec![&[]; n_samples],

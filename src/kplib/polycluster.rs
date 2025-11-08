@@ -129,20 +129,36 @@ pub fn perform_clustering(
     n_samps: usize,
 ) -> ClusterResult {
     // MeanShift to determine K
+    if haplos.is_empty() {
+        return ClusterResult {
+            assignments: vec![],
+            quality: vec![],
+            k: 0,
+            medoids: vec![],
+        };
+    }
+    if haplos.len() == 1 {
+        return ClusterResult {
+            assignments: vec![0],
+            quality: vec![0.0],
+            k: 1,
+            medoids: vec![0],
+        };
+    }
+
     let sizes: Vec<f64> = haplos.iter().map(|x| x.size as f64).collect();
     let mut ms = MeanShift::new(m_args);
     let ms_result = ms.fit(&sizes);
 
     // TODO: Experimental: try to make at most 2 like the regular GT does
     let k = ms_result.cluster_centers.len();
-    let (mut medoids, k) = if k == 1 && k >= haplos.len() {
+    let (mut medoids, k) = if k == 1 {
         // Single center, we can't trust the medoids?
         let medoids = kmedoids::random_initialization(
             haplos.len(),
             2, // K
             &mut rand::rngs::StdRng::seed_from_u64(21),
         );
-
         (medoids, 2)
     } else if k > m_args.maxclust {
         // Only collect the highest covered medoids if MSk > maxclust

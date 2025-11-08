@@ -74,7 +74,7 @@ fn task_thread(
                 let pileup_data = collect_pileup_data(&mut reads, &m_graph);
 
                 let n_haps = pileup_data.haplos.len();
-                if n_haps < m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
+                if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
                     debug!(
                         "Region skipped extreme coverage {}x @ {}:{}-{}",
                         n_haps, m_graph.chrom, m_graph.start, m_graph.end
