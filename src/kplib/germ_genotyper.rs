@@ -41,7 +41,8 @@ pub fn genotyper(ref_cov: u64, alt_cov: u64) -> GenotypeResult {
             sq: 0.0,
         };
     }
-    let scores = bino_genotype_scores(ref_cov, alt_cov);
+    //let scores = bino_genotype_scores(ref_cov, alt_cov);
+    let scores = beta_genotype_scores(ref_cov, alt_cov);
     let state = match scores
         .iter()
         .enumerate()
@@ -187,13 +188,13 @@ fn phased_genotype_scores(
 /// - The first value corresponds to the reference genotype.
 /// - The second value corresponds to the heterozygous genotype.
 /// - The third value corresponds to the homozygous genotype.
-fn bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
+fn __bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     let error_rate = 0.03;
 
     // Prior probabilities
-    let prior_homref = 0.33_f64.ln();
-    let prior_het = 0.34_f64.ln();
-    let prior_homalt = 0.33_f64.ln();
+    let prior_homref = 0.04_f64.ln();
+    let prior_het = 0.64_f64.ln();
+    let prior_homalt = 0.32_f64.ln();
 
     let n = ref_cov + alt_cov;
     if n == 0 {
@@ -218,7 +219,7 @@ fn bino_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     ]
 }
 
-fn __beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
+fn beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
     let k = k as f64;
     let n = n as f64;
 
@@ -234,7 +235,7 @@ fn __beta_binomial_ln_pmf(k: u64, n: u64, alpha: f64, beta: f64) -> f64 {
     log_binom_coef + log_beta_num - log_beta_denom
 }
 
-fn __beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
+fn beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
     // IMPL OF BETA-BINOMIAL MODEL, TIES OUT WITH PYRO BETA-BINOMIAL IMPL WHEN HYPERPARAMETERS ARE SET CLOSE TO PYRO-FIT VALUES
     // TODO expose these as CLI parameters
     // for now, roughly set to typical values seen in HPRC samples fit with pyro implementation
@@ -251,9 +252,11 @@ fn __beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
         return [0.0, 0.0, 0.0]; // keep flat prior for missing GT to keep previous GQ < 5 threshold for LOWGQ filter
     }
 
-    let frac: &[f64] = &[0.001, 0.75, 0.249]; // mixture weights
+    //let frac: &[f64] = &[0.001, 0.75, 0.249]; // mixture weights
+    let frac: &[f64] = &[0.03, 0.64, 0.32]; // mixture weights
     let mu = &[0.03, 0.50, 0.97]; // beta-binomial means
-    let nu = &[100.0, 46.90, 50.25]; // beta-binomial precisions
+                                  //let nu = &[100.0, 46.90, 50.25]; // beta-binomial precisions
+    let nu = &[25.0, 5.0, 10.0]; // beta-binomial precisions
 
     // let coverage_factor = (total as f64 / 5.0).min(1.0);
     // let nu: Vec<f64> = nu_base.iter()
@@ -268,9 +271,9 @@ fn __beta_genotype_scores(ref_cov: u64, alt_cov: u64) -> [f64; 3] {
         .collect();
 
     [
-        frac[0].ln() + __beta_binomial_ln_pmf(alt_cov, total, alpha[0], beta[0]),
-        frac[1].ln() + __beta_binomial_ln_pmf(alt_cov, total, alpha[1], beta[1]),
-        frac[2].ln() + __beta_binomial_ln_pmf(alt_cov, total, alpha[2], beta[2]),
+        frac[0].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[0], beta[0]),
+        frac[1].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[1], beta[1]),
+        frac[2].ln() + beta_binomial_ln_pmf(alt_cov, total, alpha[2], beta[2]),
     ]
 }
 
@@ -303,7 +306,45 @@ fn genotype_quals(mut gt_lplist: [f64; 3]) -> (f64, f64) {
     let sq = f64::min((-10.0 * norm_log10_probs[0]).abs(), 1000.0);
 
     norm_log10_probs.sort_by(|a, b| b.partial_cmp(a).unwrap());
-    let gq = f64::min(-10.0 * (norm_log10_probs[1] - norm_log10_probs[0]), 1000.0) / 10.0;
+    // 4 is GQ calibration that gets it closer to true probabilities
+    let gq = f64::min(-10.0 * (norm_log10_probs[1] - norm_log10_probs[0]), 1000.0);
 
-    (gq, sq)
+    (calibrate_gq(gq), sq)
+}
+
+// Load calibration table at startup
+static CALIBRATION_TABLE: &[(f64, f64)] = &[
+    (2.50, 2.17),
+    (7.50, 0.76),
+    (12.50, 0.85),
+    (17.50, 8.33),
+    (22.50, 12.93),
+    (27.50, 19.02),
+    (32.50, 22.77),
+    (37.50, 20.21),
+];
+
+fn calibrate_gq(raw_gq: f64) -> f64 {
+    if CALIBRATION_TABLE.is_empty() {
+        return raw_gq;
+    }
+
+    // Linear interpolation
+    if raw_gq <= CALIBRATION_TABLE[0].0 {
+        return CALIBRATION_TABLE[0].1;
+    }
+
+    for i in 0..CALIBRATION_TABLE.len() - 1 {
+        let (x0, y0) = CALIBRATION_TABLE[i];
+        let (x1, y1) = CALIBRATION_TABLE[i + 1];
+
+        if raw_gq >= x0 && raw_gq <= x1 {
+            // Linear interpolation
+            let t = (raw_gq - x0) / (x1 - x0);
+            return y0 + t * (y1 - y0);
+        }
+    }
+
+    // Beyond table range
+    CALIBRATION_TABLE.last().unwrap().1
 }

@@ -218,13 +218,13 @@ fn handle_diploid_two_paths<'a>(
             "1|0",
             germ_genotyper::GTstate::Het,
             path1.meta.coverage[sample_idx],
-            path2.meta.coverage[sample_idx],
+            0,
             path1.full_target,
         ),
         (false, true) => (
             "0|1",
             germ_genotyper::GTstate::Het,
-            path1.meta.coverage[sample_idx],
+            0,
             path2.meta.coverage[sample_idx],
             path2.full_target,
         ),
@@ -244,7 +244,8 @@ fn finalize_annotation(
     let (gt_str, gt_path, alt_cov1, alt_cov2, full_target) = handle;
     let ref_cov = coverage - alt_cov1 - alt_cov2;
 
-    let gt_obs = germ_genotyper::phased_genotyper(ref_cov, alt_cov1, alt_cov2);
+    let gt_obs = germ_genotyper::genotyper(ref_cov, alt_cov1 + alt_cov2);
+    //let gt_obs = germ_genotyper::phased_genotyper(ref_cov, alt_cov1, alt_cov2);
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     // Either use haplotagging PS or NE (+1 for 1-based like in the VCF)

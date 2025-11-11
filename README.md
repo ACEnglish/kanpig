@@ -50,7 +50,7 @@ The `SAMPLE` column fields populated by kanpig are:
 | **KS**  | [Kanpig score](https://github.com/ACEnglish/kanpig/wiki/Scoring-Function) |
 
 Details of `FT`
-| Flag   | Description |
+| Bit   | Description |
 |--------|-------------|
 | 0x1    | The genotype observed from variants paths matching is not equal to the genotype observed from measuring the proportions of reads supporting the two alleles. |
 | 0x2    | The genotype quality is less than 5 |
