@@ -165,6 +165,12 @@ impl KanpigCommand for GermCommand {
         is_ok &= file_validators::validate_reads(&self.io.reads, &self.graph);
         is_ok &= file_validators::validate_reference(&self.io.reference);
 
+        if let Some(cfg) = &self.gqconfig {
+            is_ok &= file_validators::validate_file(cfg, "--gqconfig");
+        } else {
+            warn!("Using default genotyper parameters. GQs may not be informative");
+        }
+
         if let Some(bed_file) = &self.io.bed {
             is_ok &= file_validators::validate_file(bed_file, "--bed");
         }

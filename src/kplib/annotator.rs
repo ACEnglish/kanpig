@@ -211,7 +211,8 @@ fn handle_diploid_single_path<'a>(
         let alt_cov = path.meta.coverage[sample_idx];
         let ref_cov = coverage - alt_cov;
         let (genotype, state) = match genotyper.genotype(ref_cov, alt_cov).state {
-            GTstate::Ref | GTstate::Het => {
+            GTstate::Ref => ("0|0", GTstate::Ref),
+            GTstate::Het => {
                 let gt = match path.meta.hp[sample_idx] {
                     None => "0|1",
                     Some(1) => "0|1",

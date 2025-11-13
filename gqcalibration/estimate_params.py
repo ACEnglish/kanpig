@@ -3,13 +3,15 @@
 Estimate beta-binomial mixture model parameters from genotyping truth set.
 Fits parameters for three genotype classes: 0/0, 0/1, 1/1
 """
-
-import pandas as pd
-import numpy as np
-from scipy.optimize import minimize
-from scipy.special import betaln, logsumexp
-import kanpig
+import sys
 import json
+import argparse
+import kanpig
+import numpy as np
+import pandas as pd
+from scipy.optimize import minimize
+from scipy.interpolate import interp1d
+from scipy.special import betaln, logsumexp
 
 def beta_binomial_logpmf(k, n, mu, nu):
     """
@@ -87,32 +89,37 @@ def estimate_initial_params(df):
     
     return initial
 
-def fit_parameters(df, verbose=True):
+def fit_parameters(df, all_gts=False, min_dp=5, max_dp=60, all_hets=False):
     """
     Fit beta-binomial mixture parameters from truth set.
-    
-    Args:
-        df: DataFrame with columns 'Ogt' (0,1,2), 'AD_alt', 'DP'
-        verbose: print progress
-    
-    Returns:
-        dict with fitted parameters
     """
-    # Filter out low depth sites
-    df = df[(df['DP'] >= 5) & df['state']].copy()
-    
+    df = df[(df['DP'] >= min_dp) & (df['DP'] <= max_dp)].copy()
+   
     df['Ogt'] = df['Ogt'].map({'REF':0,'HET':1, 'HOM':2})
-    if verbose:
-        print(f"Using {len(df)} sites for parameter estimation")
-        print(f"Genotype distribution: {df['Ogt'].value_counts().to_dict()}")
+
+    if all_hets:
+        het_data = df[df['Ogt'] == 1]  # All hets
+        ref_data = df[(df['Ogt'] == 0) & df['state']]  # Only correct refs
+        hom_data = df[(df['Ogt'] == 2) & df['state']]  # Only correct homs
+        df = pd.concat([het_data, ref_data, hom_data])
+    elif all_gts:
+        df = df[df['state']].copy()
+ 
+
+    print(f"Using {len(df)} sites for parameter estimation")
+    print(f"Genotype distribution: {df['Ogt'].value_counts().to_dict()}")
     
     # Get initial parameter estimates
     initial = estimate_initial_params(df)
     
-    if verbose:
-        print("\nInitial parameter estimates:")
-        for gt, params in initial.items():
-            print(f"  GT {gt}: mu={params['mu']:.3f}, nu={params['nu']:.1f}, n={params['n']}")
+    print("\nInitial parameter estimates:")
+    for gt, params in initial.items():
+        print(f"  GT {gt}: mu={params['mu']:.3f}, nu={params['nu']:.1f}, n={params['n']}")
+
+    # Calculate empirical genotype fractions
+    gt_counts = df['Ogt'].value_counts()
+    total = len(df)
+    frac = [gt_counts.get(i, 0) / total for i in [0, 1, 2]]
     
     # Prepare data for optimization
     data = {
@@ -120,12 +127,7 @@ def fit_parameters(df, verbose=True):
         'ad_alt': df['AD_alt'].values,
         'dp': df['DP'].values
     }
-    
-    # Calculate empirical genotype fractions
-    gt_counts = df['Ogt'].value_counts()
-    total = len(df)
-    frac = [gt_counts.get(i, 0) / total for i in [0, 1, 2]]
-    
+
     # Initial parameter vector
     x0 = [
         frac[0], frac[1],  # mixture fractions (frac2 = 1 - frac0 - frac1)
@@ -147,8 +149,7 @@ def fit_parameters(df, verbose=True):
     # Constraint: frac0 + frac1 <= 0.99
     constraints = {'type': 'ineq', 'fun': lambda x: 0.99 - x[0] - x[1]}
     
-    if verbose:
-        print("\nOptimizing parameters...")
+    print("\nOptimizing parameters...")
     
     result = minimize(
         mixture_loglikelihood,
@@ -177,34 +178,20 @@ def fit_parameters(df, verbose=True):
         'n_sites': len(df)
     }
     
-    if verbose:
-        print("\nFitted parameters:")
-        print(f"  Mixture fractions: [{frac0:.3f}, {frac1:.3f}, {frac2:.3f}]")
-        print(f"  Means (mu):        [{mu0:.4f}, {mu1:.4f}, {mu2:.4f}]")
-        print(f"  Precisions (nu):   [{nu0:.1f}, {nu1:.1f}, {nu2:.1f}]")
-        print(f"  Log-likelihood:    {fitted['log_likelihood']:.1f}")
+    print("\nFitted parameters:")
+    print(f"  Mixture fractions: [{frac0:.3f}, {frac1:.3f}, {frac2:.3f}]")
+    print(f"  Means (mu):        [{mu0:.4f}, {mu1:.4f}, {mu2:.4f}]")
+    print(f"  Precisions (nu):   [{nu0:.1f}, {nu1:.1f}, {nu2:.1f}]")
+    print(f"  Log-likelihood:    {fitted['log_likelihood']:.1f}")
     
     return fitted
 
-def format_rust_output(fitted):
-    """Format parameters for Rust code."""
-    frac = fitted['frac']
-    mu = fitted['mu']
-    nu = fitted['nu']
-    
-    rust_code = f"""
-// Fitted beta-binomial mixture parameters
-let frac: &[f64] = &[{frac[0]:.4f}, {frac[1]:.4f}, {frac[2]:.4f}];
-let mu = &[{mu[0]:.6f}, {mu[1]:.6f}, {mu[2]:.6f}];
-let nu = &[{nu[0]:.2f}, {nu[1]:.2f}, {nu[2]:.2f}];
-"""
-    return rust_code
 
-def save_config(fitted, filename, calibration=None):
+def save_config(fitted, filename, calibration=None, flat_priors=False):
     """Save parameters to JSON config file."""
 
     config = {
-        'mixture_fractions': fitted['frac'],
+        'mixture_fractions': [0.33, 0.34, 0.33] if flat_priors else fitted['frac'],
         'means': fitted['mu'],
         'precisions': fitted['nu'],
         "calibration_table": [] if calibration is None else calibration,
@@ -216,16 +203,9 @@ def save_config(fitted, filename, calibration=None):
     
     with open(filename, 'w') as f:
         json.dump(config, f, indent=2)
-    
-    print(f"\nSaved parameters to {filename}")
 
-def newgt(gt, row):
-    """
-    Rerun the genotyper on a row
-    """
-    return gt.genotype(row['AD_ref'], row['AD_alt']).gq
+    return config
 
-from scipy.interpolate import interp1d
 def build_calibration(df):
     gqs = df['nGQ']
     correct = df['state']
@@ -255,34 +235,195 @@ def build_calibration(df):
                                fill_value=(calibrated_gqs[0], calibrated_gqs[-1]))
     return [[float(x), float(y)] for x, y in zip(bin_midpoints, calibrated_gqs)]
 
+def parse_args(args):
+    parser = argparse.ArgumentParser(prog="bench", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("IN", type=str,
+                        help="Input CSV from `make_params_df.py`")
+    parser.add_argument("OUT", type=str,
+                        help="Output prefix file to write")
+    parser.add_argument("--all", action="store_true",
+                        help="Fit on all genotypes, not just correct")
+    parser.add_argument("--min_dp", type=int, default=5,
+                        help="Minimum GT depth to fit on (%(default)s)")
+    parser.add_argument("--max_dp", type=int, default=60,
+                        help="MaximumGT depth to fit on (%(default)s)")
+    parser.add_argument("--all-hets", action="store_true",
+                        help="Fit on all hets, but only correct REF/HOM")
+    parser.add_argument("--flat-priors", action="store_true",
+                        help="Use flat priors (0.33) instead of observed GT states")
+    parser.add_argument("--no-calibrate", action="store_true",
+                        help="Don't perform GQ calibration")
+    parser.add_argument("--write-calib", action="store_true",
+                        help="Write a csv of the calibrated GQs")
+    parser.add_argument("--no-plots", action="store_true",
+                        help="Skip plotting")
+    args = parser.parse_args(args)
+    if args.all and args.all-hets:
+        print("Error! Can only fit either --all-hets XOR --all")
+    return args
+
+def make_plots(data, out_prefix):
+    # Optional requirements
+    import seaborn as sb
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score
+
+    
+    print("Making GT<->GQ Plot")
+    # Sort data by GQ
+    df_sorted = data.sort_values(by='GQ').reset_index(drop=True)
+    roll = 1000
+    # Calculate rolling averages
+    state_rolling = df_sorted['state'].rolling(roll).mean()
+    gq_rolling = (df_sorted['GQ']).rolling(roll).mean()
+    gq_rolling = 1 - 10**(-gq_rolling / 10)
+    # Create figure with twin y-axes
+    fig, ax1 = plt.subplots(figsize=(8, 6), dpi=180)
+
+    # First y-axis: State (accuracy)
+    color1 = 'tab:blue'
+    ax1.set_xlabel(f'Variants (sorted by GQ)', fontsize=12)
+    ax1.set_ylabel('Accuracy (rolling avg)', color=color1, fontsize=12)
+    ax1.plot(state_rolling, color=color1, linewidth=2, label='Observed')
+    ax1.tick_params(axis='y', labelcolor=color1)
+    ax1.set_ylim(0, 1)
+
+    # Second y-axis: GQ
+    ax2 = ax1#ax1.twinx()
+    color2 = 'tab:orange'
+    ax2.set_ylabel('Accuracy (rolling avg)', fontsize=12)
+    ax2.plot(gq_rolling, color=color2, linewidth=2, label='GQ')
+    ax2.tick_params(axis='y', labelcolor=color2)
+
+    # Title and grid
+    plt.title(f'Genotype Accuracy and Quality (200-sample rolling average)',
+              fontsize=14, pad=20)
+    ax1.grid(True, alpha=0.3)
+
+    # Add legends
+    ax1.legend(loc='lower right')
+
+    plt.tight_layout()
+    plt.savefig(out_prefix + '.GTGQ.png')
+
+    print("Making ROC curves")
+    fig, ax1 = plt.subplots(1, 1, figsize=(8, 6), dpi=180)
+    # Colors for different scores
+    colors = plt.cm.Set1(np.linspace(0, 1, 1))
+
+    y_true = data['state'].astype(int)
+    y_score = data['GQ']
+    
+    # ROC curve
+    fpr, tpr, _ = roc_curve(y_true, y_score)
+    roc_auc = auc(fpr, tpr)
+    
+    # Precision-Recall curve
+    precision, recall, _ = precision_recall_curve(y_true, y_score)
+    avg_precision = average_precision_score(y_true, y_score)
+    
+    # Plot ROC
+    ax1.plot(fpr, tpr, color=colors[0], lw=2, 
+             label=f'GQ (AUC = {roc_auc:.3f})')
+
+    # Format ROC plot
+    ax1.plot([0, 1], [0, 1], 'k--', lw=1, label='Random (AUC = 0.5)')
+    ax1.set_xlim([0.0, 1.0])
+    ax1.set_ylim([0.0, 1.05])
+    ax1.set_xlabel('False Positive Rate', fontsize=12)
+    ax1.set_ylabel('True Positive Rate', fontsize=12)
+    ax1.set_title('Kanpig ROC Curve', fontsize=14, fontweight='bold')
+    ax1.legend(loc="lower right")
+    ax1.grid(alpha=0.3)
+
+    plt.savefig(out_prefix + "ROC.png")
+
+    print("Making Genotypes Plot")
+    fig, ax = plt.subplots(3, 4, figsize=(12, 6), dpi=180)
+    xlim=(0, data['GQ'].max() + 1)
+    for i, m_ax in zip(['REF', 'HET', 'HOM'], ax):
+        p = sb.histplot(data=data[data['Ogt'] == i],
+                        x='GQ', hue='state', multiple='stack',
+                        binwidth=1, ax=m_ax[0])
+        p.set(title=f"Baseline", ylabel=i + ' Count', xlim=xlim)
+
+        p = sb.histplot(data=data[data['Mgt'] == i],
+                        x='GQ', hue='state', multiple='stack',
+                        binwidth=1, ax=m_ax[1])
+        p.set(title=f"Kanpig", ylabel= i + ' Count', xlim=xlim)
+
+        subset = data[data['Ogt'] == i]
+        af = subset['AD_alt'] / subset['DP']
+        p = sb.histplot(af[subset['state']], bins=50, ax=m_ax[2], binwidth=0.02)
+        p.set(xlabel='Allele Fraction',
+              yscale='log',
+              ylabel=i + ' Count (log)',
+              xlim=(0,1),
+              title='True GT')
+
+        p = sb.histplot(af[~subset['state']], bins=50, ax=m_ax[3], binwidth=0.02)
+        p.set(xlabel='Allele Fraction',
+              yscale='log',
+              xlim=(0,1),
+              ylabel=i + ' Count (log)',
+              title='False GT')
+
+    plt.tight_layout()
+    plt.savefig(out_prefix + '.STATE.png')
+
+
 # Example usage
 if __name__ == "__main__":
-    import sys
-    
-    if len(sys.argv) < 2:
-        print("Usage: python estimate_params.py <truth_set.csv> [output.json]")
-        sys.exit(1)
+    args = parse_args(sys.argv[1:])
     
     # Load truth set
-    df = pd.read_csv(sys.argv[1])
+    df = pd.read_csv(args.IN)
     
+    cnt = df.groupby(['Ogt', 'state']).size().unstack()
+    cnt.loc['All'] = cnt.sum(axis=0)
+    cnt['Acc'] = cnt[True] / cnt.sum(axis=1)
+    print("Genotype Accuracy")
+    print(cnt)
+    print()
+
+    print("GT Confusion Matrix")
+    print(df.groupby(["Ogt", "Mgt"]).size().unstack())
+    print()
+
     # Fit parameters
-    fitted = fit_parameters(df)
+    fitted = fit_parameters(df,
+                            all_gts=args.all,
+                            min_dp=args.min_dp,
+                            max_dp=args.max_dp,
+                            all_hets=args.all_hets,
+                            )
     
-    print("Bestfit parameters:")
-    print("="*60)
-    print(format_rust_output(fitted))
     # Now you need to go re-genotype everything and grab those GQs
     # Then you make the calibration table
-    # 
-    # Save config if requested
-    if len(sys.argv) >= 3:
-        save_config(fitted, sys.argv[2])
+    out_cfg = args.OUT + '.json'
+    config = save_config(fitted, out_cfg, flat_priors=args.flat_priors)
 
-    genotyper = kanpig.Genotyper(sys.argv[2])
-
-    df['nGQ'] = df.apply((lambda x: newgt(genotyper, x)), axis=1)
-    # Make calibrate
-    calibration = build_calibration(df)
-    if len(sys.argv) >= 3:
-        save_config(fitted, sys.argv[2], calibration)
+    if not args.no_calibrate:
+        print("Calibrating GQs")
+        gt = kanpig.Genotyper(out_cfg)
+        df['nGQ'] = df.apply((lambda x: gt.genotype(x['AD_ref'], x['AD_alt']).gq), axis=1)
+        calibration = build_calibration(df)
+        config = save_config(fitted, out_cfg, calibration, flat_priors=args.flat_priors)
+        # And then we have to run again to actually get the calibrated GQs
+        if args.write_calib or not args.no_plots:
+            print("Regenotyping with config")
+            gt = kanpig.Genotyper(out_cfg)
+            df['nGQ'] = df.apply((lambda x: gt.genotype(x['AD_ref'], x['AD_alt']).gq), axis=1)
+            df.to_csv(args.OUT + '.calibrated.csv')
+    
+    if not args.no_plots:
+        print("Making original plots")
+        df = df[(df['DP'] >= args.min_dp) & (df['DP'] <= args.max_dp)].copy()
+        make_plots(df, args.OUT + '.original')
+        if not args.no_calibrate:
+            print("Making calibrated plots")
+            df['GQ'] = df['nGQ']
+            make_plots(df, args.OUT + '.calibrated')
+    # Optional plotting here before/after GQs' ROC curves, accuracy curve, distribution plot, calibration plot
+    print("Finished")

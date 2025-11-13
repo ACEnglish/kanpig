@@ -53,3 +53,5 @@ TODOs
 * Generate GT accuracy reports, too. There's patterns to what should be expected from the raw GTs' accuracy that could
   be useful to generate warnings e.g. <75% genotyping accuracy is a problem.
 * Expand on what it means to make a truth-set (have to think about merging)
+* Better arguments/--help
+  * Flat mixture weights
