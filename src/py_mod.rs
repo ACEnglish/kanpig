@@ -215,7 +215,9 @@ impl PyHaplotypeMeta {
     }
 }
 
-use crate::kplib::germ_genotyper::{GTstate, GenotypeResult};
+use crate::kplib::germ_genotyper::{GTstate, GenotypeResult, Genotyper};
+use std::path::PathBuf;
+
 #[pyclass(name = "GenotypeResult", unsendable)]
 pub struct PyGenotypeResult {
     pub inner: GenotypeResult,
@@ -244,10 +246,48 @@ impl PyGenotypeResult {
     }
 }
 
-#[pyfunction] //
-fn genotyper(_py: Python<'_>, ref_cov: u64, alt_cov: u64) -> PyResult<PyGenotypeResult> {
-    let result = crate::kplib::germ_genotyper::genotyper(ref_cov, alt_cov);
-    Ok(PyGenotypeResult { inner: result })
+#[pyclass(name = "Genotyper", unsendable)]
+struct PyGenotyper {
+    inner: Genotyper,
+}
+
+#[pymethods]
+impl PyGenotyper {
+    #[new]
+    #[args(config_path = "None")]
+    fn new(config_path: Option<String>) -> PyResult<Self> {
+        let genotyper = if let Some(path) = config_path {
+            let path_buf = PathBuf::from(path);
+            Genotyper::from_config(path_buf)
+                .map_err(|e| PyValueError::new_err(format!("Failed to load config: {}", e)))?
+        } else {
+            Genotyper::new()
+        };
+
+        Ok(PyGenotyper { inner: genotyper })
+    }
+
+    /// Genotype a variant site based on reference and alternate allele coverage
+    ///
+    /// Parameters
+    /// ----------
+    /// ref_cov : int
+    ///     Coverage of the reference allele
+    /// alt_cov : int
+    ///     Coverage of the alternate allele
+    ///
+    /// Returns
+    /// -------
+    /// tuple of (str, float, float)
+    ///     A tuple containing:
+    ///     - genotype: The called genotype as a string ("Ref", "Het", "Hom", or "Non")
+    ///     - gq: Genotype quality score
+    ///     - sq: Sample quality score
+    fn genotype(&self, ref_cov: u64, alt_cov: u64) -> PyGenotypeResult {
+        PyGenotypeResult {
+            inner: self.inner.genotype(ref_cov, alt_cov),
+        }
+    }
 }
 
 /// Define the Python module
@@ -259,9 +299,7 @@ fn kanpig(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPlupParser>()?;
     m.add_class::<PyHaplotypeMeta>()?;
     m.add_class::<PyHaplotype>()?;
-
-    m.add_function(wrap_pyfunction!(genotyper, m)?)?;
-    m.add_class::<PyGenotypeResult>()?;
+    m.add_class::<PyGenotyper>()?;
 
     Ok(())
 }

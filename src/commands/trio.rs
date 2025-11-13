@@ -11,7 +11,9 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, open_reads, open_writer_thread,
+        build_region_tree,
+        germ_genotyper::Genotyper,
+        open_reads, open_writer_thread,
         pileup::collect_pileup_data,
         polycluster::{self, ToPolyCluParams},
         trio_genotyper::trio_genotyper,
@@ -56,7 +58,7 @@ fn task_thread(
     // These need to be pulled out so we can do the polyclustering
     // on both TrioCommand and MosaicCommand
     let pclu_params = m_args.to_polyclu_params();
-
+    let germ_genotyper = Genotyper::new();
     let mut reads = vec![pro_reads, pat_reads, mat_reads];
 
     loop {
@@ -84,6 +86,7 @@ fn task_thread(
                             vec![&[], &[], &[]],
                             pileup_data.coverages.to_vec(),
                             ploidy,
+                            &germ_genotyper,
                         ))
                         .unwrap();
                     continue;
@@ -123,6 +126,7 @@ fn task_thread(
                         separated_paths.iter().map(|bin| bin.as_slice()).collect(),
                         pileup_data.coverages.to_vec(),
                         ploidy,
+                        &germ_genotyper,
                     ))
                     .unwrap();
             }

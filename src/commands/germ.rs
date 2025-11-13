@@ -11,8 +11,9 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        build_region_tree, hp_sorter, open_reads, open_writer_thread, ChannelInput, ChannelOutput,
-        GraphParams, PathScore, Ploidy, PloidyRegions, Variants, VcfChunker,
+        build_region_tree, germ_genotyper::Genotyper, hp_sorter, open_reads, open_writer_thread,
+        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, Variants,
+        VcfChunker,
     },
 };
 fn task_thread(
@@ -29,6 +30,7 @@ fn task_thread(
         1, // One total sample will be opened (for HaplotypeMeta)
         &m_args.graph,
     );
+    let genotyper = Genotyper::with_optional_config(m_args.gqconfig);
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
@@ -45,7 +47,7 @@ fn task_thread(
                 // For zero, we don't have to waste time going into the bam
                 if ploidy == Ploidy::Zero {
                     m_result_sender
-                        .send(m_graph.take_annotated(vec![&[]], vec![0], vec![&ploidy]))
+                        .send(m_graph.take_annotated(vec![&[]], vec![0], vec![&ploidy], &genotyper))
                         .unwrap();
                     continue;
                 }
@@ -75,7 +77,12 @@ fn task_thread(
                     .collect();
                 paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
                 m_result_sender
-                    .send(m_graph.take_annotated(vec![&paths], vec![coverage], vec![&ploidy]))
+                    .send(m_graph.take_annotated(
+                        vec![&paths],
+                        vec![coverage],
+                        vec![&ploidy],
+                        &genotyper,
+                    ))
                     .unwrap();
             }
         }
@@ -101,15 +108,10 @@ pub struct GermCommand {
     /// Minimum allele balance for compound het lower VAF (off=0)
     #[arg(long, default_value_t = 0.0, help_heading = "Genotyping")]
     pub ab: f32,
-    /*
-    /// Error Rate Prior
-    #[arg(long, default_value_t = 0.03, help_heading = "Genotyping")]
-    pub err: f32,
 
-    /// Genotype Priors (ref,het,hom)
-    #[arg(long, default_value_t = "0.001,0.74,0.249", help_heading = "Genotyping")]
-    pub priors: Option<String>
-    */
+    /// GQ Config
+    #[arg(long, help_heading = "Genotyping")]
+    pub gqconfig: Option<PathBuf>,
 }
 
 #[derive(clap::Args, Clone, Debug)]

@@ -1,4 +1,7 @@
-use crate::kplib::{germ_genotyper, PathScore, Ploidy};
+use crate::kplib::{
+    germ_genotyper::{GTstate, Genotyper},
+    PathScore, Ploidy,
+};
 use bitflags::bitflags;
 use noodles_vcf::{
     header::record::value::map::format,
@@ -23,6 +26,9 @@ bitflags! {
 /// Format integer type number for genotype annotations.
 type IntG = Vec<Option<i32>>;
 
+/// GT str, GTstate, alt1_cov, alt2_cov, is_fulltarget
+type HandleReturn<'a> = (&'a str, GTstate, u64, u64, bool);
+
 /// Struct representing genotype annotations.
 pub struct GenotypeAnno {
     pub var_idx: NodeIndex,
@@ -34,7 +40,7 @@ pub struct GenotypeAnno {
     pub dp: i32,
     pub ad: IntG,
     pub ks: IntG,
-    pub gt_state: germ_genotyper::GTstate,
+    pub gt_state: GTstate,
 }
 
 impl GenotypeAnno {
@@ -46,11 +52,14 @@ impl GenotypeAnno {
         ploidy: &Ploidy,
         neigh_group: u64,
         sample_idx: usize, // For pulling the correct coverage from the PathScore.HaplotypeMeta
+        genotyper: &Genotyper,
     ) -> Self {
         match ploidy {
             Ploidy::Zero => zero(*var_idx, coverage),
-            Ploidy::Haploid => haploid(var_idx, paths, coverage, neigh_group, sample_idx),
-            _ => diploid(var_idx, paths, coverage, neigh_group, sample_idx),
+            Ploidy::Haploid => {
+                haploid(var_idx, paths, coverage, neigh_group, sample_idx, genotyper)
+            }
+            _ => diploid(var_idx, paths, coverage, neigh_group, sample_idx, genotyper),
         }
     }
 
@@ -102,15 +111,24 @@ fn diploid(
     coverage: u64,
     neigh_group: u64,
     sample_idx: usize,
+    genotyper: &Genotyper,
 ) -> GenotypeAnno {
     let handle = match &paths {
         [] => handle_diploid_no_paths(coverage),
-        [p] => handle_diploid_single_path(var_idx, p, coverage, sample_idx),
+        [p] => handle_diploid_single_path(var_idx, p, coverage, sample_idx, genotyper),
         [p1, p2] => handle_diploid_two_paths(var_idx, p1, p2, coverage, sample_idx),
         p => panic!("Unexpected number of paths for diploid region {:?}", p),
     };
 
-    finalize_annotation(handle, paths, coverage, neigh_group, sample_idx, *var_idx)
+    finalize_annotation(
+        handle,
+        paths,
+        coverage,
+        neigh_group,
+        sample_idx,
+        *var_idx,
+        genotyper,
+    )
 }
 
 /// Helper for zero ploidy regions.
@@ -125,7 +143,7 @@ fn zero(var_idx: NodeIndex, coverage: u64) -> GenotypeAnno {
         dp: coverage as i32,
         ad: vec![None],
         ks: vec![None],
-        gt_state: germ_genotyper::GTstate::Non,
+        gt_state: GTstate::Non,
     }
 }
 
@@ -137,38 +155,46 @@ fn haploid(
     coverage: u64,
     neigh_group: u64,
     sample_idx: usize,
+    genotyper: &Genotyper,
 ) -> GenotypeAnno {
     if paths.is_empty() {
         let handle = match coverage {
-            0 => (".", germ_genotyper::GTstate::Non, 0, 0, true),
-            _ => ("0", germ_genotyper::GTstate::Ref, 0, 0, true),
+            0 => (".", GTstate::Non, 0, 0, true),
+            _ => ("0", GTstate::Ref, 0, 0, true),
         };
-        return finalize_annotation(handle, paths, coverage, neigh_group, sample_idx, *var_idx);
+        return finalize_annotation(
+            handle,
+            paths,
+            coverage,
+            neigh_group,
+            sample_idx,
+            *var_idx,
+            genotyper,
+        );
     }
 
     let path1 = &paths[0];
     let handle = match path1.path.contains(var_idx) {
-        true => (
-            "1",
-            germ_genotyper::GTstate::Hom,
-            path1.meta.coverage[sample_idx],
-            0,
-            true,
-        ),
-        false if coverage != 0 => ("0", germ_genotyper::GTstate::Ref, 0, 0, true),
-        false => (".", germ_genotyper::GTstate::Non, 0, 0, true),
+        true => ("1", GTstate::Hom, path1.meta.coverage[sample_idx], 0, true),
+        false if coverage != 0 => ("0", GTstate::Ref, 0, 0, true),
+        false => (".", GTstate::Non, 0, 0, true),
     };
-    finalize_annotation(handle, paths, coverage, neigh_group, sample_idx, *var_idx)
+    finalize_annotation(
+        handle,
+        paths,
+        coverage,
+        neigh_group,
+        sample_idx,
+        *var_idx,
+        genotyper,
+    )
 }
-
-/// GT str, GTstate, alt1_cov, alt2_cov, is_fulltarget
-type HandleReturn<'a> = (&'a str, germ_genotyper::GTstate, u64, u64, bool);
 
 fn handle_diploid_no_paths<'a>(coverage: u64) -> HandleReturn<'a> {
     if coverage != 0 {
-        ("0|0", germ_genotyper::GTstate::Ref, 0, 0, true)
+        ("0|0", GTstate::Ref, 0, 0, true)
     } else {
-        ("./.", germ_genotyper::GTstate::Non, 0, 0, true)
+        ("./.", GTstate::Non, 0, 0, true)
     }
 }
 
@@ -177,22 +203,23 @@ fn handle_diploid_single_path<'a>(
     path: &PathScore,
     coverage: u64,
     sample_idx: usize,
+    genotyper: &Genotyper,
 ) -> HandleReturn<'a> {
     if !path.path.contains(var_idx) {
-        ("0|0", germ_genotyper::GTstate::Ref, 0, 0, true)
+        ("0|0", GTstate::Ref, 0, 0, true)
     } else {
         let alt_cov = path.meta.coverage[sample_idx];
         let ref_cov = coverage - alt_cov;
-        let (genotype, state) = match germ_genotyper::genotyper(ref_cov, alt_cov).state {
-            germ_genotyper::GTstate::Ref | germ_genotyper::GTstate::Het => {
+        let (genotype, state) = match genotyper.genotype(ref_cov, alt_cov).state {
+            GTstate::Ref | GTstate::Het => {
                 let gt = match path.meta.hp[sample_idx] {
                     None => "0|1",
                     Some(1) => "0|1",
                     _ => "1|0",
                 };
-                (gt, germ_genotyper::GTstate::Het)
+                (gt, GTstate::Het)
             }
-            germ_genotyper::GTstate::Hom => ("1|1", germ_genotyper::GTstate::Hom),
+            GTstate::Hom => ("1|1", GTstate::Hom),
             _ => panic!("Cannot happen here"),
         };
         (genotype, state, alt_cov, 0, path.full_target)
@@ -209,27 +236,27 @@ fn handle_diploid_two_paths<'a>(
     match (path1.path.contains(var_idx), path2.path.contains(var_idx)) {
         (true, true) => (
             "1|1",
-            germ_genotyper::GTstate::Hom,
+            GTstate::Hom,
             path1.meta.coverage[sample_idx],
             path2.meta.coverage[sample_idx],
             path1.full_target || path2.full_target,
         ),
         (true, false) => (
             "1|0",
-            germ_genotyper::GTstate::Het,
+            GTstate::Het,
             path1.meta.coverage[sample_idx],
             0,
             path1.full_target,
         ),
         (false, true) => (
             "0|1",
-            germ_genotyper::GTstate::Het,
+            GTstate::Het,
             0,
             path2.meta.coverage[sample_idx],
             path2.full_target,
         ),
-        (false, false) if coverage != 0 => ("0|0", germ_genotyper::GTstate::Ref, 0, 0, true),
-        (false, false) => ("./.", germ_genotyper::GTstate::Non, 0, 0, true),
+        (false, false) if coverage != 0 => ("0|0", GTstate::Ref, 0, 0, true),
+        (false, false) => ("./.", GTstate::Non, 0, 0, true),
     }
 }
 
@@ -240,11 +267,12 @@ fn finalize_annotation(
     neigh_group: u64,
     sample_idx: usize,
     var_idx: NodeIndex,
+    genotyper: &Genotyper,
 ) -> GenotypeAnno {
     let (gt_str, gt_path, alt_cov1, alt_cov2, full_target) = handle;
     let ref_cov = coverage - alt_cov1 - alt_cov2;
 
-    let gt_obs = germ_genotyper::genotyper(ref_cov, alt_cov1 + alt_cov2);
+    let gt_obs = genotyper.genotype(ref_cov, alt_cov1 + alt_cov2);
     //let gt_obs = germ_genotyper::phased_genotyper(ref_cov, alt_cov1, alt_cov2);
 
     // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
@@ -274,7 +302,7 @@ fn finalize_annotation(
         filt |= FiltFlags::LOWCOV;
     }
 
-    if gt_path != germ_genotyper::GTstate::Ref {
+    if gt_path != GTstate::Ref {
         if gt_obs.sq < 5.0 {
             filt |= FiltFlags::LOWSQ;
         }

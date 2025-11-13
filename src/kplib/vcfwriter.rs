@@ -1,4 +1,7 @@
-use crate::kplib::{germ_genotyper::GTstate, ChannelOutput, GenotypeAnno, Ploidy};
+use crate::kplib::{
+    germ_genotyper::{GTstate, Genotyper},
+    ChannelOutput, GenotypeAnno, Ploidy,
+};
 use crossbeam_channel::Receiver;
 use indicatif::{ProgressBar, ProgressStyle};
 use petgraph::graph::NodeIndex;
@@ -29,6 +32,7 @@ pub struct VcfWriter {
     header: vcf::Header,
     keys: Keys,
     pub gtcounts: Vec<HashMap<GTstate, usize>>,
+    genotyper: Genotyper,
 }
 
 impl VcfWriter {
@@ -79,12 +83,14 @@ impl VcfWriter {
         let mut writer = vcf::io::Writer::new(out_buf);
         let _ = writer.write_header(&header);
 
+        let genotyper = Genotyper::with_optional_config(None);
         Self {
             writer,
             header,
             sample_count: sample_names.len(),
             keys: Keys::from_iter(new_fmts),
             gtcounts: vec![HashMap::new(); sample_names.len()],
+            genotyper,
         }
     }
 
@@ -96,7 +102,15 @@ impl VcfWriter {
         // Some variants aren't annotated, we'll fill it in here
         if annots.is_empty() {
             annots.resize_with(self.sample_count, || {
-                GenotypeAnno::new(&NodeIndex::new(0), &[], 0, &Ploidy::Zero, 0, 0)
+                GenotypeAnno::new(
+                    &NodeIndex::new(0),
+                    &[],
+                    0,
+                    &Ploidy::Zero,
+                    0,
+                    0,
+                    &self.genotyper,
+                )
             });
         }
 

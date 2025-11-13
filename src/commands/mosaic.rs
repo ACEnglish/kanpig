@@ -14,6 +14,7 @@ use crate::{
     kplib::{
         annotator::FiltFlags,
         build_region_tree,
+        germ_genotyper::Genotyper,
         mosaic_genotyper::{GenotypeHypothesis, MosaicGenotyper},
         open_reads, open_writer_thread,
         pileup::collect_pileup_data,
@@ -79,6 +80,8 @@ fn task_thread(
         1,
     );
 
+    let germ_genotyper = Genotyper::new();
+
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
@@ -93,6 +96,7 @@ fn task_thread(
                             vec![&[]],
                             vec![0; n_samples],
                             vec![&ploidy; n_samples],
+                            &germ_genotyper,
                         ))
                         .unwrap();
                     continue;
@@ -111,6 +115,7 @@ fn task_thread(
                             vec![&[]; n_samples],
                             pileup_data.coverages.to_vec(),
                             vec![&ploidy; n_samples],
+                            &germ_genotyper,
                         ))
                         .unwrap();
                     continue;
@@ -142,6 +147,7 @@ fn task_thread(
                                 vec![&[]; n_samples],
                                 pileup_data.coverages.to_vec(),
                                 vec![&ploidy; n_samples],
+                                &germ_genotyper,
                             ))
                             .unwrap();
                         continue;
@@ -179,6 +185,7 @@ fn task_thread(
                     germline_paths.iter().map(|bin| bin.as_slice()).collect(),
                     pileup_data.coverages.to_vec(),
                     vec![&ploidy; n_samples],
+                    &germ_genotyper,
                 );
 
                 // Before updating the somatic in place
@@ -213,10 +220,7 @@ fn task_thread(
                         for anno in annos {
                             if anno.gt.contains("1") && (anno.filt.contains(FiltFlags::SOMATIC)) {
                                 if let (Some(rcov), Some(acov)) = (anno.ad[0], anno.ad[1]) {
-                                    let ngt = crate::kplib::germ_genotyper::genotyper(
-                                        rcov as u64,
-                                        acov as u64,
-                                    );
+                                    let ngt = germ_genotyper.genotype(rcov as u64, acov as u64);
                                     anno.sq = ngt.sq as i32;
                                     if !anno.gt.contains("1") {
                                         anno.gq = ngt.gq.round() as i32;
