@@ -231,7 +231,7 @@ impl Genotyper {
 impl Default for Genotyper {
     fn default() -> Self {
         Self {
-            frac: vec![0.03, 0.64, 0.32],
+            frac: vec![0.33, 0.34, 0.33],
             mu: vec![0.03, 0.50, 0.97],
             nu: vec![25.0, 5.0, 10.0],
             calibration_table: vec![],

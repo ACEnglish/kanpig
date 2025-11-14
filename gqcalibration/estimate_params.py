@@ -349,31 +349,40 @@ def make_plots(data, out_prefix):
     fig, ax = plt.subplots(3, 4, figsize=(12, 6), dpi=180)
     xlim=(0, data['GQ'].max() + 1)
     for i, m_ax in zip(['REF', 'HET', 'HOM'], ax):
-        p = sb.histplot(data=data[data['Ogt'] == i],
-                        x='GQ', hue='state', multiple='stack',
-                        binwidth=1, ax=m_ax[0])
-        p.set(title=f"Baseline", ylabel=i + ' Count', xlim=xlim)
+        if (data['Ogt'] == i).sum() == 0:
+            print(f"No Ogt == {i} sites found. Skipping")
+        else:
+            p = sb.histplot(data=data[data['Ogt'] == i],
+                            x='GQ', hue='state', multiple='stack',
+                            binwidth=1, ax=m_ax[0])
+            p.set(title=f"Baseline", ylabel=i + ' Count', xlim=xlim)
 
-        p = sb.histplot(data=data[data['Mgt'] == i],
-                        x='GQ', hue='state', multiple='stack',
-                        binwidth=1, ax=m_ax[1])
-        p.set(title=f"Kanpig", ylabel= i + ' Count', xlim=xlim)
 
-        subset = data[data['Ogt'] == i]
-        af = subset['AD_alt'] / subset['DP']
-        p = sb.histplot(af[subset['state']], bins=50, ax=m_ax[2], binwidth=0.02)
-        p.set(xlabel='Allele Fraction',
-              yscale='log',
-              ylabel=i + ' Count (log)',
-              xlim=(0,1),
-              title='True GT')
+            subset = data[data['Ogt'] == i]
 
-        p = sb.histplot(af[~subset['state']], bins=50, ax=m_ax[3], binwidth=0.02)
-        p.set(xlabel='Allele Fraction',
-              yscale='log',
-              xlim=(0,1),
-              ylabel=i + ' Count (log)',
-              title='False GT')
+            af = subset['AD_alt'] / subset['DP']
+            p = sb.histplot(af[subset['state']], bins=50, ax=m_ax[2], binwidth=0.02)
+            p.set(xlabel='Allele Fraction',
+                  yscale='log',
+                  ylabel=i + ' Count (log)',
+                  xlim=(0,1),
+                  title='True GT')
+
+            p = sb.histplot(af[~subset['state']], bins=50, ax=m_ax[3], binwidth=0.02)
+            p.set(xlabel='Allele Fraction',
+                  yscale='log',
+                  xlim=(0,1),
+                  ylabel=i + ' Count (log)',
+                  title='False GT')
+
+        if (data['Mgt'] == i).sum() == 0:
+            print(f"No Mgt == {i} sites found. Skipping")
+        else:
+            p = sb.histplot(data=data[data['Mgt'] == i],
+                            x='GQ', hue='state', multiple='stack',
+                            binwidth=1, ax=m_ax[1])
+            p.set(title=f"Kanpig", ylabel= i + ' Count', xlim=xlim)
+
 
     plt.tight_layout()
     plt.savefig(out_prefix + '.STATE.png')
