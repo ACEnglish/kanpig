@@ -10,7 +10,7 @@ GIAB v1.1
 
 Sequencing from <path> was converted to plup via
 
-```
+```bash
 kanpig plup --threads 4 --bam https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/HG002_NA24385_son/PacBio_HiFi-Revio_20231031/HG002_PacBio-HiFi-Revio_20231031_48x_GRCh38-GIABv3.bam \
     | bedtools sort -header | bgzip > HG002.revio38x.plup.gz
 tabix -p bed HG002.revio38x.plup.gz
@@ -21,7 +21,7 @@ The truth set SV (`stvar`) VCF and high-confidence bed file from GIAB v1.1 was d
 
 Genotyping and gq calibration performed with
 
-```
+```bash
 vcf=GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz
 bed=GRCh38_HG2-T2TQ100-V1.1_stvar.benchmark.bed
 reads=HG002.revio38x.plup.gz
@@ -45,7 +45,7 @@ Using the kanpig publication's [HPRC assembly derived SVs](https://zenodo.org/re
 First, all non-HG002 VCFs were consolidated with `bcftools merge -m none`. Second, we removed SVs from the consolidated
 VCF with truvari in order to lessen the chances of kanpig applying coverage to a highly similar non-HG002 SV.
 
-```
+```bash
 truvari bench -b hg002.hprc.vcf.gz -c non-hg002.hprc.vcf.gz --pctseq 0.90 --pctsize 0.90 --short --pick multi -o bench/
 bcftools merge -m none -0 hg002.hprc.vcf.gz bench/fp.vcf.gz -O u | bcftools view -s HG002 -O z -o hprc.hg002.vcf.gz
 tabix hprc.hg002.vcf.gz
@@ -53,7 +53,7 @@ tabix hprc.hg002.vcf.gz
 
 Kanpig and parameter estimation was run with parameters
 
-```
+```bash
 vcf=hprc.hg002.vcf.gz
 bed=GRCh38_HG2-T2TQ100-V1.1_stvar.benchmark.bed
 reads=HG002.revio38x.plup.gz
