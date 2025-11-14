@@ -258,12 +258,15 @@ def parse_args(args):
                         help="Output prefix file to write")
     parser.add_argument("--bed", default=None, type=str,
                         help="Bed file for subsetting VCF entries to parse")
-    parser.add_argument("--all", action="store_true",
-                        help="Fit on all genotypes, not just correct")
+    parser.add_argument("--leaveout", type=float, default=0,
+                        help=("Leave out [0.0-1.0) from training and "
+                              "make separate plots (%(default)s)"))
     parser.add_argument("--mindp", type=int, default=5,
                         help="Minimum GT depth to fit on (%(default)s)")
     parser.add_argument("--maxdp", type=int, default=60,
                         help="MaximumGT depth to fit on (%(default)s)")
+    parser.add_argument("--all", action="store_true",
+                        help="Fit on all genotypes, not just correct ones")
     parser.add_argument("--all-hets", action="store_true",
                         help="Fit on all hets, but only correct REF/HOM")
     parser.add_argument("--flat-priors", action="store_true",
@@ -274,9 +277,6 @@ def parse_args(args):
                         help="Write a csv of the calibrated GQs")
     parser.add_argument("--no-plots", action="store_true",
                         help="Skip plotting")
-    parser.add_argument("--leaveout", type=float, default=0,
-                        help=("Leave out [0.0-1.0) from training and "
-                              "make separate plots (%(default)s)"))
     args = parser.parse_args(args)
     if args.all and args.all_hets:
         print("Error! Can only fit either --all-hets XOR --all")
@@ -443,7 +443,7 @@ def regt(row, gt):
     Runs kanpig genotyping on a row
     """
     result = gt.genotype(row['AD_ref'], row['AD_alt'])
-    return [result.state, result.state == row['Ogt'], result.gq]
+    return [result.state, result.state == row['Ogt'], int(round(result.gq))]
 
 
 def calc_accuracy(df):
@@ -497,7 +497,7 @@ if __name__ == "__main__":
     config = save_config(fitted, out_cfg, flat_priors=args.flat_priors)
 
     if not args.no_calibrate:
-        print("Calibrating GQs... ", end="", flush=True)
+        print("\nCalibrating GQs... ", end="", flush=True)
         gt = kanpig.Genotyper(out_cfg)
         m_gtfunction = partial(regt, gt=gt)
         df[['nMgt', 'nState', 'nGQ']] = df.apply(
@@ -517,24 +517,24 @@ if __name__ == "__main__":
                 m_gtfunction, axis=1, result_type='expand')
         print()
 
-    print("Saving data")
+    print("\nSaving data")
     df.to_csv(args.OUT + '.genotypes.csv', index=False)
     if args.leaveout:
         leaveout.to_csv(args.OUT + '.leaveout.genotypes.csv', index=False)
 
     if not args.no_plots:
-        print("Making original plots ", end=" ")
+        print("\nMaking original plots ", end=" ")
         make_plots(df, args.OUT + '.original')
         if not args.no_calibrate:
-            print("Making calibrated plots ", end=" ")
+            print("\nMaking calibrated plots ", end=" ")
             df['GQ'] = df['nGQ']
             make_plots(df, args.OUT + '.calibrated')
         if args.leaveout:
-            print("Making leaveout original plots ", end=" ")
+            print("\nMaking leaveout original plots ", end=" ")
             make_plots(leaveout, args.OUT + '.leaveout.original')
             if not args.no_calibrate:
-                print("Making leaveout calibrated plots ", end=" ")
+                print("\nMaking leaveout calibrated plots ", end=" ")
                 leaveout['GQ'] = leaveout['nGQ']
                 make_plots(leaveout, args.OUT + '.leaveout.calibrated')
 
-    print("Finished")
+    print("\nFinished")
