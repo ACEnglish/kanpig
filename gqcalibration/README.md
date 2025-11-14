@@ -1,35 +1,35 @@
 GQ Calibration
 ==============
 
-
 Kanpig uses a beta binomial distribution to build genotype quality scores. The defaults will work well for a
 set of SVs derived from a single sample's assembly with higher sequencing coverage.
 
 However, different experiments (e.g. single sample discovery, multi-sample merged) may need their GQs calibrated.
 
-To build a custom calibration, first a truth-set VCF must be acquired and run through kanpig without a `--gqconfig`.
-Next, the truth-set and kanpig output VCFs should be merged with 
+The script `estimate_params.py` uses a maximum likelihood estimation on a set of genotypes to set the model's parameters
+as well as calibrate genotype quality scores and generate informative plots.
 
-```
-bcftools merge -m none truth.vcf.gz kanpig.vcf.gz -O z -o merged.vcf.gz
-```
-From this VCF, we create a csv of information needed for the calibration via:
+To start, the kanpig python-bindings must be installed by running from this repository's root directory the command
 
-```
-python make_param_df.py merged.vcf.gz data.csv
-```
-
-Next, the kanpig genotyper must be available to your python environment by building the python bindings
 ```
 maturin develop --release --features python
 ```
 
-Finally, the gqconfig can be created via
+Next, a truth-set VCF must be acquired and run through kanpig on a sequencing experiment (withou a `--gqconfig`).
+This is the hardest part of GQ calibration. Example VCFs and how they were derived are in the `examples/` directory.
+
+Once the VCF has been genotyped, we reunite the kanpig results with the truth-set genotypes via:
+
 ```
-python estimate_params.py data.csv config.json
+bcftools merge -m none truth.vcf.gz kanpig.vcf.gz -O z -o merged.vcf.gz
+```
+Finally, we generate the gqconfig with the command:
+
+```
+python estimate_params.py merged.vcf.gz my_config
 ```
 
-This config can now be passed into `kanpig gt --gqconfig config.json`
+This config can now be passed into `kanpig gt --gqconfig my_config.json`
 
 Example Configs
 ===============
@@ -46,12 +46,4 @@ there.
 
 TODOs
 =====
-* Paths to GIAB and kanpig example data
-* Clean up all this code and documentation
-  * Hard paths
-* Pull in the plots from the notebook to automatically generate those
-* Generate GT accuracy reports, too. There's patterns to what should be expected from the raw GTs' accuracy that could
-  be useful to generate warnings e.g. <75% genotyping accuracy is a problem.
-* Expand on what it means to make a truth-set (have to think about merging)
-* Better arguments/--help
-  * Flat mixture weights
+* Paths to example data

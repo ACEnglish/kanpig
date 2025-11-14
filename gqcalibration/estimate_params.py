@@ -199,7 +199,8 @@ def save_config(fitted, filename, calibration=None, flat_priors=False):
         "calibration_table": [] if calibration is None else calibration,
         'metadata': {
             'n_sites': fitted['n_sites'],
-            'log_likelihood': fitted['log_likelihood']
+            'log_likelihood': fitted['log_likelihood'],
+            'estimation_params': " ".join(sys.argv[1:])
         }
     }
     
@@ -248,9 +249,9 @@ def parse_args(args):
                         help="Bed file for subsetting VCF entries to parse")
     parser.add_argument("--all", action="store_true",
                         help="Fit on all genotypes, not just correct")
-    parser.add_argument("--min_dp", type=int, default=5,
+    parser.add_argument("--mindp", type=int, default=5,
                         help="Minimum GT depth to fit on (%(default)s)")
-    parser.add_argument("--max_dp", type=int, default=60,
+    parser.add_argument("--maxdp", type=int, default=60,
                         help="MaximumGT depth to fit on (%(default)s)")
     parser.add_argument("--all-hets", action="store_true",
                         help="Fit on all hets, but only correct REF/HOM")
@@ -263,7 +264,7 @@ def parse_args(args):
     parser.add_argument("--no-plots", action="store_true",
                         help="Skip plotting")
     args = parser.parse_args(args)
-    if args.all and args.all-hets:
+    if args.all and args.all_hets:
         print("Error! Can only fit either --all-hets XOR --all")
     return args
 
@@ -277,7 +278,8 @@ def make_plots(data, out_prefix):
     print("Making GT<->GQ Plot")
     # Sort data by GQ
     df_sorted = data.sort_values(by='GQ').reset_index(drop=True)
-    roll = 1000
+    # This should kinda depend on the number of genotypes in order to properly smooth it
+    roll = len(df_sorted) // 50
     # Calculate rolling averages
     state_rolling = df_sorted['state'].rolling(roll).mean()
     gq_rolling = (df_sorted['GQ']).rolling(roll).mean()
@@ -288,9 +290,9 @@ def make_plots(data, out_prefix):
     # First y-axis: State (accuracy)
     color1 = 'tab:blue'
     ax1.set_xlabel(f'Variants (sorted by GQ)', fontsize=12)
-    ax1.set_ylabel('Accuracy (rolling avg)', color=color1, fontsize=12)
+    ax1.set_ylabel('Accuracy (rolling avg)', fontsize=12)
     ax1.plot(state_rolling, color=color1, linewidth=2, label='Observed')
-    ax1.tick_params(axis='y', labelcolor=color1)
+    ax1.tick_params(axis='y')
     ax1.set_ylim(0, 1)
 
     # Second y-axis: GQ
@@ -298,10 +300,10 @@ def make_plots(data, out_prefix):
     color2 = 'tab:orange'
     ax2.set_ylabel('Accuracy (rolling avg)', fontsize=12)
     ax2.plot(gq_rolling, color=color2, linewidth=2, label='GQ')
-    ax2.tick_params(axis='y', labelcolor=color2)
+    ax2.tick_params(axis='y')
 
     # Title and grid
-    plt.title(f'Genotype Accuracy and Quality (200-sample rolling average)',
+    plt.title(f'Genotype Accuracy and Quality ({roll}-sample rolling average)',
               fontsize=14, pad=20)
     ax1.grid(True, alpha=0.3)
 
@@ -430,8 +432,8 @@ if __name__ == "__main__":
     # Fit parameters
     fitted = fit_parameters(df,
                             all_gts=args.all,
-                            min_dp=args.min_dp,
-                            max_dp=args.max_dp,
+                            min_dp=args.mindp,
+                            max_dp=args.maxdp,
                             all_hets=args.all_hets,
                             )
     
@@ -458,7 +460,6 @@ if __name__ == "__main__":
 
     if not args.no_plots:
         print("Making original plots")
-        df = df[(df['DP'] >= args.min_dp) & (df['DP'] <= args.max_dp)].copy()
         make_plots(df, args.OUT + '.original')
         if not args.no_calibrate:
             print("Making calibrated plots")
