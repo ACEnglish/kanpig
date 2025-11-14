@@ -16,9 +16,8 @@ maturin develop --release --features python
 
 Other dependencies for the python script are in `requirements.txt` and can be installed with `pip`.
 
-
-Next, a truth-set VCF must be acquired and run through kanpig on a sequencing experiment (without a `--gqconfig`).
-This is the hardest part of GQ calibration. Example VCFs and how they were derived are in the `examples/` directory.
+A truth-set VCF must be acquired and run through kanpig on a sequencing experiment (without a `--gqconfig`).
+This is the hardest part of GQ calibration. Example VCFs and how they were used are in the `examples/` directory.
 
 Once the VCF has been genotyped, we reunite the kanpig results with the truth-set genotypes via:
 
@@ -41,12 +40,11 @@ be excluded by providing a `--bed` file. Generally, the GIAB v1.1 structural var
 default.
 
 As you iterate on different `estimate_params.py` arguments, the most basic way to evaluate if one model is better than
-another is by looking at the "Log-likelihood" line in the scripts logging output or the resulting `my_config.json`,
-where a higher (less negative) log-likelihood is better. However, you'll also want to consider looking at the QC plots,
-described below. For example, the default arguments will only train on already correctly predicted genotypes, which may
+another is by looking at the "Log-likelihood" line in the logging output or the resulting `my_config.json`,
+where a higher (less negative) log-likelihood is better. However, you'll also want to look at the QC plots, described
+below. For example, the default arguments will only train on already correctly predicted genotypes, which may
 over fit the model's parameters. Therefore, it is usually useful to run with `estimate_params.py --all` to also add in the
-natural noise of incorrectly genotyped variants, which may give a worse log-likelihood, but may have better fit GQ
-calibration.
+natural noise of incorrectly genotyped variants, which may give a worse log-likelihood, but may have operate better.
 
 To help avoid over fitting, the `--leaveout` parameter will leave out some fraction of the genotypes (across all states)
 from training and then create separate output files for testing.
@@ -55,7 +53,7 @@ Output Details
 ==============
 
 ### `gqconfig.json`
-This is the main result which can be sent to `kanpig gq --gqconfig` to produce calibrated GT/GQs.
+This is the main result which can be sent to `kanpig gt --gqconfig` to produce calibrated GTs/GQs.
 
 ### `genotypes.csv`
 This file holds the information used by `estimate_params.py` with columns of:
@@ -98,9 +96,3 @@ This plot has three rows corresponding to the REF, HET, and HOM genotype subsets
   genotypes
 * False GT - The distribution of allele balances (percent of reads supporting the alternate) for incorrectly predicted
   genotypes
-
-Example Configs
-===============
-
-Example configs are available in `examples/`. See the README for descriptions of how the calibration was performed.
-

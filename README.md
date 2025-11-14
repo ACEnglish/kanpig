@@ -233,3 +233,9 @@ these parameters impact the modeling.
 # 🐍 Python bindings
 Minimal python bindings are available for plup parsing. These can be installed via `maturin develop --release --features python`
 and used from python with `import kanpig`.
+
+# 🎛️GQ Calibration
+Genotype quality scores produced by kanpig v1 were broken.  As part of the refactoring in v2 that fixed the genotyper's
+default behavior, we also provide procedures for calibrating GQs.
+See [Genotype Quality Calibration](gqcalibration/README.md) for details.
+
