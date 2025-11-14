@@ -5,10 +5,12 @@ Fits parameters for three genotype classes: 0/0, 0/1, 1/1
 """
 import sys
 import json
+import truvari
 import argparse
 import kanpig
 import numpy as np
 import pandas as pd
+from functools import partial
 from scipy.optimize import minimize
 from scipy.interpolate import interp1d
 from scipy.special import betaln, logsumexp
@@ -239,9 +241,11 @@ def parse_args(args):
     parser = argparse.ArgumentParser(prog="bench", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("IN", type=str,
-                        help="Input CSV from `make_params_df.py`")
+                        help="Input VCF file or `.genotypes.csv` from previous run")
     parser.add_argument("OUT", type=str,
                         help="Output prefix file to write")
+    parser.add_argument("--bed", default=None, type=str,
+                        help="Bed file for subsetting VCF entries to parse")
     parser.add_argument("--all", action="store_true",
                         help="Fit on all genotypes, not just correct")
     parser.add_argument("--min_dp", type=int, default=5,
@@ -337,7 +341,7 @@ def make_plots(data, out_prefix):
     ax1.legend(loc="lower right")
     ax1.grid(alpha=0.3)
 
-    plt.savefig(out_prefix + "ROC.png")
+    plt.savefig(out_prefix + ".ROC.png")
 
     print("Making Genotypes Plot")
     fig, ax = plt.subplots(3, 4, figsize=(12, 6), dpi=180)
@@ -372,14 +376,46 @@ def make_plots(data, out_prefix):
     plt.tight_layout()
     plt.savefig(out_prefix + '.STATE.png')
 
+def make_df(in_vcf, bed):
+    vcf = truvari.VariantFile(in_vcf)
+    m_iter = vcf.fetch_bed(bed) if bed else vcf
+    rows = []
+    for entry in m_iter:
+        if entry.chrom in ['chrX', 'chrY'] \
+            or entry.var_size() > 10000 \
+            or entry.is_monrefstar() \
+            or None in entry.samples[1]['GT']:
+            continue
+
+        b_gt = truvari.get_gt(entry.gt(0))
+        o_gt = truvari.get_gt(entry.gt(1))
+        rows.append([b_gt == o_gt,
+                     b_gt.name,
+                     o_gt.name,
+                     entry.samples[1]['DP'],
+                     *entry.samples[1]['AD'],
+                     entry.samples[1]['GQ'],
+                     entry.samples[1]['FT'],
+                     min(entry.samples[1]['KS']),
+                     ])
+    out = pd.DataFrame(rows, columns=['state', 'Ogt', 'Mgt', 'DP', 'AD_ref', 'AD_alt', 'GQ', 'FT', 'KS'])
+    return out
+
+def regt(row, gt):
+    result = gt.genotype(row['AD_ref'], row['AD_alt'])
+    return [result.state, result.state == row['Ogt'], result.gq]
 
 # Example usage
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
     
-    # Load truth set
-    df = pd.read_csv(args.IN)
+    if args.IN.endswith("genotypes.csv"):
+        df = pd.read_csv(args.IN)
+    else:
+        print("Parsing VCF")
+        df = make_df(args.IN, args.bed)
     
+    #calc_accuracy(df)
     cnt = df.groupby(['Ogt', 'state']).size().unstack()
     cnt.loc['All'] = cnt.sum(axis=0)
     cnt['Acc'] = cnt[True] / cnt.sum(axis=1)
@@ -407,16 +443,19 @@ if __name__ == "__main__":
     if not args.no_calibrate:
         print("Calibrating GQs")
         gt = kanpig.Genotyper(out_cfg)
-        df['nGQ'] = df.apply((lambda x: gt.genotype(x['AD_ref'], x['AD_alt']).gq), axis=1)
+        foo = partial(regt, gt=gt)
+        df[['nMgt', 'nState', 'nGQ']] = df.apply(foo, axis=1, result_type='expand')
         calibration = build_calibration(df)
         config = save_config(fitted, out_cfg, calibration, flat_priors=args.flat_priors)
         # And then we have to run again to actually get the calibrated GQs
-        if args.write_calib or not args.no_plots:
-            print("Regenotyping with config")
-            gt = kanpig.Genotyper(out_cfg)
-            df['nGQ'] = df.apply((lambda x: gt.genotype(x['AD_ref'], x['AD_alt']).gq), axis=1)
-            df.to_csv(args.OUT + '.calibrated.csv')
+        print("Regenotyping with config")
+        gt = kanpig.Genotyper(out_cfg)
+        foo = partial(regt, gt=gt)
+        df[['nMgt', 'nState', 'nGQ']] = df.apply(foo, axis=1, result_type='expand')
     
+    print("Saving data")
+    df.to_csv(args.OUT + '.genotypes.csv', index=False)
+
     if not args.no_plots:
         print("Making original plots")
         df = df[(df['DP'] >= args.min_dp) & (df['DP'] <= args.max_dp)].copy()
