@@ -102,16 +102,5 @@ This plot has three rows corresponding to the REF, HET, and HOM genotype subsets
 Example Configs
 ===============
 
-Two example configs are available. 
+Example configs are available in `examples/`. See the README for descriptions of how the calibration was performed.
 
-The first, `gq.giab.json`, was built off of GIAB v1.1 
-
-The second, `gq.hprc.json`, was built off of just HG002 and zenodo kanipig paper assemblies. We took just HG002
-genotypes, intersected those with the merge of all the rest of the samples, and then consolidated the HG002 with the
-fn.vcf.gz. This allowed us to preserve the genotype quality scores but spike-in reference homozygous variants.
-Collapsing the variants would have been an option, but only if we could have done extra work to keep the baseline GT in
-there.
-
-TODOs
-=====
-* Paths to example data

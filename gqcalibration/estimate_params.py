@@ -265,6 +265,10 @@ def parse_args(args):
                         help="Minimum GT depth to fit on (%(default)s)")
     parser.add_argument("--maxdp", type=int, default=60,
                         help="MaximumGT depth to fit on (%(default)s)")
+    parser.add_argument("--sizemin", type=int, default=50,
+                        help="Minimum SV size to parse from VCF (%(default)s)")
+    parser.add_argument("--sizemax", type=int, default=10000,
+                        help="Maximum SV size to parse from VCF (%(default)s)")
     parser.add_argument("--all", action="store_true",
                         help="Fit on all genotypes, not just correct ones")
     parser.add_argument("--all-hets", action="store_true",
@@ -298,7 +302,7 @@ def make_plots(data, out_prefix):
     # Sort data by GQ
     df_sorted = data.sort_values(by='GQ').reset_index(drop=True)
     # This should kinda depend on the number of genotypes in order to properly smooth it
-    roll = min(len(df_sorted) // 50, 2)
+    roll = max(len(df_sorted) // 50, 2)
     # Calculate rolling averages
     state_rolling = df_sorted['state'].rolling(roll).mean()
     gq_rolling = (df_sorted['GQ']).rolling(roll).mean()
@@ -364,7 +368,7 @@ def make_plots(data, out_prefix):
 
     plt.savefig(out_prefix + ".ROC.png")
 
-    print("State ", end="", flush=True)
+    print("STATE ", end="", flush=True)
     _, ax = plt.subplots(3, 4, figsize=(12, 6), dpi=180)
     xlim = (0, data['GQ'].max() + 1)
     for i, m_ax in zip(['REF', 'HET', 'HOM'], ax):
@@ -395,10 +399,10 @@ def make_plots(data, out_prefix):
                   ylabel=i + ' Count (log)',
                   title='False GT')
 
-        if (data['Mgt'] == i).sum() == 0:
-            print(f"No Mgt == {i} sites found. Skipping")
+        if (data['Kgt'] == i).sum() == 0:
+            print(f"No Kgt == {i} sites found. Skipping")
         else:
-            p = sb.histplot(data=data[data['Mgt'] == i],
+            p = sb.histplot(data=data[data['Kgt'] == i],
                             x='GQ', hue='state', multiple='stack',
                             binwidth=1, ax=m_ax[1])
             p.set(title="Kanpig", ylabel=i + ' Count', xlim=xlim)
@@ -408,7 +412,7 @@ def make_plots(data, out_prefix):
     print()
 
 
-def make_df(in_vcf, bed):
+def make_df(in_vcf, bed, sizemin=50, sizemax=10000):
     """
     Turn a VCF into the dataframe for parameter estimation
     """
@@ -417,7 +421,7 @@ def make_df(in_vcf, bed):
     rows = []
     for entry in m_iter:
         if entry.chrom in ['chrX', 'chrY'] \
-                or entry.var_size() > 10000 \
+                or not (sizemin <= entry.var_size() <= sizemax) \
                 or entry.is_monrefstar() \
                 or None in entry.samples[1]['GT']:
             continue
@@ -433,7 +437,7 @@ def make_df(in_vcf, bed):
                      entry.samples[1]['FT'],
                      min(entry.samples[1]['KS']),
                      ])
-    out = pd.DataFrame(rows, columns=['state', 'Ogt', 'Mgt',
+    out = pd.DataFrame(rows, columns=['state', 'Ogt', 'Kgt',
                                       'DP', 'AD_ref', 'AD_alt', 'GQ', 'FT', 'KS'])
     return out
 
@@ -458,7 +462,7 @@ def calc_accuracy(df):
     print()
 
     print("GT Confusion Matrix")
-    print(df.groupby(["Ogt", "Mgt"]).size().unstack())
+    print(df.groupby(["Ogt", "Kgt"]).size().unstack())
     print()
 
 
@@ -470,7 +474,7 @@ if __name__ == "__main__":
         df = pd.read_csv(args.IN)
     else:
         print("Parsing VCF")
-        df = make_df(args.IN, args.bed)
+        df = make_df(args.IN, args.bed, args.sizemin, args.sizemax)
 
     if args.leaveout:
         leaveout = df.groupby(['Ogt']).sample(
@@ -493,14 +497,14 @@ if __name__ == "__main__":
 
     # Now you need to go re-genotype everything and grab those GQs
     # Then you make the calibration table
-    out_cfg = args.OUT + '.json'
+    out_cfg = args.OUT + '.gqconfig.json'
     config = save_config(fitted, out_cfg, flat_priors=args.flat_priors)
 
     if not args.no_calibrate:
         print("\nCalibrating GQs... ", end="", flush=True)
         gt = kanpig.Genotyper(out_cfg)
         m_gtfunction = partial(regt, gt=gt)
-        df[['nMgt', 'nState', 'nGQ']] = df.apply(
+        df[['nKgt', 'nState', 'nGQ']] = df.apply(
             m_gtfunction, axis=1, result_type='expand')
         calibration = build_calibration(df)
         config = save_config(fitted, out_cfg, calibration,
@@ -509,11 +513,11 @@ if __name__ == "__main__":
         print("Regenotyping with config...", end="", flush=True)
         gt = kanpig.Genotyper(out_cfg)
         m_gtfunction = partial(regt, gt=gt)
-        df[['nMgt', 'nState', 'nGQ']] = df.apply(
+        df[['nKgt', 'nState', 'nGQ']] = df.apply(
             m_gtfunction, axis=1, result_type='expand')
 
         if args.leaveout:
-            leaveout[['nMgt', 'nState', 'nGQ']] = leaveout.apply(
+            leaveout[['nKgt', 'nState', 'nGQ']] = leaveout.apply(
                 m_gtfunction, axis=1, result_type='expand')
         print()
 
