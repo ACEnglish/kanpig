@@ -26,6 +26,7 @@ Kanpig genotyping and parameter estimation was performed via:
 vcf=GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz
 bed=GRCh38_HG2-T2TQ100-V1.1_stvar.benchmark.bed
 reads=HG002.revio38x.plup.gz
+
 kanpig gt --input ${vcf} --reads ${reads} \
     --reference GRCh38_1kg_mainchrs.fa --threads 4 \
     | bcftools sort -O z -o kanpig.giab.vcf.gz
@@ -34,7 +35,7 @@ tabix kanpig.giab.vcf.gz
 bcftools merge -m none --force-samples ${vcf} kanpig.giab.vcf.gz -O z -o giab.merged.vcf.gz
 tabix giab.merged.vcf.gz
 
-estimate_params.py giab.merged.vcf.gz giabv1.1.hifi.38x  --bed ${bed} --all --flat-priors --leaveout 0.10
+estimate_params.py --bed ${bed} --all --flat-priors --leaveout 0.10 giab.merged.vcf.gz giabv1.1.hifi.38x
 ```
 
 HPRC samples
@@ -48,8 +49,18 @@ removed SVs from the consolidated VCF with truvari in order to lessen the chance
 highly similar non-HG002 SV.
 
 ```bash
-truvari bench -b hg002.hprc.vcf.gz -c non-hg002.hprc.vcf.gz --pctseq 0.90 --pctsize 0.90 --short --pick multi -o bench/
-bcftools merge -m none -0 hg002.hprc.vcf.gz bench/fp.vcf.gz -O u | bcftools view -s HG002 -O z -o hprc.hg002.vcf.gz
+truvari bench -b hg002.hprc.vcf.gz \
+    -c non-hg002.hprc.vcf.gz \
+    --pctseq 0.90 \
+    --pctsize 0.90 \
+    --short \
+    --pick multi \
+    -o bench/
+
+bcftools merge -m none -0 -O u \
+    hg002.hprc.vcf.gz bench/fp.vcf.gz \
+    | bcftools view -s HG002 -O z -o hprc.hg002.vcf.gz
+
 tabix hprc.hg002.vcf.gz
 ```
 
@@ -64,12 +75,13 @@ kanpig gt --input ${vcf} --reads ${reads} \
     --seqsim 0.85 --maxpaths 1000 \
     --reference GRCh38_1kg_mainchrs.fa --threads 4 \
     | bcftools sort -O z -o kanpig.hprc.vcf.gz
+
 tabix kanpig.hprc.vcf.gz
 
-bcftools merge -m none --force-samples ${vcf} kanpig.hprc.vcf.gz -O z -o hprc.merged.vcf.gz
+bcftools merge -m none --force-samples -O z -o hprc.merged.vcf.gz ${vcf} kanpig.hprc.vcf.gz 
 tabix hprc.merged.vcf.gz
 
-estimate_params.py --bed ${bed} --all --flat-priors --leaveout 0.10 hprc.merged.vcf.gz outputs/hprc.hg002.hifi.38x
+estimate_params.py --bed ${bed} --all --flat-priors --leaveout 0.10 hprc.merged.vcf.gz hprc.hg002.hifi.38x
 ```
 
 Discovery SVs (pending)

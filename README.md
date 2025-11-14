@@ -9,7 +9,7 @@ A fast tool for genotyping structural variants with long-reads.
 Binaries are available in [releases](https://github.com/ACEnglish/kanpig/releases).
 
 Alternatively, build from source with:
-```
+```bash
 git clone https://github.com/ACEnglish/kanpig
 cd kanpig
 cargo build --release
@@ -17,7 +17,7 @@ cargo build --release
 ```
 
 # 🚀 Quick Start
-```
+```bash
 kanpig gt --input variants.vcf.gz \
           --reads alignments.bam \
           --reference genome.fa \
@@ -28,7 +28,7 @@ See `kanpig -h` for all available parameters, most of which are detailed below.
 Kanpig can also create a pileup index from a bam that is smaller and faster for the genotyper to parse. This is useful
 for long-term projects or multiple reanalysis operations like N+1 for a cohort.
 
-```
+```bash
 kanpig plup --bam alignments.bam | bedtools sort -header | bgzip > alignments.plup.gz
 tabix -p bed alignments.plup.gz
 ```

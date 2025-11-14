@@ -10,23 +10,24 @@ as well as calibrate genotype quality scores and generate informative plots.
 
 To start, kanpig's python bindings must be installed by using maturin from this repository's root directory
 
-```
+```bash
 maturin develop --release --features python
 ```
 
 Other dependencies for the python script are in `requirements.txt` and can be installed with `pip`.
 
 A truth-set VCF must be acquired and run through kanpig on a sequencing experiment (without a `--gqconfig`).
-This is the hardest part of GQ calibration. Example VCFs and how they were used are in the `examples/` directory.
+This is the hardest part of GQ calibration. Example VCFs and how they were used are in the
+[examples directory](gqcalibration/examples/README.md).
 
 Once the VCF has been genotyped, we reunite the kanpig results with the truth-set genotypes via:
 
-```
+```bash
 bcftools merge -m none truth.vcf.gz kanpig.vcf.gz -O z -o merged.vcf.gz
 ```
 Finally, we generate the gqconfig with the command:
 
-```
+```bash
 python estimate_params.py merged.vcf.gz my_config
 ```
 
