@@ -18,7 +18,7 @@ Other dependencies for the python script are in `requirements.txt` and can be in
 
 A truth-set VCF must be acquired and run through kanpig on a sequencing experiment (without a `--gqconfig`).
 This is the hardest part of GQ calibration. Example VCFs and how they were used are in the
-[examples directory](gqcalibration/examples/README.md).
+[examples directory](examples/README.md).
 
 Once the VCF has been genotyped, we reunite the kanpig results with the truth-set genotypes via:
 
