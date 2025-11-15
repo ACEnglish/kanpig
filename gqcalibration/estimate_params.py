@@ -5,7 +5,9 @@ Fits parameters for three genotype classes: 0/0, 0/1, 1/1
 """
 import sys
 import json
+import logging
 import argparse
+import textwrap
 from functools import partial
 
 # pylint: disable=redefined-outer-name,no-name-in-module,no-member
@@ -106,15 +108,16 @@ def fit_parameters(df, all_gts=False, min_dp=5, max_dp=60, all_hets=False):
     elif all_gts:
         df = df[df['state']].copy()
 
-    print(f"Using {len(df)} sites for parameter estimation")
-    print(f"Genotype distribution: {df['Ogt'].value_counts().to_dict()}")
+    logging.info(f"Using {len(df)} sites for parameter estimation")
+    logging.info(f"Genotype distribution:")
+    logging.info(f"  {df['Ogt'].value_counts().to_dict()}")
 
     # Get initial parameter estimates
     initial = estimate_initial_params(df)
 
-    print("\nInitial parameter estimates:")
+    logging.info("Initial parameter estimates:")
     for gt, params in initial.items():
-        print(
+        logging.info(
             f"  GT {gt}: mu={params['mu']:.3f}, nu={params['nu']:.1f}, n={params['n']}")
 
     # Calculate empirical genotype fractions
@@ -150,7 +153,7 @@ def fit_parameters(df, all_gts=False, min_dp=5, max_dp=60, all_hets=False):
     # Constraint: frac0 + frac1 <= 0.99
     constraints = {'type': 'ineq', 'fun': lambda x: 0.99 - x[0] - x[1]}
 
-    print("\nOptimizing parameters...")
+    logging.info("Optimizing parameters...")
 
     result = minimize(
         mixture_loglikelihood,
@@ -163,8 +166,7 @@ def fit_parameters(df, all_gts=False, min_dp=5, max_dp=60, all_hets=False):
     )
 
     if not result.success:
-        print(
-            f"Warning: optimization did not fully converge: {result.message}")
+        logging.warning(f"Optimization did not fully converge: {result.message}")
 
     # Extract fitted parameters
     frac0, frac1 = result.x[0:2]
@@ -180,11 +182,11 @@ def fit_parameters(df, all_gts=False, min_dp=5, max_dp=60, all_hets=False):
         'n_sites': len(df)
     }
 
-    print("\nFitted parameters:")
-    print(f"  Mixture fractions: [{frac0:.3f}, {frac1:.3f}, {frac2:.3f}]")
-    print(f"  Means (mu):        [{mu0:.4f}, {mu1:.4f}, {mu2:.4f}]")
-    print(f"  Precisions (nu):   [{nu0:.1f}, {nu1:.1f}, {nu2:.1f}]")
-    print(f"  Log-likelihood:    {fitted['log_likelihood']:.1f}")
+    logging.info("Fitted parameters:")
+    logging.info(f"  Mixture fractions: [{frac0:.3f}, {frac1:.3f}, {frac2:.3f}]")
+    logging.info(f"  Means (mu):        [{mu0:.4f}, {mu1:.4f}, {mu2:.4f}]")
+    logging.info(f"  Precisions (nu):   [{nu0:.1f}, {nu1:.1f}, {nu2:.1f}]")
+    logging.info(f"  Log-likelihood:    {fitted['log_likelihood']:.1f}")
 
     return fitted
 
@@ -282,8 +284,6 @@ def parse_args(args):
     parser.add_argument("--no-plots", action="store_true",
                         help="Skip plotting")
     args = parser.parse_args(args)
-    if args.all and args.all_hets:
-        print("Error! Can only fit either --all-hets XOR --all")
     return args
 
 
@@ -296,18 +296,18 @@ def make_plots(data, out_prefix):
     import seaborn as sb
     import matplotlib.pyplot as plt
     from sklearn.metrics import roc_curve, auc
-    #, precision_recall_curve, average_precision_score
 
-    print("GTGQ ", end="", flush=True)
-    # Sort data by GQ
+    # GTGQ
     df_sorted = data.sort_values(by='GQ').reset_index(drop=True)
+
     # This should kinda depend on the number of genotypes in order to properly smooth it
     roll = max(len(df_sorted) // 50, 2)
+
     # Calculate rolling averages
     state_rolling = df_sorted['state'].rolling(roll).mean()
     gq_rolling = (df_sorted['GQ']).rolling(roll).mean()
     gq_rolling = 1 - 10**(-gq_rolling / 10)
-    # Create figure with twin y-axes
+
     _, ax1 = plt.subplots(figsize=(8, 6), dpi=180)
 
     # First y-axis: State (accuracy)
@@ -325,18 +325,15 @@ def make_plots(data, out_prefix):
     ax2.plot(gq_rolling, color=color2, linewidth=2, label='GQ')
     ax2.tick_params(axis='y')
 
-    # Title and grid
     plt.title(f'Genotype Accuracy and Quality ({roll}-sample rolling average)',
               fontsize=14, pad=20)
     ax1.grid(True, alpha=0.3)
-
-    # Add legends
     ax1.legend(loc='lower right')
-
     plt.tight_layout()
+
     plt.savefig(out_prefix + '.GTGQ.png')
 
-    print("ROC ", end="", flush=True)
+    # ROC
     _, ax1 = plt.subplots(1, 1, figsize=(8, 6), dpi=180)
     # Colors for different scores
     colors = plt.cm.Set1(np.linspace(0, 1, 1))
@@ -344,19 +341,12 @@ def make_plots(data, out_prefix):
     y_true = data['state'].astype(int)
     y_score = data['GQ']
 
-    # ROC curve
     fpr, tpr, _ = roc_curve(y_true, y_score)
     roc_auc = auc(fpr, tpr)
 
-    # Precision-Recall curve
-    # precision, recall, _ = precision_recall_curve(y_true, y_score)
-    # avg_precision = average_precision_score(y_true, y_score)
-
-    # Plot ROC
     ax1.plot(fpr, tpr, color=colors[0], lw=2,
              label=f'GQ (AUC = {roc_auc:.3f})')
 
-    # Format ROC plot
     ax1.plot([0, 1], [0, 1], 'k--', lw=1, label='Random (AUC = 0.5)')
     ax1.set_xlim([0.0, 1.0])
     ax1.set_ylim([0.0, 1.05])
@@ -368,12 +358,12 @@ def make_plots(data, out_prefix):
 
     plt.savefig(out_prefix + ".ROC.png")
 
-    print("STATE ", end="", flush=True)
+    # STATE
     _, ax = plt.subplots(3, 4, figsize=(12, 6), dpi=180)
     xlim = (0, data['GQ'].max() + 1)
     for i, m_ax in zip(['REF', 'HET', 'HOM'], ax):
         if (data['Ogt'] == i).sum() == 0:
-            print(f"No Ogt == {i} sites found. Skipping")
+            logging.warning(f"No Ogt == {i} sites found. Skipping")
         else:
             p = sb.histplot(data=data[data['Ogt'] == i],
                             x='GQ', hue='state', multiple='stack',
@@ -400,7 +390,7 @@ def make_plots(data, out_prefix):
                   title='False GT')
 
         if (data['Kgt'] == i).sum() == 0:
-            print(f"No Kgt == {i} sites found. Skipping")
+            logging.warning(f"No Kgt == {i} sites found. Skipping")
         else:
             p = sb.histplot(data=data[data['Kgt'] == i],
                             x='GQ', hue='state', multiple='stack',
@@ -409,7 +399,6 @@ def make_plots(data, out_prefix):
 
     plt.tight_layout()
     plt.savefig(out_prefix + '.STATE.png')
-    print()
 
 
 def make_df(in_vcf, bed, sizemin=50, sizemax=10000):
@@ -450,42 +439,44 @@ def regt(row, gt):
     return [result.state, result.state == row['Ogt'], int(round(result.gq))]
 
 
-def calc_accuracy(df):
+def calc_accuracy(df, prefix):
     """
     Print a summary of genotype accuracy
     """
     cnt = df.groupby(['Ogt', 'state']).size().unstack()
     cnt.loc['All'] = cnt.sum(axis=0)
     cnt['Acc'] = cnt[True] / cnt.sum(axis=1)
-    print("Genotype Accuracy")
-    print(cnt)
-    print()
+    table = textwrap.indent(cnt.to_string(), "    ")
+    logging.info(f"{prefix} Genotype Accuracy:\n{table}")
 
-    print("GT Confusion Matrix")
-    print(df.groupby(["Ogt", "Kgt"]).size().unstack())
-    print()
-
+    cnt = df.groupby(["Ogt", "Kgt"]).size().unstack()
+    table = textwrap.indent(cnt.to_string(), "    ")
+    logging.info(f"{prefix} GT Confusion Matrix:\n{table}")
 
 # Example usage
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
 
+    truvari.setup_logging(stream=truvari.LogFileStderr(args.OUT + '.log'), show_version=False)
+
+    if args.all and args.all_hets:
+        logging.error("Can only fit either --all-hets XOR --all")
+        sys.exit(1)
+
     if args.IN.endswith("genotypes.csv"):
         df = pd.read_csv(args.IN)
     else:
-        print("Parsing VCF")
+        logging.info("Parsing VCF")
         df = make_df(args.IN, args.bed, args.sizemin, args.sizemax)
 
     if args.leaveout:
         leaveout = df.groupby(['Ogt']).sample(
             frac=args.leaveout, random_state=232)
-        print(f"Leaving out {args.leaveout} (N={len(leaveout)}) genotypes")
-        print("Leaveout Accuracy:")
-        calc_accuracy(leaveout)
+        logging.info(f"Leaving out {args.leaveout} (N={len(leaveout)}) genotypes")
+        calc_accuracy(leaveout, "Leaveout")
         df = df.drop(leaveout.index)
-        print("Full Accuracy")
 
-    calc_accuracy(df)
+    calc_accuracy(df, "Full")
 
     # Fit parameters
     fitted = fit_parameters(df,
@@ -501,7 +492,7 @@ if __name__ == "__main__":
     config = save_config(fitted, out_cfg, flat_priors=args.flat_priors)
 
     if not args.no_calibrate:
-        print("\nCalibrating GQs... ", end="", flush=True)
+        logging.info("Calibrating GQs")
         gt = kanpig.Genotyper(out_cfg)
         m_gtfunction = partial(regt, gt=gt)
         df[['nKgt', 'nState', 'nGQ']] = df.apply(
@@ -510,7 +501,7 @@ if __name__ == "__main__":
         config = save_config(fitted, out_cfg, calibration,
                              flat_priors=args.flat_priors)
         # And then we have to run again to actually get the calibrated GQs
-        print("Regenotyping with config...", end="", flush=True)
+        logging.info("Regenotyping with config")
         gt = kanpig.Genotyper(out_cfg)
         m_gtfunction = partial(regt, gt=gt)
         df[['nKgt', 'nState', 'nGQ']] = df.apply(
@@ -519,26 +510,25 @@ if __name__ == "__main__":
         if args.leaveout:
             leaveout[['nKgt', 'nState', 'nGQ']] = leaveout.apply(
                 m_gtfunction, axis=1, result_type='expand')
-        print()
 
-    print("\nSaving data")
+    logging.info("Saving gqconfig")
     df.to_csv(args.OUT + '.genotypes.csv', index=False)
     if args.leaveout:
         leaveout.to_csv(args.OUT + '.leaveout.genotypes.csv', index=False)
 
     if not args.no_plots:
-        print("\nMaking original plots ", end=" ")
+        logging.info("Making original plots")
         make_plots(df, args.OUT + '.original')
         if not args.no_calibrate:
-            print("\nMaking calibrated plots ", end=" ")
+            logging.info("Making calibrated plots")
             df['GQ'] = df['nGQ']
             make_plots(df, args.OUT + '.calibrated')
         if args.leaveout:
-            print("\nMaking leaveout original plots ", end=" ")
+            logging.info("Making leaveout original plots",)
             make_plots(leaveout, args.OUT + '.leaveout.original')
             if not args.no_calibrate:
-                print("\nMaking leaveout calibrated plots ", end=" ")
+                logging.info("Making leaveout calibrated plots")
                 leaveout['GQ'] = leaveout['nGQ']
                 make_plots(leaveout, args.OUT + '.leaveout.calibrated')
 
-    print("\nFinished")
+    logging.info("Finished")
