@@ -1,0 +1,48 @@
+2025-11-15 11:53:08,822 [INFO] Parsing VCF
+2025-11-15 11:53:12,098 [INFO] Full Genotype Accuracy:
+    state  False   True       Acc
+    Ogt                          
+    HET     4327  17291  0.799843
+    HOM      648   4588  0.876241
+    All     4975  21879  0.814739
+2025-11-15 11:53:12,105 [INFO] Full GT Confusion Matrix:
+    Kgt    HET   HOM   REF
+    Ogt                   
+    HET  17291   646  3681
+    HOM    190  4588   458
+2025-11-15 11:53:12,117 [INFO] Leaving out 0.1 (N=2686) genotypes
+2025-11-15 11:53:12,123 [INFO] Leaveout Genotype Accuracy:
+    state  False  True       Acc
+    Ogt                         
+    HET      449  1713  0.792322
+    HOM       71   453  0.864504
+    All      520  2166  0.806404
+2025-11-15 11:53:12,126 [INFO] Leaveout GT Confusion Matrix:
+    Kgt   HET  HOM  REF
+    Ogt                
+    HET  1713   82  367
+    HOM    21  453   50
+2025-11-15 11:53:12,143 [INFO] Using 19317 sites for parameter estimation
+2025-11-15 11:53:12,143 [INFO] Genotype distribution:
+2025-11-15 11:53:12,144 [INFO]   {1: 15292, 2: 4025}
+2025-11-15 11:53:12,148 [INFO] Initial parameter estimates:
+2025-11-15 11:53:12,148 [INFO]   GT 1: mu=0.493, nu=21.8, n=15292
+2025-11-15 11:53:12,148 [INFO]   GT 2: mu=0.997, nu=8.5, n=4025
+2025-11-15 11:53:12,149 [INFO] Optimizing parameters...
+2025-11-15 11:53:40,155 [INFO] Fitted parameters:
+2025-11-15 11:53:40,155 [INFO]   Mixture fractions: [0.010, 0.792, 0.198]
+2025-11-15 11:53:40,155 [INFO]   Means (mu):        [0.0010, 0.4931, 0.9967]
+2025-11-15 11:53:40,155 [INFO]   Precisions (nu):   [25.0, 100.0, 12.1]
+2025-11-15 11:53:40,155 [INFO]   Log-likelihood:    -383909.9
+2025-11-15 11:53:40,156 [INFO] Calibrating GQs
+2025-11-15 11:53:41,495 [INFO] Regenotyping with config
+2025-11-15 11:53:42,973 [INFO] Saving gqconfig
+2025-11-15 11:53:43,094 [INFO] Making original plots
+2025-11-15 11:53:43,619 [WARNING] No Ogt == REF sites found. Skipping
+2025-11-15 11:53:48,204 [INFO] Making calibrated plots
+2025-11-15 11:53:48,625 [WARNING] No Ogt == REF sites found. Skipping
+2025-11-15 11:53:52,602 [INFO] Making leaveout original plots
+2025-11-15 11:53:52,988 [WARNING] No Ogt == REF sites found. Skipping
+2025-11-15 11:53:57,893 [INFO] Making leaveout calibrated plots
+2025-11-15 11:53:58,280 [WARNING] No Ogt == REF sites found. Skipping
+2025-11-15 11:54:02,843 [INFO] Finished

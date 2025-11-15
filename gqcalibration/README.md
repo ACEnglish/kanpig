@@ -53,10 +53,10 @@ from training and then create separate output files for testing.
 Output Details
 ==============
 
-### `gqconfig.json`
+### `<prefix>_gqconfig.json`
 This is the main result which can be sent to `kanpig gt --gqconfig` to produce calibrated GTs/GQs.
 
-### `genotypes.csv`
+### `<prefix>_data/genotypes.csv`
 This file holds the information used by `estimate_params.py` with columns of:
 * state - Boolean state of if the genotype was predicted correctly
 * Ogt - Original truth-set genotype (REF, HET, HOM)
@@ -71,26 +71,28 @@ This file holds the information used by `estimate_params.py` with columns of:
 * nState - Kanpig's new state
 * nGQ - The configured parameters' genotype quality score
 
-If `--leaveout` was used, a second `leaveout.genotypes.csv` will be output.
+If `--leaveout` was used, a second `<prefix>_data/leaveout_genotypes.csv` will be output.
 
-### Plots
+### Report
+
+Multiple tables/plots are generated into the `<prefix>_report.html`, with plots available in `<prefix>_data/`.
 
 Three main plots are created that can be used to inspect the results. Each plot will have multiple versions.
-* The `original` plot uses the input genotype information before parameter estimation.
-* The `calibrated` plot uses the genotype information after parameter estimation.
-* The `leaveout` plots will have both `original` and `calibrated` versions derived from the left out sites.
+* The Original plots use the input genotype information before parameter estimation.
+* The Calibrated plots use the genotype information after parameter estimation.
+* The Leaveout plots will have both original and calibrated versions derived from the left out sites.
 
-#### `ROC.png`
-Receiver Operating Curve of genotypes sorted by their GQ (low-to-high).
-A ROC that's further towards the top-left is indicative of a more informative GQ, 
+The specific plots made are:
 
-#### `GTGQ.png`
-This plots the observed genotype accuracy and expected genotype accuracy according to the GQ.
-These lines should be highly overlapping when the GQ is well calibrated and actually reflects the probability a genotype
+Receiver Operating Curve of genotypes sorted by their GQ (low-to-high). A ROC that's further towards the 
+top-left is indicative of a more informative GQ, 
+
+GTGQ plots with observed genotype accuracy and expected genotype accuracy according to the GQ. These lines 
+should be highly overlapping when the GQ is well calibrated and actually reflects the probability a genotype 
 is wrong.
 
-#### `STATE.png`
-This plot has three rows corresponding to the REF, HET, and HOM genotype subsets of the data. Each row has four columns.
+State plots which has three rows corresponding to the REF, HET, and HOM genotype subsets of the data. Each row 
+has four columns.
 * Baseline - The distribution of GQs based on their baseline (i.e. true) genotype and colored by their state 
 * Kanpig - The distribution of GQs based on their kanpig predicted genotype and colored by their state 
 * True GT - The distribution of allele balances (percent of reads supporting the alternate) for correctly predicted

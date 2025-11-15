@@ -3,21 +3,26 @@
 Estimate beta-binomial mixture model parameters from genotyping truth set.
 Fits parameters for three genotype classes: 0/0, 0/1, 1/1
 """
+import os
 import sys
 import json
 import logging
 import argparse
 import textwrap
 from functools import partial
-
+ 
 # pylint: disable=redefined-outer-name,no-name-in-module,no-member
 
 import kanpig
 import truvari
 import numpy as np
 import pandas as pd
+import seaborn as sb
+import matplotlib.pyplot as plt
 from scipy.special import betaln
 from scipy.optimize import minimize
+from matplotlib.patches import Rectangle
+from sklearn.metrics import roc_curve, auc
 
 def beta_binomial_logpmf(k, n, mu, nu):
     """
@@ -281,72 +286,303 @@ def parse_args(args):
                         help="Don't perform GQ calibration")
     parser.add_argument("--write-calib", action="store_true",
                         help="Write a csv of the calibrated GQs")
-    parser.add_argument("--no-plots", action="store_true",
-                        help="Skip plotting")
     args = parser.parse_args(args)
     return args
 
 
-def make_plots(data, out_prefix):
-    """
-    QC Plots
-    """
-    # Optional requirements
-    # pylint: disable=import-outside-toplevel
-    import seaborn as sb
-    import matplotlib.pyplot as plt
-    from sklearn.metrics import roc_curve, auc
+class HTMLReportBuilder:
+    """Builder for creating HTML reports with multiple plot sections."""
+    
+    def __init__(self, title="QC Report", output_dir="qc_plots"):
+        self.title = title
+        self.output_dir = output_dir
+        self.sections = []
+        self.plot_counter = 0
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+    
+    def add_section(self, section_title, plots):
+        """
+        Add a section with plots to the report.
+        
+        Args:
+            section_title: Title for this section
+            plots: List of tuples (plot_title, figure_object)
+        """
+        plot_files = []
+        
+        for plot_title, fig in plots:
+            # Generate filename
+            self.plot_counter += 1
+            filename = f"plot_{self.plot_counter:03d}.png"
+            filepath = os.path.join(self.output_dir, filename)
+            
+            # Save the figure
+            fig.savefig(filepath, bbox_inches='tight')
+            
+            # Store relative path for HTML
+            plot_files.append((plot_title, filename))
+            
+            # Close figure to free memory
+            plt.close(fig)
+        
+        self.sections.append({
+            'title': section_title,
+            'type': 'plots',
+            'plots': plot_files
+        })
+    
+    def add_table_section(self, section_title, table1_title, table1_df, table2_title, table2_df):
+        """
+        Add a section with two tables displayed side-by-side.
+        
+        Args:
+            section_title: Title for this section
+            table1_title: Title for the first table
+            table1_df: First pandas DataFrame
+            table2_title: Title for the second table
+            table2_df: Second pandas DataFrame
+        """
+        self.sections.append({
+            'title': section_title,
+            'type': 'tables',
+            'table1': {'title': table1_title, 'df': table1_df},
+            'table2': {'title': table2_title, 'df': table2_df}
+        })
+    
+    def save(self, output_path):
+        """Generate and save the HTML report."""
+        # Get relative path from HTML to plots directory
+        html_dir = os.path.dirname(os.path.abspath(output_path))
+        plots_dir = os.path.abspath(self.output_dir)
+        rel_path = os.path.relpath(plots_dir, html_dir)
+        
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{self.title}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #F0F0F0;
+        }}
+        h1 {{
+            color: #333;
+            border-bottom: 3px solid #E8A5B5;
+            padding-bottom: 10px;
+        }}
+        h2 {{
+            color: #555;
+            margin-top: 40px;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 8px;
+        }}
+        .section {{
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .plot-container {{
+            margin: 30px 0;
+        }}
+        .plot-title {{
+            font-size: 18px;
+            font-weight: bold;
+            color: #444;
+            margin-bottom: 15px;
+        }}
+        .plot-image {{
+            width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }}
+        .plot-image:hover {{
+            opacity: 0.9;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }}
+        .plot-link {{
+            display: inline-block;
+            margin-top: 5px;
+            color: #E8A5B5;
+            text-decoration: none;
+            font-size: 14px;
+        }}
+        .plot-link:hover {{
+            text-decoration: underline;
+        }}
+        .timestamp {{
+            color: #888;
+            font-size: 14px;
+            text-align: right;
+            margin-top: 20px;
+        }}
+        .info-box {{
+            background: #FFE5EC;
+            border-left: 4px solid #E8A5B5;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }}
+        .table-container {{
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }}
+        .table-wrapper {{
+            flex: 1;
+            min-width: 300px;
+        }}
+        .table-title {{
+            font-size: 16px;
+            font-weight: bold;
+            color: #444;
+            margin-bottom: 10px;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            background: white;
+        }}
+        th, td {{
+            padding: 8px 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }}
+        th {{
+            background-color: #E8A5B5;
+            color: black;
+            font-weight: bold;
+        }}
+        tr:nth-child(even) {{
+            background-color: #f9f9f9;
+        }}
+        tr:hover {{
+            background-color: #f0f0f0;
+        }}
+        td:first-child {{
+            font-weight: 500;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{self.title}</h1>
+    <div class="info-box">
+        <strong>Note:</strong> All plots are available as PNG files in the <code>{self.output_dir}/</code> directory.
+    </div>
+"""
+        
+        for section in self.sections:
+            html_content += f"""
+    <div class="section">
+        <h2>{section['title']}</h2>
+"""
+            if section['type'] == 'plots':
+                for plot_title, filename in section['plots']:
+                    plot_path = os.path.join(rel_path, filename).replace('\\', '/')
+                    html_content += f"""
+        <div class="plot-container">
+            <div class="plot-title">{plot_title}</div>
+            <a href="{plot_path}" target="_blank">
+                <img class="plot-image" src="{plot_path}" alt="{plot_title}">
+            </a>
+            <br>
+            <a class="plot-link" href="{plot_path}" download>📥 Download {filename}</a>
+        </div>
+"""
+            elif section['type'] == 'tables':
+                html_content += """
+        <div class="table-container">
+"""
+                for table_info in [section['table1'], section['table2']]:
+                    html_content += f"""
+            <div class="table-wrapper">
+                <div class="table-title">{table_info['title']}</div>
+                {table_info['df'].to_html(classes='', border=0, escape=False)}
+            </div>
+"""
+                html_content += """
+        </div>
+"""
+            html_content += """
+    </div>
+"""
+        
+        html_content += """
+    <div class="timestamp">
+        Report generated: <span id="timestamp"></span>
+    </div>
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>
+"""
+        
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
 
-    # GTGQ
+def make_plots(data, section_title, html_builder):
+    """
+    Generate QC plots and add them to the HTML report.
+    
+    Args:
+        data: DataFrame with genotype data
+        section_title: Title for this data section in the report
+        html_builder: HTMLReportBuilder instance to add plots to
+    """
+   
+    plots = []
+    
+    # GTGQ Plot
     df_sorted = data.sort_values(by='GQ').reset_index(drop=True)
-
-    # This should kinda depend on the number of genotypes in order to properly smooth it
     roll = max(len(df_sorted) // 50, 2)
-
-    # Calculate rolling averages
     state_rolling = df_sorted['state'].rolling(roll).mean()
     gq_rolling = (df_sorted['GQ']).rolling(roll).mean()
     gq_rolling = 1 - 10**(-gq_rolling / 10)
-
-    _, ax1 = plt.subplots(figsize=(8, 6), dpi=180)
-
-    # First y-axis: State (accuracy)
+    
+    fig1, ax1 = plt.subplots(figsize=(8, 6), dpi=180)
     color1 = 'tab:blue'
     ax1.set_xlabel('Variants (sorted by GQ)', fontsize=12)
     ax1.set_ylabel('Accuracy (rolling avg)', fontsize=12)
     ax1.plot(state_rolling, color=color1, linewidth=2, label='Observed')
     ax1.tick_params(axis='y')
     ax1.set_ylim(0, 1)
-
-    # Second y-axis: GQ
-    ax2 = ax1  # ax1.twinx()
+    
+    ax2 = ax1
     color2 = 'tab:orange'
     ax2.set_ylabel('Accuracy (rolling avg)', fontsize=12)
     ax2.plot(gq_rolling, color=color2, linewidth=2, label='GQ')
     ax2.tick_params(axis='y')
-
     plt.title(f'Genotype Accuracy and Quality ({roll}-sample rolling average)',
               fontsize=14, pad=20)
     ax1.grid(True, alpha=0.3)
     ax1.legend(loc='lower right')
     plt.tight_layout()
-
-    plt.savefig(out_prefix + '.GTGQ.png')
-
-    # ROC
-    _, ax1 = plt.subplots(1, 1, figsize=(8, 6), dpi=180)
-    # Colors for different scores
+    
+    plots.append(("Genotype Accuracy vs Quality", fig1))
+    
+    # ROC Plot
+    fig2, ax1 = plt.subplots(1, 1, figsize=(8, 6), dpi=180)
     colors = plt.cm.Set1(np.linspace(0, 1, 1))
-
     y_true = data['state'].astype(int)
     y_score = data['GQ']
-
     fpr, tpr, _ = roc_curve(y_true, y_score)
     roc_auc = auc(fpr, tpr)
-
     ax1.plot(fpr, tpr, color=colors[0], lw=2,
              label=f'GQ (AUC = {roc_auc:.3f})')
-
     ax1.plot([0, 1], [0, 1], 'k--', lw=1, label='Random (AUC = 0.5)')
     ax1.set_xlim([0.0, 1.0])
     ax1.set_ylim([0.0, 1.05])
@@ -355,11 +591,11 @@ def make_plots(data, out_prefix):
     ax1.set_title('Kanpig ROC Curve', fontsize=14, fontweight='bold')
     ax1.legend(loc="lower right")
     ax1.grid(alpha=0.3)
-
-    plt.savefig(out_prefix + ".ROC.png")
-
-    # STATE
-    _, ax = plt.subplots(3, 4, figsize=(12, 6), dpi=180)
+    
+    plots.append(("ROC Curve", fig2))
+    
+    # STATE Plot
+    fig3, ax = plt.subplots(3, 4, figsize=(12, 6), dpi=180)
     xlim = (0, data['GQ'].max() + 1)
     for i, m_ax in zip(['REF', 'HET', 'HOM'], ax):
         if (data['Ogt'] == i).sum() == 0:
@@ -367,28 +603,29 @@ def make_plots(data, out_prefix):
         else:
             p = sb.histplot(data=data[data['Ogt'] == i],
                             x='GQ', hue='state', multiple='stack',
+                            hue_order=[False, True],
+                            palette=sb.color_palette()[:2],
                             binwidth=1, ax=m_ax[0])
             p.set(title="Baseline", ylabel=i + ' Count', xlim=xlim)
 
             subset = data[data['Ogt'] == i]
-
             af = subset['AD_alt'] / subset['DP']
-            p = sb.histplot(af[subset['state']], bins=50,
+            p = sb.histplot(af[subset['state']],
+                            color=sb.color_palette()[1],
                             ax=m_ax[2], binwidth=0.02)
             p.set(xlabel='Allele Fraction',
                   yscale='log',
                   ylabel=i + ' Count (log)',
                   xlim=(0, 1),
                   title='True GT')
-
-            p = sb.histplot(af[~subset['state']], bins=50,
+            p = sb.histplot(af[~subset['state']],
+                            color=sb.color_palette()[0],
                             ax=m_ax[3], binwidth=0.02)
             p.set(xlabel='Allele Fraction',
                   yscale='log',
                   xlim=(0, 1),
                   ylabel=i + ' Count (log)',
                   title='False GT')
-
         if (data['Kgt'] == i).sum() == 0:
             logging.warning(f"No Kgt == {i} sites found. Skipping")
         else:
@@ -398,8 +635,39 @@ def make_plots(data, out_prefix):
             p.set(title="Kanpig", ylabel=i + ' Count', xlim=xlim)
 
     plt.tight_layout()
-    plt.savefig(out_prefix + '.STATE.png')
 
+    # Customize legend for the stacked histograms
+    for i, m_ax in enumerate(ax):
+        for j in [0, 1]:  # First two columns have the 'state' hue
+            legend = m_ax[j].get_legend()
+            if legend is not None:
+                colors = sb.color_palette()[:2]
+                legend.remove()
+                
+                # Get current title and add legend inline
+                title = m_ax[j].get_title()
+                m_ax[j].text(0.5, 1.08, title, transform=m_ax[j].transAxes,
+                            fontsize=10, ha='center', va='center', fontweight='normal')
+                
+                # Add colored squares to the right of title
+                m_ax[j].text(0.82, 1.08, 'F', transform=m_ax[j].transAxes,
+                            bbox=dict(boxstyle='square,pad=0.2', facecolor=colors[0], 
+                                    edgecolor='black', linewidth=0.5),
+                            fontsize=7, ha='center', va='center')
+                m_ax[j].text(0.75, 1.08, 'T', transform=m_ax[j].transAxes,
+                            bbox=dict(boxstyle='square,pad=0.2', facecolor=colors[1], 
+                                    edgecolor='black', linewidth=0.5),
+                            fontsize=7, ha='center', va='center')
+                
+                # Remove the default title
+                m_ax[j].set_title('')
+
+    
+    plots.append(("State Distribution", fig3))
+    
+    # Add all plots for this section to the HTML builder
+    html_builder.add_section(section_title, plots)
+    
 
 def make_df(in_vcf, bed, sizemin=50, sizemax=10000):
     """
@@ -439,19 +707,37 @@ def regt(row, gt):
     return [result.state, result.state == row['Ogt'], int(round(result.gq))]
 
 
-def calc_accuracy(df, prefix):
+def calc_accuracy(df, prefix, html_builder=None):
     """
-    Print a summary of genotype accuracy
+    Calculate and log genotype accuracy statistics.
+    Optionally add tables to HTML report.
+
+    Args:
+        df: DataFrame with genotype data
+        prefix: Prefix for log messages
+        html_builder: Optional HTMLReportBuilder instance to add tables to
     """
+    # Calculate accuracy table
     cnt = df.groupby(['Ogt', 'state']).size().unstack()
     cnt.loc['All'] = cnt.sum(axis=0)
     cnt['Acc'] = cnt[True] / cnt.sum(axis=1)
     table = textwrap.indent(cnt.to_string(), "    ")
     logging.info(f"{prefix} Genotype Accuracy:\n{table}")
 
-    cnt = df.groupby(["Ogt", "Kgt"]).size().unstack()
-    table = textwrap.indent(cnt.to_string(), "    ")
-    logging.info(f"{prefix} GT Confusion Matrix:\n{table}")
+    # Calculate confusion matrix
+    cnt2 = df.groupby(["Ogt", "Kgt"]).size().unstack()
+    table2 = textwrap.indent(cnt2.to_string(), "    ")
+    logging.info(f"{prefix} GT Confusion Matrix:\n{table2}")
+
+    # Add to HTML report if builder is provided
+    if html_builder is not None:
+        html_builder.add_table_section(
+            section_title=f"{prefix} Statistics",
+            table1_title="Genotype Accuracy",
+            table1_df=cnt,
+            table2_title="GT Confusion Matrix",
+            table2_df=cnt2
+        )
 
 # Example usage
 if __name__ == "__main__":
@@ -462,21 +748,22 @@ if __name__ == "__main__":
     if args.all and args.all_hets:
         logging.error("Can only fit either --all-hets XOR --all")
         sys.exit(1)
-
+    
+    report = HTMLReportBuilder(title="Kanpig GQ Calibration Report", output_dir=args.OUT + '_data')
     if args.IN.endswith("genotypes.csv"):
         df = pd.read_csv(args.IN)
     else:
         logging.info("Parsing VCF")
         df = make_df(args.IN, args.bed, args.sizemin, args.sizemax)
 
+    calc_accuracy(df, "Full", report)
+
     if args.leaveout:
         leaveout = df.groupby(['Ogt']).sample(
             frac=args.leaveout, random_state=232)
         logging.info(f"Leaving out {args.leaveout} (N={len(leaveout)}) genotypes")
-        calc_accuracy(leaveout, "Leaveout")
+        calc_accuracy(leaveout, "Leaveout", report)
         df = df.drop(leaveout.index)
-
-    calc_accuracy(df, "Full")
 
     # Fit parameters
     fitted = fit_parameters(df,
@@ -488,7 +775,7 @@ if __name__ == "__main__":
 
     # Now you need to go re-genotype everything and grab those GQs
     # Then you make the calibration table
-    out_cfg = args.OUT + '.gqconfig.json'
+    out_cfg = args.OUT + '_gqconfig.json'
     config = save_config(fitted, out_cfg, flat_priors=args.flat_priors)
 
     if not args.no_calibrate:
@@ -512,23 +799,23 @@ if __name__ == "__main__":
                 m_gtfunction, axis=1, result_type='expand')
 
     logging.info("Saving gqconfig")
-    df.to_csv(args.OUT + '.genotypes.csv', index=False)
+    df.to_csv(args.OUT + '_data/genotypes.csv', index=False)
     if args.leaveout:
-        leaveout.to_csv(args.OUT + '.leaveout.genotypes.csv', index=False)
+        leaveout.to_csv(args.OUT + '_data/leaveout_genotypes.csv', index=False)
 
-    if not args.no_plots:
-        logging.info("Making original plots")
-        make_plots(df, args.OUT + '.original')
+    logging.info("Making original plots")
+    make_plots(df, "Original", report)
+    if not args.no_calibrate:
+        logging.info("Making calibrated plots")
+        df['GQ'] = df['nGQ']
+        make_plots(df, 'Calibrated', report)
+    if args.leaveout:
+        logging.info("Making leaveout original plots",)
+        make_plots(leaveout, "Leftout Original", report)
         if not args.no_calibrate:
-            logging.info("Making calibrated plots")
-            df['GQ'] = df['nGQ']
-            make_plots(df, args.OUT + '.calibrated')
-        if args.leaveout:
-            logging.info("Making leaveout original plots",)
-            make_plots(leaveout, args.OUT + '.leaveout.original')
-            if not args.no_calibrate:
-                logging.info("Making leaveout calibrated plots")
-                leaveout['GQ'] = leaveout['nGQ']
-                make_plots(leaveout, args.OUT + '.leaveout.calibrated')
+            logging.info("Making leaveout calibrated plots")
+            leaveout['GQ'] = leaveout['nGQ']
+            make_plots(leaveout, "Leftout Calibrated", report)
+    report.save(args.OUT + "_report.html")
 
     logging.info("Finished")
