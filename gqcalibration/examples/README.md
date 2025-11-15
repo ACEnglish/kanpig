@@ -84,6 +84,11 @@ tabix hprc.merged.vcf.gz
 estimate_params.py --bed ${bed} --all --flat-priors --leaveout 0.10 hprc.merged.vcf.gz hprc.hg002.hifi.38x
 ```
 
+Another HPRC
+------------
+An example experiment where we use different sequencing experiment and two other HPRC samples is described in
+`experiment_hprc.sh`.
+
 Discovery SVs (pending)
 ----------------------------
 

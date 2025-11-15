@@ -265,6 +265,8 @@ def parse_args(args):
                         help="Output prefix file to write")
     parser.add_argument("--bed", default=None, type=str,
                         help="Bed file for subsetting VCF entries to parse")
+    parser.add_argument("--summary", action='store_true',
+                        help="Only make summary report of genotypes")
     parser.add_argument("--leaveout", type=float, default=0,
                         help=("Leave out [0.0-1.0) from training and "
                               "make separate plots (%(default)s)"))
@@ -765,6 +767,13 @@ if __name__ == "__main__":
         calc_accuracy(leaveout, "Leaveout", report)
         df = df.drop(leaveout.index)
 
+    logging.info("Summarizing Original Genotypes")
+    make_plots(df, "Original", report)
+    if args.summary:
+        report.save(args.OUT + "_report.html")
+        logging.info("Summary only - Finished")
+        sys.exit(0)
+
     # Fit parameters
     fitted = fit_parameters(df,
                             all_gts=args.all,
@@ -799,12 +808,11 @@ if __name__ == "__main__":
                 m_gtfunction, axis=1, result_type='expand')
 
     logging.info("Saving gqconfig")
-    df.to_csv(args.OUT + '_data/genotypes.csv', index=False)
+    df.to_csv(args.OUT + '_data/genotypes.csv.gz', index=False, compression='gzip')
     if args.leaveout:
-        leaveout.to_csv(args.OUT + '_data/leaveout_genotypes.csv', index=False)
+        leaveout.to_csv(args.OUT + '_data/leaveout_genotypes.csv.gz', index=False, compression='gzip')
 
-    logging.info("Making original plots")
-    make_plots(df, "Original", report)
+    
     if not args.no_calibrate:
         logging.info("Making calibrated plots")
         df['GQ'] = df['nGQ']
