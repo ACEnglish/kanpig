@@ -14,6 +14,7 @@ use rust_htslib::{
 use std::path::PathBuf;
 
 pub type ReadsMap = IndexMap<usize, Vec<usize>>;
+type ReadNameMap = IndexMap<usize, String>;
 pub type PileupSet = IndexSet<PileupVariant>;
 type HPMap = IndexMap<usize, Option<u8>>;
 
@@ -80,6 +81,7 @@ impl ReadParser for BamParser {
         let mut qname = 0;
         let mut record = bam::Record::new();
         let sample_index = self.get_sample_idx();
+        let mut rnames = ReadNameMap::new();
 
         while let Some(r) = self.bam.read(&mut record) {
             r.expect("Failed to parse record");
@@ -101,6 +103,10 @@ impl ReadParser for BamParser {
                     hap_meta.ps[sample_index] = read.ps;
                 }
 
+                if let Some(name) = read.rname.take() {
+                    rnames.entry(qname).or_insert(name);
+                }
+
                 if !read.pileups.is_empty() {
                     hps.entry(qname).or_insert(read.hp);
                 }
@@ -110,6 +116,7 @@ impl ReadParser for BamParser {
                         reads.entry(qname).or_default().push(p_idx);
                     }
                 }
+
                 qname += 1;
             }
         }
@@ -124,6 +131,7 @@ impl ReadParser for BamParser {
                 hps,
                 hap_meta,
                 self.get_sample_idx(),
+                Some(rnames),
             ),
             coverage,
         )
@@ -227,6 +235,7 @@ impl ReadParser for PlupParser {
                 hps,
                 hap_meta,
                 self.get_sample_idx(),
+                None,
             ),
             coverage,
         )
@@ -344,6 +353,7 @@ fn pileups_to_haps(
     hps: HPMap, // HP tags per-read
     hap_meta: HaplotypeMeta,
     sample_idx: usize,
+    rnames: Option<ReadNameMap>, // Read names per-read
 ) -> Vec<Haplotype> {
     let mut hap_parts = Vec::<Haplotype>::with_capacity(plups.len());
     let mut ret = Vec::<Haplotype>::with_capacity(reads.len());
@@ -374,10 +384,21 @@ fn pileups_to_haps(
     // qname: [plup_idx, ]
     for (read_idx, read) in reads.into_iter() {
         let mut cur_hap = Haplotype::blank(params.kmer, hap_meta.clone());
+
         cur_hap.meta.hp[sample_idx] = *hps.get(&read_idx).expect("hp populated with reads");
+
+        if let Some(ref r) = rnames {
+            cur_hap.meta.rnames[sample_idx].push(
+                r.get(&read_idx)
+                    .expect("rname populated with reads")
+                    .clone(),
+            );
+        }
+
         for p in read {
             cur_hap.add(&hap_parts[hap_parts.len() - p - 1]);
         }
+
         ret.push(cur_hap);
     }
 

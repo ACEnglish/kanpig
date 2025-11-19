@@ -14,6 +14,7 @@ pub struct ReadPileup {
     pub pileups: Vec<PileupVariant>,
     pub ps: Option<u32>,
     pub hp: Option<u8>,
+    pub rname: Option<String>,
 }
 
 /// A struct representing a read and its pileups
@@ -45,6 +46,7 @@ impl ReadPileup {
     pub fn new(chrom: String, record: &Record, sizemin: u32, sizemax: u32) -> Self {
         let start = record.reference_start();
         let end = record.reference_end();
+        let rname = Some(String::from_utf8_lossy(record.qname()).into_owned());
 
         let mut pileups = Vec::<PileupVariant>::new();
         let mut read_offset = 0;
@@ -128,6 +130,7 @@ impl ReadPileup {
             pileups,
             ps,
             hp,
+            rname,
         }
     }
 
@@ -198,6 +201,7 @@ impl ReadPileup {
             pileups,
             ps,
             hp,
+            rname: None,
         })
     }
 }

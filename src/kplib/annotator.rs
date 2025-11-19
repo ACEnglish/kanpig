@@ -64,7 +64,7 @@ impl GenotypeAnno {
     }
 
     /// Generates fields for the `GenotypeAnno` used by `VcfWriter`.
-    /// Edits to these must be sync'd with make_fmt_definitions
+    /// Edits to these must be sync'd with make_format below
     pub fn make_fields(&self) -> Vec<Option<Value>> {
         // KS can sometimes be an empty array, so we have to set it to None
         let ks = if self.ks.is_empty() {
@@ -276,7 +276,6 @@ fn finalize_annotation(
     let gt_obs = genotyper.genotype(ref_cov, alt_cov1 + alt_cov2);
     //let gt_obs = germ_genotyper::phased_genotyper(ref_cov, alt_cov1, alt_cov2);
 
-    // we're now assuming that ref/alt are the coverages used for these genotypes. no bueno
     // Either use haplotagging PS or NE (+1 for 1-based like in the VCF)
     let ps = paths
         .first()
