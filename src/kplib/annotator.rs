@@ -41,6 +41,7 @@ pub struct GenotypeAnno {
     pub ad: IntG,
     pub ks: IntG,
     pub gt_state: GTstate,
+    pub rnames: Vec<String>,
 }
 
 impl GenotypeAnno {
@@ -144,6 +145,7 @@ fn zero(var_idx: NodeIndex, coverage: u64) -> GenotypeAnno {
         ad: vec![None],
         ks: vec![None],
         gt_state: GTstate::Non,
+        rnames: vec![],
     }
 }
 
@@ -275,6 +277,11 @@ fn finalize_annotation(
 
     let gt_obs = genotyper.genotype(ref_cov, alt_cov1 + alt_cov2);
     //let gt_obs = germ_genotyper::phased_genotyper(ref_cov, alt_cov1, alt_cov2);
+    let rnames: Vec<String> = paths
+        .iter()
+        .filter(|p| p.path.contains(&var_idx))
+        .flat_map(|p| p.meta.rnames.iter().cloned())
+        .collect();
 
     // Either use haplotagging PS or NE (+1 for 1-based like in the VCF)
     let ps = paths
@@ -326,5 +333,6 @@ fn finalize_annotation(
         ad,
         ks,
         gt_state: gt_path,
+        rnames,
     }
 }

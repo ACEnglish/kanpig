@@ -4,7 +4,7 @@ pub use crate::kplib::annotator::GenotypeAnno;
 mod bedparser;
 pub use crate::kplib::bedparser::BedParser;
 
-mod cluster;
+pub mod cluster;
 
 pub mod germ_genotyper;
 

@@ -20,6 +20,7 @@ use noodles_vcf::{
         Value,
     },
     variant::io::Write as vcfWrite,
+    variant::record::Ids,
     variant::record_buf::samples::{keys::Keys, Samples},
 };
 
@@ -33,12 +34,14 @@ pub struct VcfWriter {
     keys: Keys,
     pub gtcounts: Vec<HashMap<GTstate, usize>>,
     genotyper: Genotyper,
+    rnames_writer: Option<Box<dyn Write>>,
 }
 
 impl VcfWriter {
     /// Given a path and a header, setup a new output VCF
     pub fn new(
         out_path: &Option<PathBuf>,
+        rnames_path: &Option<PathBuf>,
         mut header: vcf::Header,
         sample_names: &Vec<String>,
     ) -> Self {
@@ -53,7 +56,6 @@ impl VcfWriter {
             header.sample_names_mut().insert(i.to_owned());
         }
         // Comment line for version/params
-        //let command = env::args().skip(1).collect::<Vec<String>>().join(" ");
         let command = env::args().collect::<Vec<String>>().join(" ");
         let comment = format!("<version='v{}',command='{}'>", VERSION, command);
         let _ = header.insert(PKG_NAME.parse().expect("const"), Value::String(comment));
@@ -84,6 +86,16 @@ impl VcfWriter {
         let _ = writer.write_header(&header);
 
         let genotyper = Genotyper::with_optional_config(None);
+
+        let rnames_writer: Option<Box<dyn Write>> = match rnames_path {
+            Some(ref path) => {
+                let file = File::create(path).expect("Error creating output file");
+                let m_page = page_size::get() * 1000;
+                Some(Box::new(BufWriter::with_capacity(m_page, file)))
+            }
+            None => None,
+        };
+
         Self {
             writer,
             header,
@@ -91,6 +103,7 @@ impl VcfWriter {
             keys: Keys::from_iter(new_fmts),
             gtcounts: vec![HashMap::new(); sample_names.len()],
             genotyper,
+            rnames_writer,
         }
     }
 
@@ -124,18 +137,30 @@ impl VcfWriter {
         if let Err(error) = self.writer.write_variant_record(&self.header, &entry) {
             panic!("Couldn't write record {:?}", error);
         }
+
+        // rnames writing here
+        if let Some(writer) = &mut self.rnames_writer {
+            let m_id = entry.ids().iter().collect::<Vec<_>>().join(";");
+            for annot in annots {
+                for rname in &annot.rnames {
+                    let _ = writeln!(writer, "{}\t{}", m_id, rname);
+                }
+            }
+        }
     }
 }
 
 pub fn open_writer_thread(
     result_receiver: Receiver<ChannelOutput>,
     out_path: Option<PathBuf>,
+    rnames_path: Option<PathBuf>,
     sample_names: Vec<String>,
     wt_header: vcf::Header,
     wt_num_variants: std::sync::Arc<std::sync::Mutex<u64>>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
-        let mut m_writer = VcfWriter::new(&out_path, wt_header.clone(), &sample_names);
+        let mut m_writer =
+            VcfWriter::new(&out_path, &rnames_path, wt_header.clone(), &sample_names);
 
         let mut pbar: Option<ProgressBar> = None;
         let sty = ProgressStyle::with_template(

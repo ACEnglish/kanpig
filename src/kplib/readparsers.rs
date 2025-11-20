@@ -388,7 +388,7 @@ fn pileups_to_haps(
         cur_hap.meta.hp[sample_idx] = *hps.get(&read_idx).expect("hp populated with reads");
 
         if let Some(ref r) = rnames {
-            cur_hap.meta.rnames[sample_idx].push(
+            cur_hap.meta.rnames.push(
                 r.get(&read_idx)
                     .expect("rname populated with reads")
                     .clone(),
