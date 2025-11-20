@@ -12,6 +12,7 @@ use crate::{
     file_validators,
     kplib::{
         build_region_tree,
+        cluster::collapse_haplotypes,
         germ_genotyper::Genotyper,
         open_reads, open_writer_thread,
         pileup::collect_pileup_data,
@@ -105,8 +106,7 @@ fn task_thread(
                 debug!("Read Counts:\n {:?}", read_counts);
                 let gts = trio_genotyper(&read_counts, &cluster_result.quality);
 
-                let clustered_haps =
-                    polycluster::collapse_haplotypes(cluster_result, pileup_data.haplos, gts);
+                let clustered_haps = collapse_haplotypes(cluster_result, pileup_data.haplos, gts);
 
                 let should_build = !clustered_haps.is_empty()
                     && !m_args.graph.one_to_one
@@ -219,6 +219,10 @@ pub struct IOParams {
     /// Number of threads
     #[arg(short, long, default_value_t = 1, help_heading = "I/O")]
     pub threads: usize,
+
+    /// Output RNAMES file
+    #[arg(long, help_heading = "I/O")]
+    pub rnames: Option<PathBuf>,
 
     /// Output VCF proband sample name
     #[arg(long, default_value = "PRO", help_heading = "I/O")]
@@ -401,6 +405,7 @@ impl KanpigCommand for TrioCommand {
         let write_handler = open_writer_thread(
             result_receiver,
             self.io.out.clone(),
+            self.io.rnames.clone(),
             vec![
                 self.io.proband_sample.clone(),
                 self.io.father_sample.clone(),

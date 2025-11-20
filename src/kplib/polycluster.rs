@@ -1,7 +1,9 @@
 use ndarray::{Array, Array2, Axis};
 use rand::SeedableRng;
 
-use crate::kplib::{hp_sorter, meanshift::MeanShift, metrics, Haplotype, PathScore};
+use crate::kplib::{
+    cluster::ClusterResult, hp_sorter, meanshift::MeanShift, metrics, Haplotype, PathScore,
+};
 
 // Put this trait on TrioCommand and Mosaic Command so we contain the copying
 pub trait ToPolyCluParams {
@@ -114,14 +116,6 @@ pub fn top_n_rows_by_sum(arr: &Array2<usize>, n: usize) -> Vec<usize> {
         .collect()
 }
 
-// Structure to hold clustering results
-pub struct ClusterResult {
-    pub assignments: Vec<usize>,
-    pub quality: Vec<f64>,
-    pub k: usize,
-    pub medoids: Vec<usize>,
-}
-
 // Perform MeanShift and K-medoid clustering
 pub fn perform_clustering(
     haplos: &[Haplotype],
@@ -214,66 +208,6 @@ pub fn perform_clustering(
         k,
         medoids,
     }
-}
-
-/// Given a cluster result, all observed haplotypes, and a vector of observed haplotypes ids
-/// per-sample a.k.a. vec of vec
-pub fn collapse_haplotypes(
-    cluster_result: ClusterResult,
-    haplos: Vec<Haplotype>,
-    gts: Vec<Vec<usize>>,
-) -> Vec<Haplotype> {
-    let mut clustered_haps: Vec<Haplotype> = cluster_result
-        .medoids
-        .iter()
-        .enumerate()
-        .map(|(idx, i)| haplos[*i].clear_clone(idx + 1))
-        .collect();
-
-    let mut hp_cnt = Array::<u16, _>::zeros((cluster_result.k, gts.len(), 2));
-
-    cluster_result
-        .assignments
-        .into_iter()
-        .zip(haplos)
-        .for_each(|(cluster_idx, m_hap)| {
-            // Sample index inside the HaplotypeMeta
-            let idx = m_hap.meta.samples_flag.trailing_zeros() as usize;
-            // Only apply reads to the clustered_hap if it goes together
-            if gts[idx].contains(&(cluster_idx + 1)) {
-                let k_hap = &mut clustered_haps[cluster_idx];
-                k_hap.meta.coverage[idx] += 1;
-                k_hap.meta.ps[idx] = k_hap.meta.ps[idx].or(m_hap.meta.ps[idx]);
-                k_hap.meta.hp[idx] = k_hap.meta.hp[idx].or(m_hap.meta.hp[idx]);
-                k_hap.meta.samples_flag |= m_hap.meta.samples_flag;
-
-                if let Some(val) = m_hap.meta.hp[idx] {
-                    hp_cnt[[cluster_idx, idx, val as usize - 1]] += 1;
-                }
-            }
-            // TODO: Reassignment of reads assigned to unused clusters?
-        });
-
-    // Set HP tag to the most common seen in the cluster
-    for (i, m_hap) in clustered_haps.iter_mut().enumerate() {
-        for j in 0..gts.len() {
-            if m_hap.meta.hp[j].is_some() {
-                let max_idx: u8 = hp_cnt
-                    .slice(ndarray::s![i, j, ..])
-                    .iter()
-                    .cloned()
-                    .enumerate()
-                    .max_by_key(|&(_, val)| val)
-                    .map(|(idx, _)| idx)
-                    .unwrap_or(1)
-                    .try_into()
-                    .unwrap();
-                m_hap.meta.hp[j] = Some(max_idx + 1);
-            }
-        }
-    }
-
-    clustered_haps
 }
 
 pub fn separate_paths_by_sample(paths: Vec<PathScore>, n_samples: usize) -> Vec<Vec<PathScore>> {

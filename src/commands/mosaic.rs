@@ -14,6 +14,7 @@ use crate::{
     kplib::{
         annotator::FiltFlags,
         build_region_tree,
+        cluster::collapse_haplotypes,
         germ_genotyper::Genotyper,
         mosaic_genotyper::{GenotypeHypothesis, MosaicGenotyper},
         open_reads, open_writer_thread,
@@ -154,7 +155,7 @@ fn task_thread(
                     }
                 };
 
-                let clustered_haps = polycluster::collapse_haplotypes(
+                let clustered_haps = collapse_haplotypes(
                     cluster_result,
                     pileup_data.haplos,
                     vec![gts.genotype.observed_alleles.clone(); n_samples],
@@ -199,6 +200,7 @@ fn task_thread(
                                     if !anno.gt.contains("1") {
                                         anno.gq = gts.quality_score.round() as i32;
                                     }
+                                    anno.rnames.extend(path.meta.rnames.clone());
                                     anno.filt |= FiltFlags::SOMATIC;
                                     // TODO: wrong for haploid regions
                                     *anno.ad[1].get_or_insert(0) +=
@@ -314,6 +316,10 @@ pub struct IOParams {
     /// Number of threads
     #[arg(short, long, default_value_t = 1, help_heading = "I/O")]
     pub threads: usize,
+
+    /// Output RNAMES file
+    #[arg(long, help_heading = "I/O")]
+    pub rnames: Option<PathBuf>,
 
     /// Output VCF sample names (one per `--reads`; can be specified multiple times)
     #[arg(long, default_value = "SAMPLE", help_heading = "I/O", action = ArgAction::Append)]
@@ -459,6 +465,7 @@ impl KanpigCommand for MosaicCommand {
         let write_handler = open_writer_thread(
             result_receiver,
             self.io.out.clone(),
+            self.io.rnames.clone(),
             self.io.sample.clone(),
             input_header.clone(),
             num_variants.clone(),

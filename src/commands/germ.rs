@@ -136,6 +136,10 @@ pub struct IOParams {
     #[arg(short, long, default_value_t = 1, help_heading = "I/O")]
     pub threads: usize,
 
+    /// Output RNAMES file
+    #[arg(long, help_heading = "I/O")]
+    pub rnames: Option<PathBuf>,
+
     /// Output VCF sample name
     #[arg(long, help_heading = "I/O")]
     pub sample: Option<String>,
@@ -271,6 +275,7 @@ impl KanpigCommand for GermCommand {
         let write_handler = open_writer_thread(
             result_receiver,
             self.io.out.clone(),
+            self.io.rnames.clone(),
             vec![self
                 .io
                 .sample

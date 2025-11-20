@@ -86,11 +86,7 @@ pub fn validate_reads(reads: &Path, params: &GraphParams) -> bool {
     let file_path = reads.to_str().unwrap_or_default();
 
     // Check pileup first
-    let plup_ok = {
-        let mut is_ok = validate_file(reads, "--reads");
-        is_ok &= validate_plup(file_path, params);
-        is_ok
-    };
+    let plup_ok = validate_plup(file_path, params);
 
     // Only check BAM if it's not a valid pileup
     let bam_ok = if !plup_ok {

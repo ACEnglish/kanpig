@@ -24,18 +24,22 @@ pub struct HaplotypeMeta {
     pub ps: Vec<Option<u32>>,
     pub hp: Vec<Option<u8>>,
     pub samples_flag: usize,
+    pub rnames: Vec<String>,
 }
 
 impl HaplotypeMeta {
     pub fn new(sample_idx: usize, num_samples: usize) -> Self {
         let mut coverage = vec![0u64; num_samples];
         coverage[sample_idx] += 1;
+        let rnames = vec![];
+
         HaplotypeMeta {
             id: 0,
             coverage,
             ps: vec![None; num_samples],
             hp: vec![None; num_samples],
             samples_flag: 2_usize.pow(sample_idx as u32),
+            rnames,
         }
     }
 
@@ -48,6 +52,7 @@ impl HaplotypeMeta {
             ps: vec![None; num_samples],
             hp: vec![None; num_samples],
             samples_flag: 0,
+            rnames: vec![],
         }
     }
 
@@ -67,6 +72,8 @@ impl HaplotypeMeta {
                 *self_hp = *other_hp;
             }
         }
+
+        self.rnames.extend(other.rnames.clone());
 
         self.samples_flag |= other.samples_flag;
     }
