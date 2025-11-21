@@ -191,8 +191,6 @@ impl Genotyper {
     }
 
     fn bino_genotype_scores(&self, ref_cov: u64, alt_cov: u64) -> [f64; 3] {
-        let error_rate = 0.03;
-
         // Prior probabilities
         let prior_homref = self.config.mixture_fractions[0].ln();
         let prior_het = self.config.mixture_fractions[1].ln();
@@ -204,9 +202,9 @@ impl Genotyper {
         }
 
         // Create binomial distributions for each genotype
-        let binom_homref = Binomial::new(error_rate, n).unwrap();
-        let binom_het = Binomial::new(0.5, n).unwrap();
-        let binom_homalt = Binomial::new(0.98, n).unwrap();
+        let binom_homref = Binomial::new(self.config.means[0], n).unwrap();
+        let binom_het = Binomial::new(self.config.means[1], n).unwrap();
+        let binom_homalt = Binomial::new(self.config.means[2], n).unwrap();
 
         // Calculate log-likelihoods
         let ll_homref = binom_homref.ln_pmf(alt_cov);
@@ -259,8 +257,6 @@ impl Genotyper {
         allele1_reads: u64, // Reads supporting allele1 (haplotype 1)
         allele2_reads: u64, // Reads supporting allele2 (haplotype 2)
     ) -> [f64; 3] {
-        let error_rate = 0.03;
-
         // Prior probabilities
         let prior_homref = self.config.mixture_fractions[0].ln();
         let prior_het = self.config.mixture_fractions[1].ln();
@@ -274,7 +270,7 @@ impl Genotyper {
         // 0/0: Both haplotypes are REF
         // Expect: mostly ref_reads, few allele1/allele2 (from errors)
         let ll_00 = {
-            let binom = Binomial::new(1.0 - 2.0 * error_rate, total).unwrap();
+            let binom = Binomial::new(1.0 - self.config.means[0], total).unwrap();
             binom.ln_pmf(ref_reads)
         };
 
@@ -284,9 +280,8 @@ impl Genotyper {
         let ll_01_a = {
             // Model as trinomial, but use sequential binomials
             // First: P(allele2_reads | should be ~0)
-            let p_error_allele2 = error_rate;
             let ll_allele2 = if total > 0 {
-                Binomial::new(p_error_allele2, total)
+                Binomial::new(self.config.means[0], total)
                     .unwrap()
                     .ln_pmf(allele2_reads)
             } else {
@@ -296,7 +291,9 @@ impl Genotyper {
             // Second: P(allele1_reads | remaining reads should split ~50/50 with ref)
             let remaining = ref_reads + allele1_reads;
             let ll_allele1 = if remaining > 0 {
-                Binomial::new(0.5, remaining).unwrap().ln_pmf(allele1_reads)
+                Binomial::new(self.config.means[1], remaining)
+                    .unwrap()
+                    .ln_pmf(allele1_reads)
             } else {
                 0.0
             };
@@ -307,9 +304,8 @@ impl Genotyper {
         // Possibility B: hap1=REF, hap2=allele2
         //   Expect: ~50% ref_reads, ~0% allele1_reads, ~50% allele2_reads
         let ll_02_b = {
-            let p_error_allele1 = error_rate;
             let ll_allele1 = if total > 0 {
-                Binomial::new(p_error_allele1, total)
+                Binomial::new(self.config.means[0], total)
                     .unwrap()
                     .ln_pmf(allele1_reads)
             } else {
@@ -318,7 +314,9 @@ impl Genotyper {
 
             let remaining = ref_reads + allele2_reads;
             let ll_allele2 = if remaining > 0 {
-                Binomial::new(0.5, remaining).unwrap().ln_pmf(allele2_reads)
+                Binomial::new(self.config.means[1], remaining)
+                    .unwrap()
+                    .ln_pmf(allele2_reads)
             } else {
                 0.0
             };
@@ -334,7 +332,7 @@ impl Genotyper {
         // Expect: mostly alt reads (allele1 + allele2), few ref_reads
         let ll_11 = {
             let alt_reads = allele1_reads + allele2_reads;
-            let binom = Binomial::new(1.0 - error_rate, total).unwrap();
+            let binom = Binomial::new(self.config.means[2], total).unwrap();
             binom.ln_pmf(alt_reads)
         };
 

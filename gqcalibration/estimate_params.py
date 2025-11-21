@@ -196,11 +196,11 @@ def fit_parameters(df, all_gts=False, min_dp=5, max_dp=60, all_hets=False):
     return fitted
 
 
-def save_config(fitted, filename, calibration=None, flat_priors=False):
+def save_config(fitted, filename, calibration=None, flat_priors=False, mode="Beta"):
     """Save parameters to JSON config file."""
 
     config = {
-        'mode': 'Beta',
+        'mode': args.mode,
         'mixture_fractions': [0.33, 0.34, 0.33] if flat_priors else fitted['frac'],
         'means': fitted['mu'],
         'precisions': fitted['nu'],
@@ -266,6 +266,8 @@ def parse_args(args):
                         help="Output prefix file to write")
     parser.add_argument("--bed", default=None, type=str,
                         help="Bed file for subsetting VCF entries to parse")
+    parser.add_argument("--mode", default="Beta", choices=["Beta", "Bino", "Phased"],
+                        help="Genotyper mode (only Beta uses precisions) (%(default)s)")
     parser.add_argument("--summary", action='store_true',
                         help="Only make summary report of genotypes")
     parser.add_argument("--leaveout", type=float, default=0,
@@ -786,7 +788,7 @@ if __name__ == "__main__":
     # Now you need to go re-genotype everything and grab those GQs
     # Then you make the calibration table
     out_cfg = args.OUT + '_gqconfig.json'
-    config = save_config(fitted, out_cfg, flat_priors=args.flat_priors)
+    config = save_config(fitted, out_cfg, flat_priors=args.flat_priors, mode=args.mode)
 
     if not args.no_calibrate:
         logging.info("Calibrating GQs")
