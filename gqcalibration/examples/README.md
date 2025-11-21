@@ -6,6 +6,22 @@ i.e. using the hifi.38x gq configs on, say, an ONT 20x sequencing experiment. Th
 one type of long-read sequencing isn't useful for another type of long-read sequencing, just that these example gq
 configs shouldn't be automatic defaults used in your kanpig runs.
 
+Note that the default genotyper is Beta. In order to calibrate on a different genotyper, an initial kanpig run should
+have a default gqconfig provided e.g.
+
+```json
+{
+  "mode": "Bino",
+  "mixture_fractions": [0.33, 0.34, 0.33],
+  "means": [0.03, 0.50, 0.97],
+  "precisions": [0.0, 0.0, 0.0],
+  "calibration_table": [],
+  "metadata": {
+    "notes": "Manual Default",
+  }
+}
+```
+
 GIAB v1.1
 ---------
 

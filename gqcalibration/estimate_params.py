@@ -225,7 +225,7 @@ def build_calibration(df):
     gqs = df['nGQ']
     correct = df['state']
     # Bin by GQ and calculate observed accuracy
-    gq_bins = np.arange(0, 101, 5)
+    gq_bins = np.arange(0, gqs.max(), 5)
     observed_accuracies = []
     bin_midpoints = []
 
