@@ -200,6 +200,7 @@ def save_config(fitted, filename, calibration=None, flat_priors=False):
     """Save parameters to JSON config file."""
 
     config = {
+        'mode': 'Beta',
         'mixture_fractions': [0.33, 0.34, 0.33] if flat_priors else fitted['frac'],
         'means': fitted['mu'],
         'precisions': fitted['nu'],
@@ -705,7 +706,7 @@ def regt(row, gt):
     """
     Runs kanpig genotyping on a row
     """
-    result = gt.genotype(row['AD_ref'], row['AD_alt'])
+    result = gt.genotype(row['AD_ref'], 0, row['AD_alt'])
     return [result.state, result.state == row['Ogt'], int(round(result.gq))]
 
 
@@ -789,7 +790,7 @@ if __name__ == "__main__":
 
     if not args.no_calibrate:
         logging.info("Calibrating GQs")
-        gt = kanpig.Genotyper(out_cfg)
+        gt = kanpig.Genotyper.from_config_path(out_cfg)
         m_gtfunction = partial(regt, gt=gt)
         df[['nKgt', 'nState', 'nGQ']] = df.apply(
             m_gtfunction, axis=1, result_type='expand')
@@ -798,7 +799,7 @@ if __name__ == "__main__":
                              flat_priors=args.flat_priors)
         # And then we have to run again to actually get the calibrated GQs
         logging.info("Regenotyping with config")
-        gt = kanpig.Genotyper(out_cfg)
+        gt = kanpig.Genotyper.from_config_path(out_cfg)
         m_gtfunction = partial(regt, gt=gt)
         df[['nKgt', 'nState', 'nGQ']] = df.apply(
             m_gtfunction, axis=1, result_type='expand')

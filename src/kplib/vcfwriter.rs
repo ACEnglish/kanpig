@@ -85,7 +85,8 @@ impl VcfWriter {
         let mut writer = vcf::io::Writer::new(out_buf);
         let _ = writer.write_header(&header);
 
-        let genotyper = Genotyper::with_optional_config(None);
+        // Gross - I have to keep this around for the unannotated variants
+        let genotyper = Genotyper::default();
 
         let rnames_writer: Option<Box<dyn Write>> = match rnames_path {
             Some(ref path) => {

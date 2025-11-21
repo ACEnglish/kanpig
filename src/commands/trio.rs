@@ -59,7 +59,7 @@ fn task_thread(
     // These need to be pulled out so we can do the polyclustering
     // on both TrioCommand and MosaicCommand
     let pclu_params = m_args.to_polyclu_params();
-    let germ_genotyper = Genotyper::new();
+    let germ_genotyper = Genotyper::default();
     let mut reads = vec![pro_reads, pat_reads, mat_reads];
 
     loop {

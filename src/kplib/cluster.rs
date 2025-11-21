@@ -191,7 +191,13 @@ pub fn diploid_haplotypes(
     // there's 1 or 2 alts. Now we figure out if its Het/Hom
     let applied_coverage = hap1.meta.coverage[sample_idx] + hap2.meta.coverage[sample_idx];
     let remaining_coverage = coverage - applied_coverage;
-    let gt = germ_genotyper::phased_genotyper(
+    let genotyper = germ_genotyper::Genotyper {
+        config: germ_genotyper::GenotyperConfig {
+            mode: germ_genotyper::GenotypeMode::Phased,
+            ..Default::default()
+        },
+    };
+    let gt = genotyper.genotype(
         remaining_coverage,
         hap1.meta.coverage[sample_idx],
         hap2.meta.coverage[sample_idx],

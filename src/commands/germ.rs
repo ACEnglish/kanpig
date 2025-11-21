@@ -30,7 +30,7 @@ fn task_thread(
         1, // One total sample will be opened (for HaplotypeMeta)
         &m_args.graph,
     );
-    let genotyper = Genotyper::with_optional_config(m_args.gqconfig);
+    let genotyper = Genotyper::from_config_file(m_args.gqconfig);
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,

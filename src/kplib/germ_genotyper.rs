@@ -22,35 +22,53 @@ pub struct GenotypeResult {
     pub sq: f64,
 }
 
-#[derive(Debug, Deserialize)]
-struct GenotyperConfig {
-    mixture_fractions: Vec<f64>,
-    means: Vec<f64>,
-    precisions: Vec<f64>,
-    calibration_table: Vec<(f64, f64)>,
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub enum GenotypeMode {
+    Beta,
+    Bino,
+    Phased,
 }
 
-pub struct Genotyper {
-    frac: Vec<f64>,
-    mu: Vec<f64>,
-    nu: Vec<f64>,
-    calibration_table: Vec<(f64, f64)>,
-}
-
-impl Genotyper {
-    /// Creates a new Genotyper with default parameters
-    pub fn new() -> Self {
-        Self::default()
+impl GenotypeMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GenotypeMode::Beta => "Beta",
+            GenotypeMode::Bino => "Bino",
+            GenotypeMode::Phased => "Phased",
+        }
     }
 
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "Beta" => Ok(GenotypeMode::Beta),
+            "Bino" => Ok(GenotypeMode::Bino),
+            "Phased" => Ok(GenotypeMode::Phased),
+            other => Err(format!(
+                "Invalid GenotypeMode '{}'; expected 'Beta', 'Bino', or 'Phased'",
+                other
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct GenotyperConfig {
+    pub mode: GenotypeMode,
+    pub mixture_fractions: Vec<f64>,
+    pub means: Vec<f64>,
+    pub precisions: Vec<f64>,
+    pub calibration_table: Vec<(f64, f64)>,
+}
+
+impl GenotyperConfig {
     /// Creates a new Genotyper from a JSON config file
     ///
     /// # Parameters
     /// - `config_path`: Path to the JSON configuration file
     ///
     /// # Returns
-    /// Result containing the Genotyper or an error if the file cannot be read/parsed
-    pub fn from_config(config_path: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+    /// Result containing the GenotyperConfig or an error if the file cannot be read/parsed
+    pub fn from_config_file(config_path: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         let config_str = fs::read_to_string(config_path)?;
         let config: GenotyperConfig = serde_json::from_str(&config_str)?;
 
@@ -60,12 +78,8 @@ impl Genotyper {
         {
             return Err("Config must contain exactly 3 values for each parameter".into());
         }
-        Ok(Self {
-            frac: config.mixture_fractions,
-            mu: config.means,
-            nu: config.precisions,
-            calibration_table: config.calibration_table,
-        })
+
+        Ok(config)
     }
 
     /// Creates a new Genotyper, optionally loading from a config file
@@ -75,14 +89,43 @@ impl Genotyper {
     ///
     /// # Returns
     /// A Genotyper instance (falls back to defaults if path is None or loading fails)
-    pub fn with_optional_config(config_path: Option<PathBuf>) -> Self {
+    pub fn from_optional_config(config_path: Option<PathBuf>) -> Self {
         match config_path {
-            Some(path) => Self::from_config(path).unwrap_or_else(|e| {
+            Some(path) => Self::from_config_file(path).unwrap_or_else(|e| {
                 error!("Warning: Failed to load config ({}), using defaults", e);
                 Self::default()
             }),
             None => Self::default(),
         }
+    }
+}
+
+impl Default for GenotyperConfig {
+    fn default() -> Self {
+        Self {
+            mode: GenotypeMode::Beta,
+            mixture_fractions: vec![0.33, 0.34, 0.33],
+            means: vec![0.03, 0.50, 0.97],
+            precisions: vec![25.0, 5.0, 10.0],
+            calibration_table: vec![],
+        }
+    }
+}
+
+pub struct Genotyper {
+    pub config: GenotyperConfig,
+}
+
+impl Genotyper {
+    // From config
+    pub fn from_config_file(config_path: Option<PathBuf>) -> Self {
+        Self {
+            config: GenotyperConfig::from_optional_config(config_path),
+        }
+    }
+
+    pub fn from_config(config: GenotyperConfig) -> Self {
+        Self { config }
     }
 
     /// Determines the genotype state based on coverage values for two alternate alleles.
@@ -98,8 +141,9 @@ impl Genotyper {
     ///
     /// # Panics
     /// This function will panic if an invalid state is encountered, which should be impossible under normal circumstances.
-    pub fn genotype(&self, ref_cov: u64, alt_cov: u64) -> GenotypeResult {
-        let tot_cov = ref_cov + alt_cov;
+    pub fn genotype(&self, ref_cov: u64, alt_cov1: u64, alt_cov2: u64) -> GenotypeResult {
+        let alt_cov = alt_cov1 + alt_cov2;
+        let tot_cov = ref_cov + alt_cov1 + alt_cov2;
         if tot_cov == 0 {
             return GenotypeResult {
                 state: GTstate::Non,
@@ -108,7 +152,12 @@ impl Genotyper {
             };
         }
 
-        let scores = self.beta_genotype_scores(ref_cov, alt_cov);
+        let scores = match self.config.mode {
+            GenotypeMode::Beta => self.beta_genotype_scores(ref_cov, alt_cov),
+            GenotypeMode::Bino => self.bino_genotype_scores(ref_cov, alt_cov),
+            GenotypeMode::Phased => self.phased_genotype_scores(ref_cov, alt_cov1, alt_cov2),
+        };
+
         let state = match scores
             .iter()
             .enumerate()
@@ -141,6 +190,37 @@ impl Genotyper {
         log_binom_coef + log_beta_num - log_beta_denom
     }
 
+    fn bino_genotype_scores(&self, ref_cov: u64, alt_cov: u64) -> [f64; 3] {
+        let error_rate = 0.03;
+
+        // Prior probabilities
+        let prior_homref = self.config.mixture_fractions[0].ln();
+        let prior_het = self.config.mixture_fractions[1].ln();
+        let prior_homalt = self.config.mixture_fractions[2].ln();
+
+        let n = ref_cov + alt_cov;
+        if n == 0 {
+            return [0.0, 0.0, 0.0];
+        }
+
+        // Create binomial distributions for each genotype
+        let binom_homref = Binomial::new(error_rate, n).unwrap();
+        let binom_het = Binomial::new(0.5, n).unwrap();
+        let binom_homalt = Binomial::new(0.98, n).unwrap();
+
+        // Calculate log-likelihoods
+        let ll_homref = binom_homref.ln_pmf(alt_cov);
+        let ll_het = binom_het.ln_pmf(alt_cov);
+        let ll_homalt = binom_homalt.ln_pmf(alt_cov);
+
+        // Posterior = Prior + Likelihood
+        [
+            prior_homref + ll_homref,
+            prior_het + ll_het,
+            prior_homalt + ll_homalt,
+        ]
+    }
+
     fn beta_genotype_scores(&self, ref_cov: u64, alt_cov: u64) -> [f64; 3] {
         let total = ref_cov + alt_cov;
 
@@ -149,22 +229,120 @@ impl Genotyper {
         }
 
         let alpha: Vec<f64> = self
-            .mu
+            .config
+            .means
             .iter()
-            .zip(self.nu.iter())
+            .zip(self.config.precisions.iter())
             .map(|(m, n)| m * n)
             .collect();
         let beta: Vec<f64> = self
-            .mu
+            .config
+            .means
             .iter()
-            .zip(self.nu.iter())
+            .zip(self.config.precisions.iter())
             .map(|(m, n)| (1.0 - m) * n)
             .collect();
 
         [
-            self.frac[0].ln() + self.beta_binomial_ln_pmf(alt_cov, total, alpha[0], beta[0]),
-            self.frac[1].ln() + self.beta_binomial_ln_pmf(alt_cov, total, alpha[1], beta[1]),
-            self.frac[2].ln() + self.beta_binomial_ln_pmf(alt_cov, total, alpha[2], beta[2]),
+            self.config.mixture_fractions[0].ln()
+                + self.beta_binomial_ln_pmf(alt_cov, total, alpha[0], beta[0]),
+            self.config.mixture_fractions[1].ln()
+                + self.beta_binomial_ln_pmf(alt_cov, total, alpha[1], beta[1]),
+            self.config.mixture_fractions[2].ln()
+                + self.beta_binomial_ln_pmf(alt_cov, total, alpha[2], beta[2]),
+        ]
+    }
+
+    fn phased_genotype_scores(
+        &self,
+        ref_reads: u64,     // Reads supporting reference allele
+        allele1_reads: u64, // Reads supporting allele1 (haplotype 1)
+        allele2_reads: u64, // Reads supporting allele2 (haplotype 2)
+    ) -> [f64; 3] {
+        let error_rate = 0.03;
+
+        // Prior probabilities
+        let prior_homref = self.config.mixture_fractions[0].ln();
+        let prior_het = self.config.mixture_fractions[1].ln();
+        let prior_homalt = self.config.mixture_fractions[2].ln();
+
+        let total = ref_reads + allele1_reads + allele2_reads;
+        if total == 0 {
+            return [0.0, 0.0, 0.0];
+        }
+
+        // 0/0: Both haplotypes are REF
+        // Expect: mostly ref_reads, few allele1/allele2 (from errors)
+        let ll_00 = {
+            let binom = Binomial::new(1.0 - 2.0 * error_rate, total).unwrap();
+            binom.ln_pmf(ref_reads)
+        };
+
+        // 0/1: One haplotype REF, one haplotype carries allele1
+        // Possibility A: hap1=REF, hap2=allele1
+        // Expect: ~50% ref_reads, ~50% allele1_reads, ~0% allele2_reads
+        let ll_01_a = {
+            // Model as trinomial, but use sequential binomials
+            // First: P(allele2_reads | should be ~0)
+            let p_error_allele2 = error_rate;
+            let ll_allele2 = if total > 0 {
+                Binomial::new(p_error_allele2, total)
+                    .unwrap()
+                    .ln_pmf(allele2_reads)
+            } else {
+                0.0
+            };
+
+            // Second: P(allele1_reads | remaining reads should split ~50/50 with ref)
+            let remaining = ref_reads + allele1_reads;
+            let ll_allele1 = if remaining > 0 {
+                Binomial::new(0.5, remaining).unwrap().ln_pmf(allele1_reads)
+            } else {
+                0.0
+            };
+
+            ll_allele2 + ll_allele1
+        };
+
+        // Possibility B: hap1=REF, hap2=allele2
+        //   Expect: ~50% ref_reads, ~0% allele1_reads, ~50% allele2_reads
+        let ll_02_b = {
+            let p_error_allele1 = error_rate;
+            let ll_allele1 = if total > 0 {
+                Binomial::new(p_error_allele1, total)
+                    .unwrap()
+                    .ln_pmf(allele1_reads)
+            } else {
+                0.0
+            };
+
+            let remaining = ref_reads + allele2_reads;
+            let ll_allele2 = if remaining > 0 {
+                Binomial::new(0.5, remaining).unwrap().ln_pmf(allele2_reads)
+            } else {
+                0.0
+            };
+
+            ll_allele1 + ll_allele2
+        };
+
+        // Marginalize over which allele is on which haplotype
+        let max_het = ll_01_a.max(ll_02_b);
+        let ll_01 = max_het + ((ll_01_a - max_het).exp() + (ll_02_b - max_het).exp()).ln();
+
+        // 1/1: Both haplotypes carry alt alleles
+        // Expect: mostly alt reads (allele1 + allele2), few ref_reads
+        let ll_11 = {
+            let alt_reads = allele1_reads + allele2_reads;
+            let binom = Binomial::new(1.0 - error_rate, total).unwrap();
+            binom.ln_pmf(alt_reads)
+        };
+
+        // Posterior = Prior + Likelihood
+        [
+            prior_homref + ll_00,
+            prior_het + ll_01,
+            prior_homalt + ll_11,
         ]
     }
 
@@ -203,18 +381,18 @@ impl Genotyper {
     }
 
     fn calibrate_gq(&self, raw_gq: f64) -> f64 {
-        if self.calibration_table.is_empty() {
+        if self.config.calibration_table.is_empty() {
             return raw_gq;
         }
 
         // Linear interpolation
-        if raw_gq <= self.calibration_table[0].0 {
-            return self.calibration_table[0].1;
+        if raw_gq <= self.config.calibration_table[0].0 {
+            return self.config.calibration_table[0].1;
         }
 
-        for i in 0..self.calibration_table.len() - 1 {
-            let (x0, y0) = self.calibration_table[i];
-            let (x1, y1) = self.calibration_table[i + 1];
+        for i in 0..self.config.calibration_table.len() - 1 {
+            let (x0, y0) = self.config.calibration_table[i];
+            let (x1, y1) = self.config.calibration_table[i + 1];
 
             if raw_gq >= x0 && raw_gq <= x1 {
                 // Linear interpolation
@@ -224,138 +402,14 @@ impl Genotyper {
         }
 
         // Beyond table range
-        self.calibration_table.last().unwrap().1
+        self.config.calibration_table.last().unwrap().1
     }
 }
 
 impl Default for Genotyper {
     fn default() -> Self {
         Self {
-            frac: vec![0.33, 0.34, 0.33],
-            mu: vec![0.03, 0.50, 0.97],
-            nu: vec![25.0, 5.0, 10.0],
-            calibration_table: vec![],
+            config: GenotyperConfig::default(),
         }
     }
-}
-
-pub fn phased_genotyper(ref_cov: u64, alt1_cov: u64, alt2_cov: u64) -> GenotypeResult {
-    let tot_cov = ref_cov + alt1_cov + alt2_cov;
-    if tot_cov == 0 {
-        return GenotypeResult {
-            state: GTstate::Non,
-            gq: 0.0,
-            sq: 0.0,
-        };
-    }
-    let scores = phased_genotype_scores(ref_cov, alt1_cov, alt2_cov);
-    let state = match scores
-        .iter()
-        .enumerate()
-        .max_by_key(|&(_, &x)| OrderedFloat(x))
-        .map(|(i, _)| i)
-    {
-        Some(0) => GTstate::Ref,
-        Some(1) => GTstate::Het,
-        Some(2) => GTstate::Hom,
-        _ => panic!("not possible"),
-    };
-    //let (gq, sq) = genotype_quals(scores);
-    GenotypeResult {
-        state,
-        gq: 0.0,
-        sq: 0.0,
-    }
-}
-
-fn phased_genotype_scores(
-    ref_reads: u64,     // Reads supporting reference allele
-    allele1_reads: u64, // Reads supporting allele1 (haplotype 1)
-    allele2_reads: u64, // Reads supporting allele2 (haplotype 2)
-) -> [f64; 3] {
-    let error_rate = 0.03;
-
-    // Prior probabilities
-    let prior_homref = 0.001_f64.ln();
-    let prior_het = 0.75_f64.ln();
-    let prior_homalt = 0.249_f64.ln();
-
-    let total = ref_reads + allele1_reads + allele2_reads;
-    if total == 0 {
-        return [0.0, 0.0, 0.0];
-    }
-
-    // 0/0: Both haplotypes are REF
-    // Expect: mostly ref_reads, few allele1/allele2 (from errors)
-    let ll_00 = {
-        let binom = Binomial::new(1.0 - 2.0 * error_rate, total).unwrap();
-        binom.ln_pmf(ref_reads)
-    };
-
-    // 0/1: One haplotype REF, one haplotype carries allele1
-    // Possibility A: hap1=REF, hap2=allele1
-    // Expect: ~50% ref_reads, ~50% allele1_reads, ~0% allele2_reads
-    let ll_01_a = {
-        // Model as trinomial, but use sequential binomials
-        // First: P(allele2_reads | should be ~0)
-        let p_error_allele2 = error_rate;
-        let ll_allele2 = if total > 0 {
-            Binomial::new(p_error_allele2, total)
-                .unwrap()
-                .ln_pmf(allele2_reads)
-        } else {
-            0.0
-        };
-
-        // Second: P(allele1_reads | remaining reads should split ~50/50 with ref)
-        let remaining = ref_reads + allele1_reads;
-        let ll_allele1 = if remaining > 0 {
-            Binomial::new(0.5, remaining).unwrap().ln_pmf(allele1_reads)
-        } else {
-            0.0
-        };
-
-        ll_allele2 + ll_allele1
-    };
-
-    // Possibility B: hap1=REF, hap2=allele2
-    //   Expect: ~50% ref_reads, ~0% allele1_reads, ~50% allele2_reads
-    let ll_02_b = {
-        let p_error_allele1 = error_rate;
-        let ll_allele1 = if total > 0 {
-            Binomial::new(p_error_allele1, total)
-                .unwrap()
-                .ln_pmf(allele1_reads)
-        } else {
-            0.0
-        };
-
-        let remaining = ref_reads + allele2_reads;
-        let ll_allele2 = if remaining > 0 {
-            Binomial::new(0.5, remaining).unwrap().ln_pmf(allele2_reads)
-        } else {
-            0.0
-        };
-
-        ll_allele1 + ll_allele2
-    };
-
-    // Marginalize over which allele is on which haplotype
-    let max_het = ll_01_a.max(ll_02_b);
-    let ll_01 = max_het + ((ll_01_a - max_het).exp() + (ll_02_b - max_het).exp()).ln();
-
-    // 1/1: Both haplotypes carry alt alleles
-    // Expect: mostly alt reads (allele1 + allele2), few ref_reads
-    let ll_11 = {
-        let alt_reads = allele1_reads + allele2_reads;
-        let binom = Binomial::new(1.0 - error_rate, total).unwrap();
-        binom.ln_pmf(alt_reads)
-    };
-
-    // Posterior = Prior + Likelihood
-    [
-        prior_homref + ll_00,
-        prior_het + ll_01,
-        prior_homalt + ll_11,
-    ]
 }

@@ -81,7 +81,7 @@ fn task_thread(
         1,
     );
 
-    let germ_genotyper = Genotyper::new();
+    let germ_genotyper = Genotyper::default();
 
     loop {
         match m_receiver.recv() {
@@ -222,7 +222,7 @@ fn task_thread(
                         for anno in annos {
                             if anno.gt.contains("1") && (anno.filt.contains(FiltFlags::SOMATIC)) {
                                 if let (Some(rcov), Some(acov)) = (anno.ad[0], anno.ad[1]) {
-                                    let ngt = germ_genotyper.genotype(rcov as u64, acov as u64);
+                                    let ngt = germ_genotyper.genotype(rcov as u64, 0, acov as u64);
                                     anno.sq = ngt.sq as i32;
                                     if !anno.gt.contains("1") {
                                         anno.gq = ngt.gq.round() as i32;

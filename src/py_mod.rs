@@ -1,10 +1,15 @@
+use pyo3::exceptions::PyIOError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 use rust_htslib::faidx;
 
-use crate::kplib::ReadParser;
-use crate::kplib::{Haplotype, HaplotypeMeta};
+use crate::kplib::{
+    germ_genotyper::{GTstate, GenotypeMode, GenotypeResult, Genotyper, GenotyperConfig},
+    Haplotype, HaplotypeMeta, ReadParser,
+};
+use std::path::PathBuf;
 
 #[pyfunction]
 pub fn cansim(a: &PyAny, b: &PyAny, mink: f32) -> PyResult<f32> {
@@ -215,9 +220,6 @@ impl PyHaplotypeMeta {
     }
 }
 
-use crate::kplib::germ_genotyper::{GTstate, GenotypeResult, Genotyper};
-use std::path::PathBuf;
-
 #[pyclass(name = "GenotypeResult", unsendable)]
 pub struct PyGenotypeResult {
     pub inner: GenotypeResult,
@@ -255,15 +257,16 @@ struct PyGenotyper {
 impl PyGenotyper {
     #[new]
     #[args(config_path = "None")]
-    fn new(config_path: Option<String>) -> PyResult<Self> {
-        let genotyper = if let Some(path) = config_path {
-            let path_buf = PathBuf::from(path);
-            Genotyper::from_config(path_buf)
-                .map_err(|e| PyValueError::new_err(format!("Failed to load config: {}", e)))?
-        } else {
-            Genotyper::new()
-        };
+    fn new(config: Option<PyGenotyperConfig>) -> PyResult<Self> {
+        Ok(PyGenotyper {
+            inner: Genotyper::from_config(config.unwrap().inner),
+        })
+    }
 
+    #[staticmethod]
+    fn from_config_path(path: String) -> PyResult<Self> {
+        let path_buf = PathBuf::from(path);
+        let genotyper = Genotyper::from_config_file(Some(path_buf));
         Ok(PyGenotyper { inner: genotyper })
     }
 
@@ -273,8 +276,10 @@ impl PyGenotyper {
     /// ----------
     /// ref_cov : int
     ///     Coverage of the reference allele
-    /// alt_cov : int
-    ///     Coverage of the alternate allele
+    /// alt_cov1 : int
+    ///     Coverage of the first alternate allele
+    /// alt_cov2 : int
+    ///     Coverage of the second alternate allele
     ///
     /// Returns
     /// -------
@@ -283,10 +288,134 @@ impl PyGenotyper {
     ///     - genotype: The called genotype as a string ("Ref", "Het", "Hom", or "Non")
     ///     - gq: Genotype quality score
     ///     - sq: Sample quality score
-    fn genotype(&self, ref_cov: u64, alt_cov: u64) -> PyGenotypeResult {
+    fn genotype(&self, ref_cov: u64, alt1_cov: u64, alt2_cov: u64) -> PyGenotypeResult {
         PyGenotypeResult {
-            inner: self.inner.genotype(ref_cov, alt_cov),
+            inner: self.inner.genotype(ref_cov, alt1_cov, alt2_cov),
         }
+    }
+}
+
+#[pyclass(name = "GenotyperConfig")]
+#[derive(Debug, Clone)]
+pub struct PyGenotyperConfig {
+    inner: GenotyperConfig,
+}
+
+#[pymethods]
+impl PyGenotyperConfig {
+    /// Python __init__: allow constructing manually from fields
+    ///
+    /// GenotyperConfig(
+    ///     mode: str = "Beta",
+    ///     mixture_fractions: Optional[List[float]] = None,
+    ///     means: Optional[List[float]] = None,
+    ///     precisions: Optional[List[float]] = None,
+    ///     calibration_table: Optional[List[Tuple[float,float]]] = None,
+    /// )
+    #[new]
+    fn py_new(
+        mode: Option<&str>,
+        mixture_fractions: Option<Vec<f64>>,
+        means: Option<Vec<f64>>,
+        precisions: Option<Vec<f64>>,
+        calibration_table: Option<Vec<(f64, f64)>>,
+    ) -> PyResult<Self> {
+        let mode = mode.unwrap_or("Beta");
+        let mode_rs = GenotypeMode::from_str(mode).map_err(|e| PyValueError::new_err(e))?;
+
+        let mut inner = GenotyperConfig::default();
+        inner.mode = mode_rs;
+
+        if let Some(v) = mixture_fractions {
+            inner.mixture_fractions = v;
+        }
+        if let Some(v) = means {
+            inner.means = v;
+        }
+        if let Some(v) = precisions {
+            inner.precisions = v;
+        }
+        if let Some(v) = calibration_table {
+            inner.calibration_table = v;
+        }
+
+        Ok(PyGenotyperConfig { inner })
+    }
+
+    /// mode as a string: "Beta" | "Bino" | "Phased"
+    #[getter]
+    pub fn mode(&self) -> String {
+        self.inner.mode.as_str().to_string()
+    }
+
+    /// mixture_fractions: List[float]
+    #[getter]
+    pub fn mixture_fractions(&self) -> Vec<f64> {
+        self.inner.mixture_fractions.clone()
+    }
+
+    /// means: List[float]
+    #[getter]
+    pub fn means(&self) -> Vec<f64> {
+        self.inner.means.clone()
+    }
+
+    /// precisions: List[float]
+    #[getter]
+    pub fn precisions(&self) -> Vec<f64> {
+        self.inner.precisions.clone()
+    }
+
+    /// calibration_table: List[Tuple[float, float]]
+    #[getter]
+    pub fn calibration_table(&self) -> Vec<(f64, f64)> {
+        self.inner.calibration_table.clone()
+    }
+
+    /// Create from a JSON config file.
+    ///
+    /// Python: GenotyperConfig.from_config_file(path: str) -> GenotyperConfig
+    #[classmethod]
+    pub fn from_config_path(_cls: &PyType, path: &str) -> PyResult<Self> {
+        let pb = PathBuf::from(path);
+        match GenotyperConfig::from_config_file(pb) {
+            Ok(cfg) => Ok(PyGenotyperConfig { inner: cfg }),
+            Err(e) => Err(PyIOError::new_err(format!(
+                "Failed to load config from '{}': {}",
+                path, e
+            ))),
+        }
+    }
+
+    /// Create from an optional JSON config file.
+    ///
+    /// Python: GenotyperConfig.from_optional_config(path: Optional[str]) -> GenotyperConfig
+    #[classmethod]
+    pub fn from_optional_config(_cls: &PyType, path: Option<&str>) -> PyResult<Self> {
+        let opt_pb = path.map(PathBuf::from);
+        let cfg = GenotyperConfig::from_optional_config(opt_pb);
+        Ok(PyGenotyperConfig { inner: cfg })
+    }
+
+    /// Default config.
+    ///
+    /// Python: GenotyperConfig.default() -> GenotyperConfig
+    #[classmethod]
+    pub fn default(_cls: &PyType) -> PyResult<Self> {
+        Ok(PyGenotyperConfig {
+            inner: GenotyperConfig::default(),
+        })
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "GenotyperConfig(mode='{}', mixture_fractions={:?}, means={:?}, precisions={:?}, calibration_table={:?})",
+            self.inner.mode.as_str(),
+            self.inner.mixture_fractions,
+            self.inner.means,
+            self.inner.precisions,
+            self.inner.calibration_table,
+        ))
     }
 }
 
@@ -299,6 +428,7 @@ fn kanpig(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPlupParser>()?;
     m.add_class::<PyHaplotypeMeta>()?;
     m.add_class::<PyHaplotype>()?;
+    m.add_class::<PyGenotyperConfig>()?;
     m.add_class::<PyGenotyper>()?;
 
     Ok(())

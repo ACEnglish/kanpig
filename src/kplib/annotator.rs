@@ -212,7 +212,7 @@ fn handle_diploid_single_path<'a>(
     } else {
         let alt_cov = path.meta.coverage[sample_idx];
         let ref_cov = coverage - alt_cov;
-        let (genotype, state) = match genotyper.genotype(ref_cov, alt_cov).state {
+        let (genotype, state) = match genotyper.genotype(ref_cov, 0, alt_cov).state {
             GTstate::Ref => ("0|0", GTstate::Ref),
             GTstate::Het => {
                 let gt = match path.meta.hp[sample_idx] {
@@ -275,8 +275,7 @@ fn finalize_annotation(
     let (gt_str, gt_path, alt_cov1, alt_cov2, full_target) = handle;
     let ref_cov = coverage - alt_cov1 - alt_cov2;
 
-    let gt_obs = genotyper.genotype(ref_cov, alt_cov1 + alt_cov2);
-    //let gt_obs = germ_genotyper::phased_genotyper(ref_cov, alt_cov1, alt_cov2);
+    let gt_obs = genotyper.genotype(ref_cov, alt_cov1, alt_cov2);
     let rnames: Vec<String> = paths
         .iter()
         .filter(|p| p.path.contains(&var_idx))
