@@ -4,8 +4,7 @@ use statrs::{
     distribution::{Binomial, Discrete},
     function::gamma::ln_gamma,
 };
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf, str::FromStr};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum GTstate {
@@ -20,6 +19,20 @@ pub struct GenotypeResult {
     pub state: GTstate,
     pub gq: f64,
     pub sq: f64,
+}
+
+#[derive(Debug)]
+pub struct ParseGenotypeModeError(String);
+impl std::error::Error for ParseGenotypeModeError {}
+
+impl std::fmt::Display for ParseGenotypeModeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Invalid GenotypeMode '{}'; expected 'Beta', 'Bino', or 'Phased'",
+            self.0
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -37,16 +50,17 @@ impl GenotypeMode {
             GenotypeMode::Phased => "Phased",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Result<Self, String> {
+impl FromStr for GenotypeMode {
+    type Err = ParseGenotypeModeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Beta" => Ok(GenotypeMode::Beta),
             "Bino" => Ok(GenotypeMode::Bino),
             "Phased" => Ok(GenotypeMode::Phased),
-            other => Err(format!(
-                "Invalid GenotypeMode '{}'; expected 'Beta', 'Bino', or 'Phased'",
-                other
-            )),
+            other => Err(ParseGenotypeModeError(other.to_string())),
         }
     }
 }
@@ -112,6 +126,7 @@ impl Default for GenotyperConfig {
     }
 }
 
+#[derive(Default)]
 pub struct Genotyper {
     pub config: GenotyperConfig,
 }
@@ -401,13 +416,5 @@ impl Genotyper {
 
         // Beyond table range
         self.config.calibration_table.last().unwrap().1
-    }
-}
-
-impl Default for Genotyper {
-    fn default() -> Self {
-        Self {
-            config: GenotyperConfig::default(),
-        }
     }
 }

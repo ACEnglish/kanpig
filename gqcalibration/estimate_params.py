@@ -288,9 +288,7 @@ def parse_args(args):
     parser.add_argument("--flat-priors", action="store_true",
                         help="Use flat priors (0.33) instead of observed GT states")
     parser.add_argument("--no-calibrate", action="store_true",
-                        help="Don't perform GQ calibration")
-    parser.add_argument("--write-calib", action="store_true",
-                        help="Write a csv of the calibrated GQs")
+                        help="Only perform fitting without GQ calibration")
     args = parser.parse_args(args)
     return args
 
@@ -614,23 +612,28 @@ def make_plots(data, section_title, html_builder):
             p.set(title="Baseline", ylabel=i + ' Count', xlim=xlim)
 
             subset = data[data['Ogt'] == i]
+            # Allele fraction, not frequency
             af = subset['AD_alt'] / subset['DP']
             p = sb.histplot(af[subset['state']],
                             color=sb.color_palette()[1],
-                            ax=m_ax[2], binwidth=0.02)
+                            ax=m_ax[2], binwidth=0.02,
+                            binrange=(0, 1))
             p.set(xlabel='Allele Fraction',
                   yscale='log',
                   ylabel=i + ' Count (log)',
                   xlim=(0, 1),
                   title='True GT')
+
             p = sb.histplot(af[~subset['state']],
                             color=sb.color_palette()[0],
-                            ax=m_ax[3], binwidth=0.02)
+                            ax=m_ax[3], binwidth=0.02,
+                            binrange=(0, 1))
             p.set(xlabel='Allele Fraction',
                   yscale='log',
                   xlim=(0, 1),
                   ylabel=i + ' Count (log)',
                   title='False GT')
+
         if (data['Kgt'] == i).sum() == 0:
             logging.warning(f"No Kgt == {i} sites found. Skipping")
         else:
@@ -681,6 +684,7 @@ def make_df(in_vcf, bed, sizemin=50, sizemax=10000):
     vcf = truvari.VariantFile(in_vcf)
     m_iter = vcf.fetch_bed(bed) if bed else vcf
     rows = []
+    non_truth = 0
     for entry in m_iter:
         if entry.chrom in ['chrX', 'chrY'] \
                 or not (sizemin <= entry.var_size() <= sizemax) \
@@ -689,16 +693,21 @@ def make_df(in_vcf, bed, sizemin=50, sizemax=10000):
             continue
 
         b_gt = truvari.get_gt(entry.gt(0))
-        o_gt = truvari.get_gt(entry.gt(1))
-        rows.append([b_gt == o_gt,
+        c_gt = truvari.get_gt(entry.gt(1))
+        if b_gt == truvari.GT.NON:
+            non_truth += 1
+            continue
+        rows.append([b_gt == c_gt,
                      b_gt.name,
-                     o_gt.name,
+                     c_gt.name,
                      entry.samples[1]['DP'],
                      *entry.samples[1]['AD'],
                      entry.samples[1]['GQ'],
                      entry.samples[1]['FT'],
                      min(entry.samples[1]['KS']),
                      ])
+    if non_truth:
+        logging.warning("%d SVs with NON (./.) genotypes skipped", non_truth)
     out = pd.DataFrame(rows, columns=['state', 'Ogt', 'Kgt',
                                       'DP', 'AD_ref', 'AD_alt', 'GQ', 'FT', 'KS'])
     return out

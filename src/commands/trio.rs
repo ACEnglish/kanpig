@@ -59,7 +59,7 @@ fn task_thread(
     // These need to be pulled out so we can do the polyclustering
     // on both TrioCommand and MosaicCommand
     let pclu_params = m_args.to_polyclu_params();
-    let germ_genotyper = Genotyper::default();
+    let germ_genotyper = Genotyper::from_config_file(m_args.gqconfig);
     let mut reads = vec![pro_reads, pat_reads, mat_reads];
 
     loop {
@@ -167,6 +167,10 @@ pub struct TrioCommand {
         hide = true
     )]
     pub lengthonly: bool,
+
+    /// GQ Config
+    #[arg(long, help_heading = "Genotyping")]
+    pub gqconfig: Option<PathBuf>,
 }
 
 impl ToPolyCluParams for TrioCommand {
