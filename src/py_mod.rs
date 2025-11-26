@@ -9,7 +9,7 @@ use crate::kplib::{
     germ_genotyper::{GTstate, GenotypeMode, GenotypeResult, Genotyper, GenotyperConfig},
     Haplotype, HaplotypeMeta, ReadParser,
 };
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 #[pyfunction]
 pub fn cansim(a: &PyAny, b: &PyAny, mink: f32) -> PyResult<f32> {
@@ -321,7 +321,7 @@ impl PyGenotyperConfig {
         calibration_table: Option<Vec<(f64, f64)>>,
     ) -> PyResult<Self> {
         let mode = mode.unwrap_or("Beta");
-        let mode_rs = GenotypeMode::from_str(mode).map_err(|e| PyValueError::new_err(e))?;
+        let mode_rs = GenotypeMode::from_str(mode).map_err(|_| PyValueError::new_err("Invalid Mode"))?;
 
         let mut inner = GenotyperConfig::default();
         inner.mode = mode_rs;
