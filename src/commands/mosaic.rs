@@ -15,7 +15,7 @@ use crate::{
         annotator::FiltFlags,
         build_region_tree,
         cluster::collapse_haplotypes,
-        germ_genotyper::Genotyper,
+        germ_genotyper::{GTstate, GenotypeMode, Genotyper, GenotyperConfig},
         mosaic_genotyper::{GenotypeHypothesis, MosaicGenotyper},
         open_reads, open_writer_thread,
         pileup::collect_pileup_data,
@@ -32,7 +32,6 @@ fn separate_paths_by_vaf(
     let mut germ = vec![Vec::new(); paths.len()];
     let mut soma = vec![Vec::new(); paths.len()];
 
-    // Iterate through each sample's paths
     for (idx, sample_paths) in paths.into_iter().enumerate() {
         for path in sample_paths {
             if gts.germline_alleles.contains(&path.meta.id) {
@@ -80,8 +79,11 @@ fn task_thread(
         m_args.soma_vaf,
         1,
     );
-
-    let germ_genotyper = Genotyper::default();
+    let cfg = GenotyperConfig {
+        mode: GenotypeMode::Bino,
+        ..Default::default()
+    };
+    let germ_genotyper = Genotyper::from_config(cfg);
 
     loop {
         match m_receiver.recv() {
@@ -191,17 +193,24 @@ fn task_thread(
 
                 // Before updating the somatic in place
                 if let Some(ref mut send_back) = send_back {
+                    // VCF entry
                     for (_record, annos) in &mut *send_back {
+                        // Sample columns
                         for (sample_idx, (anno, sample_paths)) in
                             annos.iter_mut().zip(&somatic_paths).enumerate()
                         {
+                            let mut any_update = false;
+                            // Check all paths this sample had reads in
                             for path in sample_paths {
                                 if path.path.contains(&anno.var_idx) {
+                                    // This sample will need to be updated
+                                    any_update = true;
                                     if !anno.gt.contains("1") {
                                         anno.gq = gts.quality_score.round() as i32;
                                     }
                                     anno.rnames.extend(path.meta.rnames.clone());
                                     anno.filt |= FiltFlags::SOMATIC;
+
                                     // TODO: wrong for haploid regions
                                     *anno.ad[1].get_or_insert(0) +=
                                         path.meta.coverage[sample_idx] as i32;
@@ -214,19 +223,20 @@ fn task_thread(
                                         .saturating_sub(path.meta.coverage[sample_idx] as i32);
                                 }
                             }
-                        }
-                    }
 
-                    // Recalculate GQ/SQ given the updated coverages
-                    for (_record, annos) in &mut *send_back {
-                        for anno in annos {
-                            if anno.gt.contains("1") && (anno.filt.contains(FiltFlags::SOMATIC)) {
+                            if any_update {
+                                // Redo the genotyping with the new coverage
                                 if let (Some(rcov), Some(acov)) = (anno.ad[0], anno.ad[1]) {
                                     let ngt = germ_genotyper.genotype(rcov as u64, 0, acov as u64);
                                     anno.sq = ngt.sq as i32;
-                                    if !anno.gt.contains("1") {
-                                        anno.gq = ngt.gq.round() as i32;
-                                    }
+                                    anno.gq = ngt.gq.round() as i32;
+                                    anno.gt_state = ngt.state;
+                                    anno.gt = match anno.gt_state {
+                                        GTstate::Ref => "0/0".to_string(),
+                                        GTstate::Het => "0/1".to_string(),
+                                        GTstate::Hom => "1/1".to_string(),
+                                        GTstate::Non => "./.".to_string(),
+                                    };
                                 }
                             }
                         }
