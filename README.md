@@ -66,7 +66,7 @@ Kanpig is highly parallelized and will fully utilize all threads it is given. Ho
 help and therefore the number of threads should probably be limited to the number of physical processors available. For
 memory, giving kanpig 2GB per-core is usually more than enough.
 
-Note that kanpig is predominantly I/O limited and may not benefit more than ~4-8 cores.
+Note that kanpig is predominantly I/O limited and may not benefit from more than ~4-8 cores.
 
 The actual runtime and memory usage of kanpig run will depend on the read coverage and the number of SVs in the input
 VCF. As a example of kanpig's resource usage with 16 cores available, genotyping a 30x long-read bam against a 2,199
