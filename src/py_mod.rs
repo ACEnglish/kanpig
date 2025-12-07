@@ -321,7 +321,8 @@ impl PyGenotyperConfig {
         calibration_table: Option<Vec<(f64, f64)>>,
     ) -> PyResult<Self> {
         let mode = mode.unwrap_or("Beta");
-        let mode_rs = GenotypeMode::from_str(mode).map_err(|_| PyValueError::new_err("Invalid Mode"))?;
+        let mode_rs =
+            GenotypeMode::from_str(mode).map_err(|_| PyValueError::new_err("Invalid Mode"))?;
 
         let mut inner = GenotyperConfig::default();
         inner.mode = mode_rs;
