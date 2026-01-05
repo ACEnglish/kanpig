@@ -96,7 +96,7 @@ fn task_thread(
                 if ploidy == Ploidy::Zero {
                     m_result_sender
                         .send(m_graph.take_annotated(
-                            vec![&[]],
+                            vec![&[]; n_samples],
                             vec![0; n_samples],
                             vec![&ploidy; n_samples],
                             &germ_genotyper,
