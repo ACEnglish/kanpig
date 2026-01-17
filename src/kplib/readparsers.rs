@@ -2,7 +2,7 @@ use crate::kplib::{
     pileup::{PileupVariant, ReadPileup},
     seq_to_kmer,
     vcftraits::Svtype,
-    GraphParams, Haplotype, HaplotypeMeta,
+    CoverageTrack, GraphParams, Haplotype, HaplotypeMeta,
 };
 use indexmap::{IndexMap, IndexSet};
 use rust_htslib::faidx;
@@ -20,7 +20,7 @@ type HPMap = IndexMap<usize, Option<u8>>;
 
 pub trait ReadParser {
     /// Pull reads and create Haplotype
-    fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64);
+    fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, CoverageTrack);
     /// Official Sample Name
     fn get_sample_name(&self) -> String;
     /// Index of the sample - this is for HaplotypeMeta which holds all samples at once in vectors
@@ -63,7 +63,7 @@ impl BamParser {
 
 impl ReadParser for BamParser {
     /// Returns all unique haplotypes over a region
-    fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64) {
+    fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, CoverageTrack) {
         // We pileup a little outside the region for variants
         let window_start = start.saturating_sub(self.params.neighdist);
         let window_end = end + self.params.neighdist;
@@ -77,7 +77,7 @@ impl ReadParser for BamParser {
         let mut hap_meta = HaplotypeMeta::new(self.get_sample_idx(), self.get_sample_count());
         let mut hps = HPMap::new();
         let mut p_variants = PileupSet::new();
-        let mut coverage = 0;
+        let mut coverage : Vec<(u64, u64)> = vec![];
         let mut qname = 0;
         let mut record = bam::Record::new();
         let sample_index = self.get_sample_idx();
@@ -88,10 +88,11 @@ impl ReadParser for BamParser {
             if !record.seq().is_empty()
                 && record.mapq() >= self.params.mapq
                 && (record.flags() & self.params.mapflag) == 0
-                && (record.reference_start() as u64) < window_start
-                && (record.reference_end() as u64) > window_end
+                //&& (record.reference_start() as u64) < window_start
+                //&& (record.reference_end() as u64) > window_end
             {
-                coverage += 1;
+                coverage.push((record.reference_start() as u64, record.reference_end() as u64));
+
                 let mut read = ReadPileup::new(
                     chrom.to_string(),
                     &record,
@@ -120,7 +121,8 @@ impl ReadParser for BamParser {
                 qname += 1;
             }
         }
-
+        
+        let coverage = CoverageTrack::new(Some(coverage), self.params.neighdist);
         (
             pileups_to_haps(
                 chrom,
@@ -184,13 +186,13 @@ impl PlupParser {
 impl ReadParser for PlupParser {
     /// Fetch and parse pileups within a specified genomic interval.
     /// Returns the set of haplotypes
-    fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, u64) {
+    fn find_pileups(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<Haplotype>, CoverageTrack) {
         let window_start = start.saturating_sub(self.params.neighdist);
         let window_end = end + self.params.neighdist;
 
         let tid = match self.tbx.tid(chrom) {
             Ok(t) => t,
-            Err(_) => return (vec![], 0),
+            Err(_) => return (vec![], CoverageTrack::new(None, 0)),
         };
         self.tbx
             .fetch(tid, window_start, window_end)
@@ -200,15 +202,15 @@ impl ReadParser for PlupParser {
         let mut hps = HPMap::new();
         let mut hap_meta = HaplotypeMeta::new(self.get_sample_idx(), self.get_sample_count());
         let mut p_variants = PileupSet::new();
-        let mut coverage = 0;
+        let mut coverage : Vec<(u64, u64)> = vec![];
         let sample_idx = self.get_sample_idx();
 
         for (qname, line) in self.tbx.records().filter_map(Result::ok).enumerate() {
             if let Some(mut read) =
                 ReadPileup::decode(&line, self.params.sizemin, self.params.sizemax)
             {
-                if read.start < window_start && read.end > window_end {
-                    coverage += 1;
+                //if read.start < window_start && read.end > window_end {
+                    coverage.push((read.start, read.end));
                     if hap_meta.ps[sample_idx].is_none() && read.ps.is_some() {
                         hap_meta.ps[sample_idx] = read.ps;
                     }
@@ -221,10 +223,11 @@ impl ReadParser for PlupParser {
                             reads.entry(qname).or_default().push(p_idx);
                         }
                     }
-                }
+                //}
             }
         }
 
+        let coverage = CoverageTrack::new(Some(coverage), self.params.neighdist);
         (
             pileups_to_haps(
                 chrom,

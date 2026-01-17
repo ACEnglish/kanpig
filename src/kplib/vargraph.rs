@@ -139,7 +139,7 @@ impl Variants {
     pub fn take_annotated(
         &mut self,
         paths: Vec<&[PathScore]>,
-        coverages: Vec<u64>,
+        coverages: Vec<CoverageTrack>,
         ploidy: Vec<&Ploidy>,
         genotyper: &Genotyper,
     ) -> ChannelOutput {
@@ -153,7 +153,9 @@ impl Variants {
                     .take()
                     .map(|entry| {
                         let mut annos = Vec::with_capacity(coverages.len());
-                        for (i, (&cov, &ploid)) in coverages.iter().zip(ploidy.iter()).enumerate() {
+                        for (i, (&cov_track, &ploid)) in coverages.iter().zip(ploidy.iter()).enumerate() {
+                            let (start, end) = entry.boundaries();
+                            let cov = cov_track.count_spanning_reads(start, end);
                             annos.push(GenotypeAnno::new(
                                 var_idx, paths[i], cov, ploid, self.start, i, genotyper,
                             ));

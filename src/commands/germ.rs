@@ -52,8 +52,13 @@ fn task_thread(
                     continue;
                 }
 
-                let (haps, coverage) =
+                //let (haps, local_neigh, coverage_track) =
+                let (haps, coverage_track) =
                     m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+                // Here is where we could/should be editing the graph based on the pileups
+                // m_graph.trim_neighborhood(local_neigh);
+                let coverage = coverage_track.count_spanning_reads(m_graph.start, m_graph.end);
+
                 let haps = ploidy.cluster(
                     haps,
                     coverage,
@@ -84,6 +89,9 @@ fn task_thread(
                         &genotyper,
                     ))
                     .unwrap();
+                // TODO: separately I need to m_graph.take_nonlocal(coverage_tracker, vec![&ploidy], &genotyper)
+                // Or I can force more stuff into take_annotated, but I'm annoyed by how terse that
+                // method is w.r.t. it doing the union of paths to variants
             }
         }
     }

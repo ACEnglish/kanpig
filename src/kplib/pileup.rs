@@ -1,5 +1,5 @@
 /// A pileup variant that's hashable / comparable
-use crate::kplib::{vcftraits::Svtype, Haplotype, ReadParser, Variants};
+use crate::kplib::{vcftraits::Svtype, Haplotype, ReadParser, Variants, CoverageTrack};
 use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::{
     fmt,
@@ -408,28 +408,26 @@ impl std::fmt::Debug for PileupVariant {
 #[derive(Clone)]
 pub struct PileupData {
     pub haplos: Vec<Haplotype>,
-    pub ref_coverage: Vec<usize>,
-    pub coverages: Vec<u64>,
+    pub coverages: Vec<CoverageTrack>,
 }
 
 // Collect pileup data from all samples
+// TODO: I should be using this in germ also?
 pub fn collect_pileup_data(
     samples: &mut Vec<Box<dyn ReadParser>>,
     m_graph: &Variants,
 ) -> PileupData {
-    let mut ref_coverage = Vec::<usize>::with_capacity(samples.len());
-    let mut coverages = Vec::<u64>::with_capacity(samples.len());
+    let mut ref_coverage
+    let mut coverages = Vec::<CoverageTrack>::with_capacity(samples.len());
     let mut haplos = Vec::<Haplotype>::new();
     for samp in samples.iter_mut() {
-        let (haps, cov) = samp.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-        ref_coverage.push(cov as usize - haps.len());
+        let (haps, cov_track) = samp.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
         coverages.push(cov);
         haplos.extend(haps);
     }
 
     PileupData {
         haplos,
-        ref_coverage,
         coverages,
     }
 }

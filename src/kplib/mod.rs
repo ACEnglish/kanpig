@@ -6,6 +6,9 @@ pub use crate::kplib::bedparser::BedParser;
 
 pub mod cluster;
 
+pub mod coverage;
+pub use crate::kplib::coverage::CoverageTrack;
+
 pub mod germ_genotyper;
 
 mod graphparams;
