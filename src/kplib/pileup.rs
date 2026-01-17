@@ -6,15 +6,87 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+/// This holds read information that's eventually passed to PathScore
+/// And then is used by the GenotypeAnno to fill in FORMAT fields
+/// In order to allow reads across samples to talk to one another
+/// we need to use Vectors. For a single sample operation, we will be
+/// accessing everything simply as attribute[0]. For multi-sample, we'll
+/// use e.g. attribute[0] for proband, attribute[1] for mother, etc.
+/// Since reads can consolidate into a single haplotype, we use the
+/// sample_flag as a shortcut to know what samples contributed to the
+/// haplotype. e.g. flag & 1 means this is a proband haplotype
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct SequenceMeta {
+    pub id: usize,
+    pub coverage: Vec<u64>,
+    pub ps: Vec<Option<u32>>,
+    pub hp: Vec<Option<u8>>,
+    pub samples_flag: usize,
+    pub rnames: Vec<String>,
+}
+
+impl SequenceMeta {
+    pub fn new(sample_idx: usize, num_samples: usize) -> Self {
+        let mut coverage = vec![0u64; num_samples];
+        coverage[sample_idx] += 1;
+        let rnames = vec![];
+
+        SequenceMeta {
+            id: 0,
+            coverage,
+            ps: vec![None; num_samples],
+            hp: vec![None; num_samples],
+            samples_flag: 2_usize.pow(sample_idx as u32),
+            rnames,
+        }
+    }
+
+    /// New SequenceMeta that doesn't belong to anyone
+    pub fn new_blank(num_samples: usize) -> Self {
+        let coverage = vec![0u64; num_samples];
+        SequenceMeta {
+            id: 0,
+            coverage,
+            ps: vec![None; num_samples],
+            hp: vec![None; num_samples],
+            samples_flag: 0,
+            rnames: vec![],
+        }
+    }
+
+    pub fn combine(&mut self, other: &SequenceMeta) {
+        for (self_cov, other_cov) in self.coverage.iter_mut().zip(&other.coverage) {
+            *self_cov += other_cov;
+        }
+
+        for (self_ps, other_ps) in self.ps.iter_mut().zip(&other.ps) {
+            if self_ps.is_none() {
+                *self_ps = *other_ps;
+            }
+        }
+
+        for (self_hp, other_hp) in self.hp.iter_mut().zip(&other.hp) {
+            if self_hp.is_none() {
+                *self_hp = *other_hp;
+            }
+        }
+
+        self.rnames.extend(other.rnames.clone());
+
+        self.samples_flag |= other.samples_flag;
+    }
+}
+
+
+
+
 #[derive(Debug)]
 pub struct ReadPileup {
     pub chrom: String,
     pub start: u64,
     pub end: u64,
     pub pileups: Vec<PileupVariant>,
-    pub ps: Option<u32>,
-    pub hp: Option<u8>,
-    pub rname: Option<String>,
+    pub metadata: SequenceMeta,
 }
 
 /// A struct representing a read and its pileups
@@ -43,10 +115,18 @@ impl ReadPileup {
     /// let pileup = ReadPileup::new(record, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new(chrom: String, record: &Record, sizemin: u32, sizemax: u32) -> Self {
+    pub fn new_record(chrom: String, record: &Record, sizemin: u32, sizemax: u32, seq_meta: SequenceMeta) -> Self {
         let start = record.reference_start();
         let end = record.reference_end();
-        let rname = Some(String::from_utf8_lossy(record.qname()).into_owned());
+
+        // TODO: I don't know what exactly this should look like
+        // Also, I think I can just do this inside of ReadPilup::new..
+        seq_meta.set_ps(read.ps);
+        seq_meta.set_hp(read.hp);
+
+        let rname = String::from_utf8_lossy(record.qname()).into_owned();
+        seq_meta.rnames.push(rname);
+
 
         let mut pileups = Vec::<PileupVariant>::new();
         let mut read_offset = 0;
@@ -128,9 +208,7 @@ impl ReadPileup {
             start: start as u64,
             end: end as u64,
             pileups,
-            ps,
-            hp,
-            rname,
+            seq_meta,
         }
     }
 
@@ -160,7 +238,7 @@ impl ReadPileup {
     /// let pileup = ReadPileup::decode(line, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn decode(line: &[u8], sizemin: u32, sizemax: u32) -> Option<Self> {
+    pub fn new_text(line: &[u8], sizemin: u32, sizemax: u32) -> Option<Self> {
         let line_str = std::str::from_utf8(line).ok()?;
         let mut fields = line_str.split('\t');
 
@@ -204,6 +282,14 @@ impl ReadPileup {
             rname: None,
         })
     }
+
+    ///
+    /// Create a new ReadPileup with a subset of the read.
+    ///
+    pub fn trim_read(&self, start, end) -> Self
+    {
+        // I just have to subset the self.pileups to those within start/end
+    }
 }
 
 impl fmt::Display for ReadPileup {
@@ -241,6 +327,7 @@ pub struct PileupVariant {
     pub indel: Svtype,
     pub size: i64,
     pub sequence: Option<Vec<u8>>,
+    pub kfeat: Option<Vec<f32>>,
 }
 
 /// Provides information for an individual deletion or insertion with
@@ -275,6 +362,7 @@ impl PileupVariant {
             indel,
             size,
             sequence,
+            kfeat: None,
         }
     }
 
@@ -404,30 +492,70 @@ impl std::fmt::Debug for PileupVariant {
     }
 }
 
-// Data structure to hold pileup information from multiple samples
-#[derive(Clone)]
-pub struct PileupData {
-    pub haplos: Vec<Haplotype>,
-    pub coverages: Vec<CoverageTrack>,
-}
-
-// Collect pileup data from all samples
-// TODO: I should be using this in germ also?
-pub fn collect_pileup_data(
-    samples: &mut Vec<Box<dyn ReadParser>>,
-    m_graph: &Variants,
-) -> PileupData {
-    let mut ref_coverage
-    let mut coverages = Vec::<CoverageTrack>::with_capacity(samples.len());
-    let mut haplos = Vec::<Haplotype>::new();
-    for samp in samples.iter_mut() {
-        let (haps, cov_track) = samp.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
-        coverages.push(cov);
-        haplos.extend(haps);
+/// Converts a set of Pileups collected by read_parsers into a set of ReadPileups
+/// This is useful for fetching reference DEL sequence and running seq_to_kmer less frequently
+///
+/// # Parameters
+/// - `chrom`: The name of the reference chromosome or contig as a `&str`.
+/// - `reads`: A `ReadsMap` mapping read identifiers to a list of pileup indices.
+/// - `plups`: A `PileupSet` representing the pileups to process.
+/// - `reference`: A reference to a `faidx::Reader` for querying the reference genome.
+///
+/// # Returns
+/// - `(Vec<Haplotype>, u64)`: A tuple containing:
+///   - A `Vec<Haplotype>`: The deduplicated and sorted list of haplotypes generated from the pileups.
+///
+/// # Function Details
+/// - The function processes each pileup in `plups` to construct the corresponding sequence.
+///     - For deletions, it retrieves the missing sequence from the reference genome.
+///     - For insertions, it uses the pre-existing sequence associated with the pileup.
+/// - Converts the sequence into k-mers and creates a new `Haplotype` for each pileup.
+/// - Deduplicates reads by grouping them based on their associated pileup indices.
+/// - Combines pileup-based haplotypes into full haplotypes using deduplicated read groupings.
+/// - Sorts the resulting haplotypes in descending order of relevance for output.
+///
+/// # Panics
+/// - Panics if the indel type in a pileup is unknown.
+/// - Panics if an insertion pileup lacks an associated sequence.
+/// - Panics if the reference genome fetch fails for deletions.
+///
+/// # Example
+/// ```rust
+/// use faidx::Reader;
+/// use std::collections::HashMap;
+///
+/// let chrom = "chr1";
+/// let reads: ReadsMap = HashMap::new(); // Populate with actual read-pileup mappings
+/// let plups: PileupSet = Vec::new(); // Populate with pileups
+/// let reference = Reader::from_path("reference.fa").unwrap();
+///
+/// let haplotypes = pileups_consolidator(chrom, reads, plups, &reference);
+/// for hap in haplotypes {
+///     println!("{:?}", hap);
+/// }
+/// ```
+fn pileup_finisher(
+    chrom: &str,
+    read_pileups: Vec<ReadPileup>,
+    read_pileup_lookup: HashMap, // read_index_in_vecplup: [index to pileup variant,]
+    mut plups: PileupSet,
+    reference: &faidx::Reader,
+) {
+    // TODO: Not a pop, an edit in place
+    while let Some(mut p) = plups.pop() {
+        // Need to fill in deleted sequence
+        if p.indel == Svtype::Del {
+            p.sequence = reference
+                .fetch_seq(chrom, p.position as usize, p.end as usize)
+                .unwrap();
+        }
     }
 
-    PileupData {
-        haplos,
-        coverages,
+    for (read_idx, plup_idxs) in read_pileup_lookup.into_iter() {
+        let pileups = vec![];
+        for p in plup_idxs {
+            pileups.push(plups.get(plups.len() - p - 1).clone())
+        }
+        read_pileups[read_idx].pileups = pileups
     }
 }

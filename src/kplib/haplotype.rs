@@ -6,91 +6,20 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-/// This holds read information that's eventually passed to PathScore
-/// And then is used by the GenotypeAnno to fill in FORMAT fields
-/// In order to allow reads across samples to talk to one another
-/// we need to use Vectors. For a single sample operation, we will be
-/// accessing everything simply as attribute[0]. For multi-sample, we'll
-/// use e.g. attribute[0] for proband, attribute[1] for mother, etc.
-/// Since reads can consolidate into a single haplotype, we use the
-/// sample_flag as a shortcut to know what samples contributed to the
-/// haplotype. e.g. flag & 1 means this is a proband haplotype
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct HaplotypeMeta {
-    // Once we cluster/genotype, we need to be able to identify them
-    // esp for mosaic
-    pub id: usize,
-    pub coverage: Vec<u64>,
-    pub ps: Vec<Option<u32>>,
-    pub hp: Vec<Option<u8>>,
-    pub samples_flag: usize,
-    pub rnames: Vec<String>,
-}
-
-impl HaplotypeMeta {
-    pub fn new(sample_idx: usize, num_samples: usize) -> Self {
-        let mut coverage = vec![0u64; num_samples];
-        coverage[sample_idx] += 1;
-        let rnames = vec![];
-
-        HaplotypeMeta {
-            id: 0,
-            coverage,
-            ps: vec![None; num_samples],
-            hp: vec![None; num_samples],
-            samples_flag: 2_usize.pow(sample_idx as u32),
-            rnames,
-        }
-    }
-
-    /// New HaplotypeMetadata that doesn't belong to anyone
-    pub fn new_blank(num_samples: usize) -> Self {
-        let coverage = vec![0u64; num_samples];
-        HaplotypeMeta {
-            id: 0,
-            coverage,
-            ps: vec![None; num_samples],
-            hp: vec![None; num_samples],
-            samples_flag: 0,
-            rnames: vec![],
-        }
-    }
-
-    pub fn combine(&mut self, other: &HaplotypeMeta) {
-        for (self_cov, other_cov) in self.coverage.iter_mut().zip(&other.coverage) {
-            *self_cov += other_cov;
-        }
-
-        for (self_ps, other_ps) in self.ps.iter_mut().zip(&other.ps) {
-            if self_ps.is_none() {
-                *self_ps = *other_ps;
-            }
-        }
-
-        for (self_hp, other_hp) in self.hp.iter_mut().zip(&other.hp) {
-            if self_hp.is_none() {
-                *self_hp = *other_hp;
-            }
-        }
-
-        self.rnames.extend(other.rnames.clone());
-
-        self.samples_flag |= other.samples_flag;
-    }
-}
-
 #[derive(Clone)]
 pub struct Haplotype {
     pub size: i64,
-    pub n: u64,
+    pub n: u64, // Number of parts
     pub kfeat: Vec<f32>,
     pub parts: Vec<(i64, Vec<f32>)>,
     pub partial: usize,
-    pub meta: HaplotypeMeta,
+    pub meta: SequenceMeta,
+    pub start: u64,
+    pub end: u64,
 }
 
 impl Haplotype {
-    pub fn new(kfeat: Vec<f32>, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
+    pub fn new(kfeat: Vec<f32>, size: i64, n: u64, hap_meta: SequenceMeta) -> Self {
         Self {
             size,
             n,
@@ -102,7 +31,7 @@ impl Haplotype {
     }
 
     // Create an empty haplotype
-    pub fn blank(kmer: u8, meta: HaplotypeMeta) -> Haplotype {
+    pub fn blank(kmer: u8, meta: SequenceMeta) -> Haplotype {
         let mk = seq_to_kmer(&[], kmer, false);
         Haplotype {
             size: 0,
@@ -117,7 +46,7 @@ impl Haplotype {
     /// Clear the Metadata and return a clone
     pub fn clear_clone(&self, id: usize) -> Haplotype {
         let mut ret = self.clone();
-        let mut n_meta = HaplotypeMeta::new_blank(self.meta.coverage.len());
+        let mut n_meta = SequenceMeta::new_blank(self.meta.coverage.len());
         n_meta.id = id;
         ret.meta = n_meta;
         ret
