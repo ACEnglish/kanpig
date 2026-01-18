@@ -54,6 +54,16 @@ impl SequenceMeta {
         }
     }
 
+    /// Sets ONLY for a single sample
+    pub fn set_ps(&mut self, ps: Option<u32>) {
+        self.ps[self.samples_flag.trailing_zeros() as usize] = ps
+    }
+
+    /// Sets ONLY for a single sample
+    pub fn set_hp(&mut self, hp: Option<u8>) {
+        self.hp[self.samples_flag.trailing_zeros() as usize] = hp
+    }
+
     pub fn combine(&mut self, other: &SequenceMeta) {
         for (self_cov, other_cov) in self.coverage.iter_mut().zip(&other.coverage) {
             *self_cov += other_cov;
@@ -80,13 +90,13 @@ impl SequenceMeta {
 
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ReadPileup {
     pub chrom: String,
     pub start: u64,
     pub end: u64,
     pub pileups: Vec<PileupVariant>,
-    pub metadata: SequenceMeta,
+    pub meta: SequenceMeta,
 }
 
 /// A struct representing a read and its pileups
@@ -115,17 +125,17 @@ impl ReadPileup {
     /// let pileup = ReadPileup::new(record, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new_record(chrom: String, record: &Record, sizemin: u32, sizemax: u32, seq_meta: SequenceMeta) -> Self {
+    pub fn new_record(chrom: String, record: &Record, sizemin: u32, sizemax: u32, meta: SequenceMeta) -> Self {
         let start = record.reference_start();
         let end = record.reference_end();
 
         // TODO: I don't know what exactly this should look like
         // Also, I think I can just do this inside of ReadPilup::new..
-        seq_meta.set_ps(read.ps);
-        seq_meta.set_hp(read.hp);
+        meta.set_ps(read.ps);
+        meta.set_hp(read.hp);
 
         let rname = String::from_utf8_lossy(record.qname()).into_owned();
-        seq_meta.rnames.push(rname);
+        meta.rnames.push(rname);
 
 
         let mut pileups = Vec::<PileupVariant>::new();
@@ -208,7 +218,7 @@ impl ReadPileup {
             start: start as u64,
             end: end as u64,
             pileups,
-            seq_meta,
+            meta,
         }
     }
 
@@ -238,7 +248,7 @@ impl ReadPileup {
     /// let pileup = ReadPileup::decode(line, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new_text(line: &[u8], sizemin: u32, sizemax: u32) -> Option<Self> {
+    pub fn new_text(line: &[u8], sizemin: u32, sizemax: u32, meta: SequenceMeta) -> Option<Self> {
         let line_str = std::str::from_utf8(line).ok()?;
         let mut fields = line_str.split('\t');
 
@@ -259,37 +269,34 @@ impl ReadPileup {
                 .collect(),
         };
 
-        let ps = fields.next()?;
-        let ps = match ps {
+        let ps = fields.next()? {
             "." => None,
             _ => Some(ps.parse().ok()?),
         };
+        meta.set_ps(ps);
 
-        let hp = fields.next()?;
-        let hp = match hp {
+        let hp = match fields.next()? {
             "." => None,
             _ => Some(hp.parse().ok()?),
         };
+        meta.set_hp(hp);
 
-        // I use chrom 0 for the decode because new puts in tid
         Some(ReadPileup {
             chrom,
             start,
             end,
             pileups,
-            ps,
-            hp,
-            rname: None,
+            meta,
         })
     }
 
     ///
     /// Create a new ReadPileup with a subset of the read.
     ///
-    pub fn trim_read(&self, start, end) -> Self
-    {
+    // TODO pub fn trim_read(&self, start, end) -> Self
+    // TODO {
         // I just have to subset the self.pileups to those within start/end
-    }
+    // TODO }
 }
 
 impl fmt::Display for ReadPileup {
@@ -303,16 +310,18 @@ impl fmt::Display for ReadPileup {
                 .collect::<Vec<_>>()
                 .join(",")
         };
+        
+        let ps = self.meta.ps
+            .iter()
+            .map(|x| x.map(|v| v.to_string()).unwrap_or_else(|| ".".to_string()))
+            .collect::<Vec<_>>()
+            .join(",");
 
-        let ps: String = match self.ps {
-            Some(p) => p.to_string(),
-            None => ".".to_string(),
-        };
-
-        let hp: String = match self.hp {
-            Some(h) => h.to_string(),
-            None => ".".to_string(),
-        };
+        let hp = self.meta.hp
+            .iter()
+            .map(|x| x.map(|v| v.to_string()).unwrap_or_else(|| ".".to_string()))
+            .collect::<Vec<_>>()
+            .join(",");
 
         write!(
             f,
@@ -321,6 +330,8 @@ impl fmt::Display for ReadPileup {
         )
     }
 }
+
+#[derive(Clone)]
 pub struct PileupVariant {
     pub position: u64,
     pub end: u64,

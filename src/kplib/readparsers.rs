@@ -117,7 +117,7 @@ impl ReadParser for BamParser {
         }
         
         ( 
-            pileup_finisher(chrom, read_pileups, read_pileup_lookup, p_variants, &self.reference),
+            pileup_finisher(chrom, reads, read_pileup_lookup, p_variants, &self.reference),
             CoverageTrack::new(Some(coverage), self.params.neighdist)
         )
     }
@@ -181,49 +181,33 @@ impl ReadParser for PlupParser {
             .fetch(tid, window_start, window_end)
             .expect("Could not fetch region from TBX");
 
-        let mut reads = ReadsMap::new();
-        let mut hps = HPMap::new();
-        let mut hap_meta = HaplotypeMeta::new(self.get_sample_idx(), self.get_sample_count());
+        let mut seq_meta_template = SequenceMeta::new(self.get_sample_idx(), self.get_sample_count());
+        let mut reads : Vec<Read Pileup> = vec![];
+        let mut read_pileup_lookup = ReadsMap::new();
         let mut p_variants = PileupSet::new();
+
         let mut coverage : Vec<(u64, u64)> = vec![];
-        let sample_idx = self.get_sample_idx();
 
         for (qname, line) in self.tbx.records().filter_map(Result::ok).enumerate() {
             if let Some(mut read) =
-                ReadPileup::decode(&line, self.params.sizemin, self.params.sizemax)
+                ReadPileup::new_text(&line, self.params.sizemin, self.params.sizemax, seq_meta_template.clone())
             {
-                //if read.start < window_start && read.end > window_end {
-                    coverage.push((read.start, read.end));
-                    if hap_meta.ps[sample_idx].is_none() && read.ps.is_some() {
-                        hap_meta.ps[sample_idx] = read.ps;
+                coverage.push((read.start, read.end));
+
+                for m_var in read.pileups.drain(..) {
+                    if m_var.position >= window_start && m_var.position <= window_end {
+                        let (p_idx, _) = p_variants.insert_full(m_var);
+                        read_pileup_lookup.entry(qname).or_default().push(p_idx);
                     }
-                    if !read.pileups.is_empty() {
-                        hps.entry(qname).or_insert(read.hp);
-                    }
-                    for m_var in read.pileups.drain(..) {
-                        if m_var.position >= window_start && m_var.position <= window_end {
-                            let (p_idx, _) = p_variants.insert_full(m_var);
-                            reads.entry(qname).or_default().push(p_idx);
-                        }
-                    }
-                //}
+                }
+
+                reads.push(read);
             }
         }
 
-        let coverage = CoverageTrack::new(Some(coverage), self.params.neighdist);
-        (
-            pileups_to_haps(
-                chrom,
-                reads,
-                p_variants,
-                &self.reference,
-                &self.params,
-                hps,
-                hap_meta,
-                self.get_sample_idx(),
-                None,
-            ),
-            coverage,
+        ( 
+            pileup_finisher(chrom, reads, read_pileup_lookup, p_variants, &self.reference),
+            CoverageTrack::new(Some(coverage), self.params.neighdist)
         )
     }
 
