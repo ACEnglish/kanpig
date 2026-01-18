@@ -72,14 +72,13 @@ fn main() {
         Commands::Plup(mut cmd) => {
             setup_logging(&cmd);
             cmd.run();
-        }
-        Commands::Trio(mut cmd) => {
-            setup_logging(&cmd);
-            cmd.run();
-        }
-        Commands::Mosaic(mut cmd) => {
-            setup_logging(&cmd);
-            cmd.run();
-        }
+        } /* Commands::Trio(mut cmd) => {
+              setup_logging(&cmd);
+              cmd.run();
+          }
+          Commands::Mosaic(mut cmd) => {
+              setup_logging(&cmd);
+              cmd.run();
+          }*/
     }
 }

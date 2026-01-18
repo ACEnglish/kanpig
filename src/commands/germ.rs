@@ -111,9 +111,13 @@ fn task_thread(
                         ))
                         .unwrap();
                 }
-                /*for remaining_variant in m_graph.iter() {
-                    Annotate remaining_variant with coverage_track
-                }*/
+                // Annotate remaining_variants with coverage_track
+                let remaining_variants =
+                    m_graph.take_refcovered(vec![coverage_track], vec![&ploidy], &genotyper);
+                // Guard because I don't know what happens to variant-less graphs
+                if remaining_variants.is_some() {
+                    m_result_sender.send(remaining_variants).unwrap();
+                }
             }
         }
     }

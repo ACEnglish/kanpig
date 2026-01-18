@@ -1,7 +1,7 @@
 use crate::kplib::{
     germ_genotyper::Genotyper, metrics::overlaps, traverse::brute_force_find_path,
-    traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, GenotypeAnno, GraphParams,
-    Haplotype, PathScore, Ploidy,
+    traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, CoverageTrack, GenotypeAnno,
+    GraphParams, Haplotype, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -207,5 +207,42 @@ impl VariantGraph {
         *self = VariantGraph::new(keep_entries, self.kmer);
 
         take_graph
+    }
+
+    pub fn take_refcovered(
+        &mut self,
+        coverages: Vec<CoverageTrack>,
+        ploidy: Vec<&Ploidy>,
+        genotyper: &Genotyper,
+    ) -> ChannelOutput {
+        self.node_indices
+            .iter_mut()
+            .filter_map(|var_idx| {
+                self.graph
+                    .node_weight_mut(*var_idx)
+                    .unwrap()
+                    .entry
+                    .take()
+                    .map(|entry| {
+                        let mut annos = Vec::with_capacity(coverages.len());
+                        for (i, (cov_tracker, &ploid)) in
+                            coverages.iter().zip(ploidy.iter()).enumerate()
+                        {
+                            let (start, end) = entry.boundaries();
+                            let cov = cov_tracker.count_spanning_reads(start, end);
+                            annos.push(GenotypeAnno::new(
+                                var_idx,
+                                &[],
+                                cov,
+                                ploid,
+                                start,
+                                i,
+                                genotyper,
+                            ));
+                        }
+                        Some((entry, annos))
+                    })
+            })
+            .collect::<ChannelOutput>()
     }
 }

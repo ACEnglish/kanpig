@@ -13,11 +13,11 @@ use crate::commands::germ::GermCommand;
 pub mod plup;
 use crate::commands::plup::PlupCommand;
 
-pub mod trio;
-use crate::commands::trio::TrioCommand;
+// pub mod trio;
+// use crate::commands::trio::TrioCommand;
 
-pub mod mosaic;
-use crate::commands::mosaic::MosaicCommand;
+// pub mod mosaic;
+// use crate::commands::mosaic::MosaicCommand;
 
 /// Set of commands
 #[derive(Subcommand, Debug, Clone)]
@@ -27,10 +27,9 @@ pub enum Commands {
 
     #[command(about = "Germline SV Genotyping")]
     GT(GermCommand),
+    // #[command(about = "Trio SV Genotyping")]
+    // Trio(TrioCommand),
 
-    #[command(about = "Trio SV Genotyping")]
-    Trio(TrioCommand),
-
-    #[command(about = "Mosaic SV Genotyping")]
-    Mosaic(MosaicCommand),
+    // #[command(about = "Mosaic SV Genotyping")]
+    // Mosaic(MosaicCommand),
 }
