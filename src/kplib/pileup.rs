@@ -1,7 +1,7 @@
 /// A pileup variant that's hashable / comparable
 use crate::kplib::{vcftraits::Svtype, SequenceMeta};
 use indexmap::{IndexMap, IndexSet};
-use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
+use rust_htslib::{faidx, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::{
     fmt,
     hash::{Hash, Hasher},
@@ -189,13 +189,13 @@ impl ReadPileup {
 
         let ps = match fields.next()? {
             "." => None,
-            _ => Some(ps.parse().ok()?),
+            f => Some(f.parse().ok()?),
         };
         meta.set_ps(ps);
 
         let hp = match fields.next()? {
             "." => None,
-            _ => Some(hp.parse().ok()?),
+            f => Some(f.parse().ok()?),
         };
         meta.set_hp(hp);
 
@@ -427,24 +427,24 @@ impl std::fmt::Debug for PileupVariant {
 /// Edits the reads in place.
 /// # Parameters
 /// - `chrom`: The name of the reference chromosome or contig as a `&str`.
-/// - `reads`: A `ReadsMap` mapping read identifiers to a list of pileup indices.
+/// - `read_pileups`: The set of reads to fill in
+/// - `read_pileup_lookup`: A `ReadsMap` mapping read identifiers to a list of pileup indices.
 /// - `plups`: A `PileupSet` representing the pileups to process.
 /// - `reference`: A reference to a `faidx::Reader` for querying the reference genome.
 ///
 pub fn pileup_finisher(
     chrom: &str,
-    read_pileups: Vec<ReadPileup>,
-    read_pileup_lookup: HashMap, // read_index_in_vecplup: [index to pileup variant,]
+    mut read_pileups: Vec<ReadPileup>,
+    read_pileup_lookup: ReadsMap, // read_index_in_vecplup: [index to pileup variant,]
     mut plups: PileupSet,
     reference: &faidx::Reader,
 ) {
-    // TODO: Not a pop, an edit in place
-    while let Some(mut p) = plups.pop() {
+    for p in plups.iter_mut() {
         // Need to fill in deleted sequence
         if p.indel == Svtype::Del {
             p.sequence = reference
                 .fetch_seq(chrom, p.position as usize, p.end as usize)
-                .unwrap();
+                .expect("Couldn't fetch reference sequence");
         }
     }
 

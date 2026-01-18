@@ -1,6 +1,6 @@
 use crate::kplib::{
     pileup::{pileup_finisher, ReadPileup, ReadsMap, PileupSet},
-    CoverageTrack, GraphParams, Haplotype, HaplotypeMeta, SequenceMeta, VariantGraph
+    CoverageTrack, GraphParams, Haplotype, SequenceMeta, VariantGraph
 };
 use rust_htslib::{
     faidx,
@@ -16,9 +16,9 @@ pub trait ReadParser {
     fn find_reads(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<ReadPileup>, CoverageTrack);
     /// Official Sample Name
     fn get_sample_name(&self) -> String;
-    /// Index of the sample - this is for HaplotypeMeta which holds all samples at once in vectors
+    /// Index of the sample - this is for SequenceMeta which holds all samples at once in vectors
     fn get_sample_idx(&self) -> usize;
-    /// Needed for initializing the HaplotypeMeta with the correct array size
+    /// Needed for initializing the SequenceMeta with the correct array size
     fn get_sample_count(&self) -> usize;
 }
 

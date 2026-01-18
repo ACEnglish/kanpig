@@ -1,7 +1,7 @@
 use crate::{
     commands::KanpigCommand,
     file_validators,
-    kplib::{open_bam, pileup::ReadPileup},
+    kplib::{open_bam, pileup::ReadPileup, SequenceMeta},
 };
 use clap::Parser;
 use crossbeam_channel::{unbounded, Receiver, Sender};
