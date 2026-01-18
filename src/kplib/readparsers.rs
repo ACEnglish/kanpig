@@ -182,7 +182,7 @@ impl ReadParser for PlupParser {
             .expect("Could not fetch region from TBX");
 
         let mut seq_meta_template = SequenceMeta::new(self.get_sample_idx(), self.get_sample_count());
-        let mut reads : Vec<Read Pileup> = vec![];
+        let mut reads : Vec<ReadPileup> = vec![];
         let mut read_pileup_lookup = ReadsMap::new();
         let mut p_variants = PileupSet::new();
 

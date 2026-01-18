@@ -54,7 +54,7 @@ fn task_thread(
 
                 //let (haps, local_neigh, coverage_track) =
                 let (haps, coverage_track) =
-                    m_reads.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+                    m_reads.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
                 //
                 // Here is where we could/should be editing the graph based on the pileups
                 // m_graph.trim_neighborhood(local_neigh);

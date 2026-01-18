@@ -14,8 +14,6 @@ pub struct Haplotype {
     pub parts: Vec<(i64, Vec<f32>)>,
     pub partial: usize,
     pub meta: SequenceMeta,
-    pub start: u64,
-    pub end: u64,
 }
 
 impl Haplotype {

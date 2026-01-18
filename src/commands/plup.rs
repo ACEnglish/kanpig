@@ -78,11 +78,12 @@ fn process_bam_region(
             && record.reference_start().unsigned_abs() >= start
             && record.reference_start().unsigned_abs() < end
         {
-            ret.push(ReadPileup::new(
+            ret.push(ReadPileup::new_record(
                 chrom.clone(),
                 &record,
                 params.sizemin,
                 params.sizemax,
+                SequenceMeta::new(0, 1),
             ));
         }
     }
