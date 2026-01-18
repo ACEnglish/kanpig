@@ -51,6 +51,9 @@ pub use crate::kplib::regions::{build_region_tree, Regions};
 mod sequencemeta;
 pub use crate::kplib::sequencemeta::SequenceMeta;
 
+mod subintervals;
+pub use crate::kplib::subintervals::find_subintervals;
+
 pub mod traverse;
 
 pub mod trio_genotyper;

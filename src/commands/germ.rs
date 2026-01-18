@@ -53,11 +53,24 @@ fn task_thread(
                 }
 
                 //let (haps, local_neigh, coverage_track) =
-                let (haps, coverage_track) =
+                let (reads, coverage_track) =
                     m_reads.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
-                //
-                // Here is where we could/should be editing the graph based on the pileups
-                // m_graph.trim_neighborhood(local_neigh);
+                /* Structure
+                let subintiv = find_subintervals(&reads, m_args.graph.neighdist);
+                for si in subintiv.iter() {
+                    // Just yoink out the variants
+                    let subgraph = m_grah.make_subgraph(si.0, si.1);
+                    // TODO
+                    let m_reads = reads.iter().map(|r| r.trim_read(si.0, si.1) as Haplotype).collect();
+                    let coverage = m_reads.len() as u64;
+                    Resume ploidy.cluster below
+                    And subgraph.apply_haplotype()
+                }
+
+                for remaining_variant in m_graph.iter() {
+                    Annotate remaining_variant with coverage_track
+                }*/
+
                 let coverage = coverage_track.count_spanning_reads(m_graph.start, m_graph.end);
 
                 let haps = ploidy.cluster(
@@ -75,7 +88,8 @@ fn task_thread(
                     && !m_args.graph.one_to_one
                     && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
                 m_graph.build(should_build);
-
+                // I kinda want to push this into a VariantGraph.apply_haplotypes
+                // its reused I believe the same in the other commands
                 let mut paths: Vec<PathScore> = haps
                     .iter()
                     .map(|h| m_graph.apply_haplotype(h, &m_args.graph))
@@ -90,9 +104,6 @@ fn task_thread(
                         &genotyper,
                     ))
                     .unwrap();
-                // TODO: separately I need to m_graph.take_nonlocal(coverage_tracker, vec![&ploidy], &genotyper)
-                // Or I can force more stuff into take_annotated, but I'm annoyed by how terse that
-                // method is w.r.t. it doing the union of paths to variants
             }
         }
     }
