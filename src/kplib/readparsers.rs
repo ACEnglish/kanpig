@@ -13,10 +13,6 @@ use rust_htslib::{
 };
 use std::path::PathBuf;
 
-/// A mapping of read identifiers to a list of pileup indices.
-pub type ReadsMap = IndexMap<usize, Vec<usize>>;
-/// Unique pileups found by the read parsers
-pub type PileupSet = IndexSet<PileupVariant>;
 
 pub trait ReadParser {
     /// Pull reads

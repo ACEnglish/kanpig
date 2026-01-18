@@ -48,6 +48,9 @@ pub use crate::kplib::readparsers::{open_bam, open_reads, PlupParser, ReadParser
 mod regions;
 pub use crate::kplib::regions::{build_region_tree, Regions};
 
+mod sequencemeta;
+pub use crate::kplib::sequencemeta::SequenceMeta;
+
 pub mod traverse;
 
 pub mod trio_genotyper;
