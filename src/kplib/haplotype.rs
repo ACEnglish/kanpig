@@ -1,4 +1,4 @@
-use crate::kplib::seq_to_kmer;
+use crate::kplib::{seq_to_kmer, SequenceMeta};
 use itertools::Itertools;
 use std::{
     cmp::Ordering,

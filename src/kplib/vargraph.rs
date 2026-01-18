@@ -1,7 +1,7 @@
 use crate::kplib::{
     germ_genotyper::Genotyper, metrics::overlaps, traverse::brute_force_find_path,
-    traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, GenotypeAnno, GraphParams,
-    Haplotype, PathScore, Ploidy,
+    traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, CoverageTrack,
+    GenotypeAnno, GraphParams, Haplotype, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -42,7 +42,7 @@ impl VarNode {
 }
 
 #[derive(Debug)]
-pub struct Variants {
+pub struct VariantGraph {
     pub chrom: String,
     pub start: u64,
     pub end: u64,
@@ -52,10 +52,10 @@ pub struct Variants {
 
 /// Build a graph of all variants in a chunk.
 /// Assumes variants are ordered by position (small to large)
-/// Variants will have edges to every downstream variant that it does not overlap
+/// VariantGraph will have edges to every downstream variant that it does not overlap
 /// The graph has an upstream 'src' node that point to every variant node
 /// The graph has a dnstream 'snk' node that is pointed to by every variant node and 'src'
-impl Variants {
+impl VariantGraph {
     pub fn new(mut variants: Vec<RecordBuf>, kmer: u8) -> Self {
         if variants.is_empty() {
             panic!("Cannot create a graph from no variants");
@@ -63,7 +63,7 @@ impl Variants {
 
         let mut graph = DiGraph::new();
 
-        let (chrom, start, end) = Variants::get_region(&variants);
+        let (chrom, start, end) = VariantGraph::get_region(&variants);
         let mut node_indices = Vec::<NodeIndex<_>>::with_capacity(variants.len() + 2);
         node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
 

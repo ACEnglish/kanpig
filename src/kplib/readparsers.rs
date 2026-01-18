@@ -1,12 +1,9 @@
 use crate::kplib::{
-    pileup::{PileupVariant, ReadPileup},
-    seq_to_kmer,
-    vcftraits::Svtype,
-    CoverageTrack, GraphParams, Haplotype, HaplotypeMeta,
+    pileup::{pileup_finisher, ReadPileup, ReadsMap, PileupSet},
+    CoverageTrack, GraphParams, Haplotype, HaplotypeMeta, SequenceMeta, VariantGraph
 };
-use indexmap::{IndexMap, IndexSet};
-use rust_htslib::faidx;
 use rust_htslib::{
+    faidx,
     bam::ext::BamRecordExtensions,
     bam::{self, IndexedReader, Read as BamRead},
     tbx::{self, Read as TbxRead},
@@ -274,17 +271,17 @@ pub struct ReadData {
 
 pub fn collect_read_data(
     samples: &mut Vec<Box<dyn ReadParser>>,
-    m_graph: &Variants,
-) -> PileupData {
-    let mut coverages = Vec::<CoverageTrack>::with_capacity(samples.len());
+    m_graph: &VariantGraph,
+) -> ReadData {
     let mut reads = Vec::<Haplotype>::new();
+    let mut coverages = Vec::<CoverageTrack>::with_capacity(samples.len());
     for samp in samples.iter_mut() {
         let (reads, cov_track) = samp.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
-        coverages.push(cov);
         reads.extend(reads);
+        coverages.push(cov_track);
     }
 
-    PileupData {
+    ReadData {
         reads,
         coverages,
     }

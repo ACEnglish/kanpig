@@ -18,10 +18,10 @@ use crate::{
         germ_genotyper::{GTstate, GenotypeMode, Genotyper, GenotyperConfig},
         mosaic_genotyper::{GenotypeHypothesis, MosaicGenotyper},
         open_reads, open_writer_thread,
-        pileup::collect_pileup_data,
+        readparsers::collect_read_data,
         polycluster::{self, ToPolyCluParams},
         ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, ReadParser,
-        Variants, VcfChunker,
+        VariantGraph, VcfChunker,
     },
 };
 
@@ -89,7 +89,7 @@ fn task_thread(
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = Variants::new(chunk, m_args.graph.kmer);
+                let mut m_graph = VariantGraph::new(chunk, m_args.graph.kmer);
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam
@@ -105,7 +105,7 @@ fn task_thread(
                     continue;
                 }
 
-                let pileup_data = collect_pileup_data(&mut reads, &m_graph);
+                let pileup_data = collect_read_data(&mut reads, &m_graph);
 
                 let n_haps = pileup_data.haplos.len();
                 if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {

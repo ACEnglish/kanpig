@@ -1,5 +1,6 @@
 /// A pileup variant that's hashable / comparable
-use crate::kplib::{vcftraits::Svtype, Haplotype, ReadParser, Variants, CoverageTrack};
+use crate::kplib::{vcftraits::Svtype, SequenceMeta};
+use indexmap::{IndexMap, IndexSet};
 use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::{
     fmt,
@@ -46,18 +47,12 @@ impl ReadPileup {
     /// let pileup = ReadPileup::new(record, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new_record(chrom: String, record: &Record, sizemin: u32, sizemax: u32, meta: SequenceMeta) -> Self {
+    pub fn new_record(chrom: String, record: &Record, sizemin: u32, sizemax: u32, mut meta: SequenceMeta) -> Self {
         let start = record.reference_start();
         let end = record.reference_end();
 
-        // TODO: I don't know what exactly this should look like
-        // Also, I think I can just do this inside of ReadPilup::new..
-        meta.set_ps(read.ps);
-        meta.set_hp(read.hp);
-
         let rname = String::from_utf8_lossy(record.qname()).into_owned();
         meta.rnames.push(rname);
-
 
         let mut pileups = Vec::<PileupVariant>::new();
         let mut read_offset = 0;
@@ -120,6 +115,7 @@ impl ReadPileup {
             }
             Err(_) => None,
         };
+        meta.set_ps(ps);
 
         let hp = match record.aux(b"HP") {
             Ok(Aux::U8(value)) => Some(value),
@@ -133,6 +129,7 @@ impl ReadPileup {
             }
             Err(_) => None,
         };
+        meta.set_hp(hp);
 
         Self {
             chrom,
@@ -169,7 +166,7 @@ impl ReadPileup {
     /// let pileup = ReadPileup::decode(line, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new_text(line: &[u8], sizemin: u32, sizemax: u32, meta: SequenceMeta) -> Option<Self> {
+    pub fn new_text(line: &[u8], sizemin: u32, sizemax: u32, mut meta: SequenceMeta) -> Option<Self> {
         let line_str = std::str::from_utf8(line).ok()?;
         let mut fields = line_str.split('\t');
 
@@ -190,7 +187,7 @@ impl ReadPileup {
                 .collect(),
         };
 
-        let ps = fields.next()? {
+        let ps = match fields.next()? {
             "." => None,
             _ => Some(ps.parse().ok()?),
         };
@@ -211,13 +208,14 @@ impl ReadPileup {
         })
     }
 
-    ///
+    /*
     /// Create a new ReadPileup with a subset of the read.
     ///
     // TODO pub fn trim_read(&self, start, end) -> Self
     // TODO {
         // I just have to subset the self.pileups to those within start/end
     // TODO }
+    */
 }
 
 impl fmt::Display for ReadPileup {
@@ -426,47 +424,14 @@ impl std::fmt::Debug for PileupVariant {
 
 /// Converts a set of Pileups collected by read_parsers into a set of ReadPileups
 /// This is useful for fetching reference DEL sequence and running seq_to_kmer less frequently
-///
+/// Edits the reads in place.
 /// # Parameters
 /// - `chrom`: The name of the reference chromosome or contig as a `&str`.
 /// - `reads`: A `ReadsMap` mapping read identifiers to a list of pileup indices.
 /// - `plups`: A `PileupSet` representing the pileups to process.
 /// - `reference`: A reference to a `faidx::Reader` for querying the reference genome.
 ///
-/// # Returns
-/// - `(Vec<Haplotype>, u64)`: A tuple containing:
-///   - A `Vec<Haplotype>`: The deduplicated and sorted list of haplotypes generated from the pileups.
-///
-/// # Function Details
-/// - The function processes each pileup in `plups` to construct the corresponding sequence.
-///     - For deletions, it retrieves the missing sequence from the reference genome.
-///     - For insertions, it uses the pre-existing sequence associated with the pileup.
-/// - Converts the sequence into k-mers and creates a new `Haplotype` for each pileup.
-/// - Deduplicates reads by grouping them based on their associated pileup indices.
-/// - Combines pileup-based haplotypes into full haplotypes using deduplicated read groupings.
-/// - Sorts the resulting haplotypes in descending order of relevance for output.
-///
-/// # Panics
-/// - Panics if the indel type in a pileup is unknown.
-/// - Panics if an insertion pileup lacks an associated sequence.
-/// - Panics if the reference genome fetch fails for deletions.
-///
-/// # Example
-/// ```rust
-/// use faidx::Reader;
-/// use std::collections::HashMap;
-///
-/// let chrom = "chr1";
-/// let reads: ReadsMap = HashMap::new(); // Populate with actual read-pileup mappings
-/// let plups: PileupSet = Vec::new(); // Populate with pileups
-/// let reference = Reader::from_path("reference.fa").unwrap();
-///
-/// let haplotypes = pileups_consolidator(chrom, reads, plups, &reference);
-/// for hap in haplotypes {
-///     println!("{:?}", hap);
-/// }
-/// ```
-fn pileup_finisher(
+pub fn pileup_finisher(
     chrom: &str,
     read_pileups: Vec<ReadPileup>,
     read_pileup_lookup: HashMap, // read_index_in_vecplup: [index to pileup variant,]

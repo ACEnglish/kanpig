@@ -12,7 +12,7 @@ use crate::{
     file_validators,
     kplib::{
         build_region_tree, germ_genotyper::Genotyper, hp_sorter, open_reads, open_writer_thread,
-        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, Variants,
+        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, VariantGraph,
         VcfChunker,
     },
 };
@@ -35,7 +35,7 @@ fn task_thread(
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = Variants::new(chunk, m_args.graph.kmer);
+                let mut m_graph = VariantGraph::new(chunk, m_args.graph.kmer);
                 debug!(
                     "Chunk {:?}:{:?}-{:?} w/ {}",
                     m_graph.chrom,

@@ -15,11 +15,11 @@ use crate::{
         cluster::collapse_haplotypes,
         germ_genotyper::Genotyper,
         open_reads, open_writer_thread,
-        pileup::collect_pileup_data,
+        readparsers::collect_read_data,
         polycluster::{self, ToPolyCluParams},
         trio_genotyper::trio_genotyper,
-        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, Variants,
-        VcfChunker,
+        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions,
+        VariantGraph, VcfChunker,
     },
 };
 
@@ -66,7 +66,7 @@ fn task_thread(
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = Variants::new(chunk, m_args.graph.kmer);
+                let mut m_graph = VariantGraph::new(chunk, m_args.graph.kmer);
 
                 let ploidy_owned: Vec<Ploidy> = m_ploidy
                     .iter()
@@ -74,7 +74,8 @@ fn task_thread(
                     .collect();
                 let ploidy: Vec<&Ploidy> = ploidy_owned.iter().collect();
 
-                let pileup_data = collect_pileup_data(&mut reads, &m_graph);
+                // TODO:
+                let pileup_data = collect_read_data(&mut reads, &m_graph);
 
                 let n_haps = pileup_data.haplos.len();
                 if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {

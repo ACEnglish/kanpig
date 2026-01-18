@@ -1,4 +1,4 @@
-use crate::kplib::{metrics, vargraph::VarNode, GraphParams, Haplotype, HaplotypeMeta};
+use crate::kplib::{metrics, vargraph::VarNode, GraphParams, Haplotype, SequenceMeta};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::cmp::Ordering;
 
@@ -10,7 +10,7 @@ pub struct PathScore {
     pub seqsim: f32,
     pub path: Vec<NodeIndex>,
     pub full_target: bool, // Does this path use partial
-    pub meta: HaplotypeMeta,
+    pub meta: SequenceMeta,
 }
 
 impl Eq for PathScore {}
@@ -43,7 +43,7 @@ impl Default for PathScore {
             sizesim: 0.0,
             seqsim: 0.0,
             full_target: false,
-            meta: HaplotypeMeta::default(),
+            meta: SequenceMeta::default(),
         }
     }
 }

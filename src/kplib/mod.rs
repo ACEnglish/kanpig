@@ -15,7 +15,7 @@ mod graphparams;
 pub use crate::kplib::graphparams::GraphParams;
 
 mod haplotype;
-pub use crate::kplib::haplotype::{Haplotype, HaplotypeMeta};
+pub use crate::kplib::haplotype::Haplotype;
 
 mod infra;
 pub use crate::kplib::infra::{ChannelInput, ChannelOutput};
@@ -42,7 +42,7 @@ pub use crate::kplib::ploidy::{Ploidy, PloidyRegions};
 
 pub mod polycluster;
 
-mod readparsers;
+pub mod readparsers;
 pub use crate::kplib::readparsers::{open_bam, open_reads, PlupParser, ReadParser};
 
 mod regions;
@@ -56,7 +56,7 @@ pub mod traverse;
 pub mod trio_genotyper;
 
 pub mod vargraph;
-pub use crate::kplib::vargraph::Variants;
+pub use crate::kplib::vargraph::VariantGraph;
 
 pub mod vcftraits;
 
