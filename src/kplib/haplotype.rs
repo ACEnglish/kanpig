@@ -1,4 +1,4 @@
-use crate::kplib::{seq_to_kmer, SequenceMeta, pileup::ReadPileup, vcftraits::Svtype};
+use crate::kplib::{pileup::ReadPileup, seq_to_kmer, vcftraits::Svtype, SequenceMeta};
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -46,7 +46,13 @@ impl Haplotype {
         for p in pileup.pileups.iter() {
             ret.size += p.size;
             ret.n += 1;
-            let other_kfeat = seq_to_kmer(&p.sequence.as_ref().expect("You didn't fill in pileup sequence"), kmer, p.indel == Svtype::Del);
+            let other_kfeat = seq_to_kmer(
+                &p.sequence
+                    .as_ref()
+                    .expect("You didn't fill in pileup sequence"),
+                kmer,
+                p.indel == Svtype::Del,
+            );
             ret.kfeat
                 .iter_mut()
                 .zip(other_kfeat.iter())
@@ -54,7 +60,7 @@ impl Haplotype {
         }
         ret
     }
-    
+
     /// Clear the Metadata and return a clone
     pub fn clear_clone(&self, id: usize) -> Haplotype {
         let mut ret = self.clone();

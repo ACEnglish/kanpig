@@ -194,10 +194,12 @@ impl VariantGraph {
 
         // Rebuild self with remaining entries (those not taken)
         // This will skip None entries (source/sink nodes that had None to begin with)
-        let keep_entries: Vec<_> = self.node_indices
+        let keep_entries: Vec<_> = self
+            .node_indices
             .iter()
             .filter_map(|var_idx| {
-                self.graph.node_weight_mut(*var_idx)
+                self.graph
+                    .node_weight_mut(*var_idx)
                     .and_then(|node| node.entry.take())
             })
             .collect();

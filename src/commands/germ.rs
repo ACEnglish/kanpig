@@ -11,10 +11,9 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
-        find_subintervals,
-        build_region_tree, germ_genotyper::Genotyper, hp_sorter, open_reads, open_writer_thread,
-        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, VariantGraph,
-        VcfChunker, Haplotype,
+        build_region_tree, find_subintervals, germ_genotyper::Genotyper, hp_sorter, open_reads,
+        open_writer_thread, ChannelInput, ChannelOutput, GraphParams, Haplotype, PathScore, Ploidy,
+        PloidyRegions, VariantGraph, VcfChunker,
     },
 };
 fn task_thread(
@@ -60,7 +59,6 @@ fn task_thread(
                 let subintiv = find_subintervals(&reads, m_args.graph.neighdist);
                 // This is too deep -- need to pull some of this code out
                 for si in subintiv.iter() {
-                    
                     // Just yoink out the variants
                     let mut subgraph = m_graph.make_subgraph(si.0, si.1);
 
@@ -70,11 +68,14 @@ fn task_thread(
 
                     for read in reads.iter() {
                         if !read.spans(si.0, si.1) {
-                            continue
+                            continue;
                         }
                         coverage += 1;
                         if !read.pileups.is_empty() {
-                            m_haps.push(Haplotype::from_readpileup(read.trim(si.0, si.1), m_args.graph.kmer));
+                            m_haps.push(Haplotype::from_readpileup(
+                                read.trim(si.0, si.1),
+                                m_args.graph.kmer,
+                            ));
                         }
                     }
 

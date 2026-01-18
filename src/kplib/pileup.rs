@@ -221,13 +221,11 @@ impl ReadPileup {
 
     /// Create a new ReadPileup with a subset of the read.
     /// Only call this if you're sure that self.spans
-    pub fn trim(&self, start: u64, end: u64) -> ReadPileup
-    {
+    pub fn trim(&self, start: u64, end: u64) -> ReadPileup {
         todo!("implement trimming logic")
     }
 
-    pub fn spans(&self, start: u64, end: u64) -> bool
-    {
+    pub fn spans(&self, start: u64, end: u64) -> bool {
         (self.start <= start) & (end >= self.end)
     }
 }
