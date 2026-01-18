@@ -1,7 +1,7 @@
 /// A pileup variant that's hashable / comparable
 use crate::kplib::{vcftraits::Svtype, SequenceMeta};
 use indexmap::{IndexMap, IndexSet};
-use rust_htslib::{faidx, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
+use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record, faidx};
 use std::{
     fmt,
     hash::{Hash, Hasher},
@@ -47,7 +47,13 @@ impl ReadPileup {
     /// let pileup = ReadPileup::new(record, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new_record(chrom: String, record: &Record, sizemin: u32, sizemax: u32, mut meta: SequenceMeta) -> Self {
+    pub fn new_record(
+        chrom: String,
+        record: &Record,
+        sizemin: u32,
+        sizemax: u32,
+        mut meta: SequenceMeta,
+    ) -> Self {
         let start = record.reference_start();
         let end = record.reference_end();
 
@@ -166,7 +172,12 @@ impl ReadPileup {
     /// let pileup = ReadPileup::decode(line, 10, 100);
     /// println!("{:?}", pileup);
     /// ```
-    pub fn new_text(line: &[u8], sizemin: u32, sizemax: u32, mut meta: SequenceMeta) -> Option<Self> {
+    pub fn new_text(
+        line: &[u8],
+        sizemin: u32,
+        sizemax: u32,
+        mut meta: SequenceMeta,
+    ) -> Option<Self> {
         let line_str = std::str::from_utf8(line).ok()?;
         let mut fields = line_str.split('\t');
 
@@ -213,9 +224,9 @@ impl ReadPileup {
     ///
     // TODO pub fn trim_read(&self, start, end) -> Self
     // TODO {
-        // I just have to subset the self.pileups to those within start/end
+    // I just have to subset the self.pileups to those within start/end
     // TODO }
-    */
+     */
 }
 
 impl fmt::Display for ReadPileup {
@@ -229,14 +240,18 @@ impl fmt::Display for ReadPileup {
                 .collect::<Vec<_>>()
                 .join(",")
         };
-        
-        let ps = self.meta.ps
+
+        let ps = self
+            .meta
+            .ps
             .iter()
             .map(|x| x.map(|v| v.to_string()).unwrap_or_else(|| ".".to_string()))
             .collect::<Vec<_>>()
             .join(",");
 
-        let hp = self.meta.hp
+        let hp = self
+            .meta
+            .hp
             .iter()
             .map(|x| x.map(|v| v.to_string()).unwrap_or_else(|| ".".to_string()))
             .collect::<Vec<_>>()
@@ -294,6 +309,10 @@ impl PileupVariant {
             sequence,
             kfeat: None,
         }
+    }
+
+    pub fn set_sequence(&mut self, sequence: Vec<u8>) {
+        self.sequence = Some(sequence);
     }
 
     /// Decodes a string entry into a `PileupVariant`.
@@ -434,24 +453,28 @@ impl std::fmt::Debug for PileupVariant {
 ///
 pub fn pileup_finisher(
     chrom: &str,
-    mut read_pileups: Vec<ReadPileup>,
+    read_pileups: &mut Vec<ReadPileup>,
     read_pileup_lookup: ReadsMap, // read_index_in_vecplup: [index to pileup variant,]
     mut plups: PileupSet,
     reference: &faidx::Reader,
 ) {
-    for p in plups.iter_mut() {
-        // Need to fill in deleted sequence
+    let mut filled_plups = vec![];
+    for mut p in plups.drain(..) {
         if p.indel == Svtype::Del {
-            p.sequence = reference
-                .fetch_seq(chrom, p.position as usize, p.end as usize)
-                .expect("Couldn't fetch reference sequence");
+            p.set_sequence(
+                reference
+                    .fetch_seq(chrom, p.position as usize, p.end as usize)
+                    .expect("Couldn't fetch reference sequence")
+                    .to_vec(),
+            );
         }
+        filled_plups.push(p);
     }
 
     for (read_idx, plup_idxs) in read_pileup_lookup.into_iter() {
-        let pileups = vec![];
+        let mut pileups = vec![];
         for p in plup_idxs {
-            pileups.push(plups.get(plups.len() - p - 1).clone())
+            pileups.push(filled_plups[plups.len() - p - 1].clone())
         }
         read_pileups[read_idx].pileups = pileups
     }

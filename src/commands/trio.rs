@@ -15,11 +15,11 @@ use crate::{
         cluster::collapse_haplotypes,
         germ_genotyper::Genotyper,
         open_reads, open_writer_thread,
-        readparsers::collect_read_data,
         polycluster::{self, ToPolyCluParams},
+        readparsers::collect_read_data,
         trio_genotyper::trio_genotyper,
-        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions,
-        VariantGraph, VcfChunker,
+        ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, VariantGraph,
+        VcfChunker,
     },
 };
 

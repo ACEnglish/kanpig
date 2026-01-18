@@ -1,19 +1,19 @@
 use crate::kplib::{
-    pileup::{pileup_finisher, ReadPileup, ReadsMap, PileupSet},
-    CoverageTrack, GraphParams, Haplotype, SequenceMeta, VariantGraph
+    pileup::{pileup_finisher, PileupSet, ReadPileup, ReadsMap},
+    CoverageTrack, GraphParams, SequenceMeta, VariantGraph,
 };
 use rust_htslib::{
-    faidx,
     bam::ext::BamRecordExtensions,
     bam::{self, IndexedReader, Read as BamRead},
+    faidx,
     tbx::{self, Read as TbxRead},
 };
 use std::path::PathBuf;
 
-
 pub trait ReadParser {
     /// Pull reads
-    fn find_reads(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<ReadPileup>, CoverageTrack);
+    fn find_reads(&mut self, chrom: &str, start: u64, end: u64)
+        -> (Vec<ReadPileup>, CoverageTrack);
     /// Official Sample Name
     fn get_sample_name(&self) -> String;
     /// Index of the sample - this is for SequenceMeta which holds all samples at once in vectors
@@ -56,7 +56,12 @@ impl BamParser {
 
 impl ReadParser for BamParser {
     /// Returns all unique haplotypes over a region
-    fn find_reads(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<ReadPileup>, CoverageTrack) {
+    fn find_reads(
+        &mut self,
+        chrom: &str,
+        start: u64,
+        end: u64,
+    ) -> (Vec<ReadPileup>, CoverageTrack) {
         // We pileup a little outside the region for variants
         let window_start = start.saturating_sub(self.params.neighdist);
         let window_end = end + self.params.neighdist;
@@ -65,9 +70,9 @@ impl ReadParser for BamParser {
             panic!("Unable to fetch bam {}:{}-{}\n{:?}", chrom, start, end, e)
         };
 
-        let mut seq_meta_template = SequenceMeta::new(self.get_sample_idx(), self.get_sample_count());
+        let seq_meta_template = SequenceMeta::new(self.get_sample_idx(), self.get_sample_count());
 
-        let mut reads : Vec<ReadPileup> = vec![];
+        let mut reads: Vec<ReadPileup> = vec![];
         // track the changes made by each read
         // We keep a unique set so we don't have to carry around as much data at first
         // But also so we can reduce the IO for fetching deletions' reference sequence
@@ -75,7 +80,7 @@ impl ReadParser for BamParser {
         let mut read_pileup_lookup = ReadsMap::new();
         let mut p_variants = PileupSet::new();
 
-        let mut coverage : Vec<(u64, u64)> = vec![];
+        let mut coverage: Vec<(u64, u64)> = vec![];
 
         let mut qname = 0;
         let mut record = bam::Record::new();
@@ -86,7 +91,10 @@ impl ReadParser for BamParser {
                 && record.mapq() >= self.params.mapq
                 && (record.flags() & self.params.mapflag) == 0
             {
-                coverage.push((record.reference_start() as u64, record.reference_end() as u64));
+                coverage.push((
+                    record.reference_start() as u64,
+                    record.reference_end() as u64,
+                ));
 
                 let mut read = ReadPileup::new_record(
                     chrom.to_string(),
@@ -108,10 +116,17 @@ impl ReadParser for BamParser {
                 qname += 1;
             }
         }
-        
-        ( 
-            pileup_finisher(chrom, reads, read_pileup_lookup, p_variants, &self.reference),
-            CoverageTrack::new(Some(coverage), self.params.neighdist)
+
+        pileup_finisher(
+            chrom,
+            &mut reads,
+            read_pileup_lookup,
+            p_variants,
+            &self.reference,
+        );
+        (
+            reads,
+            CoverageTrack::new(Some(coverage), self.params.neighdist),
         )
     }
 
@@ -162,7 +177,12 @@ impl PlupParser {
 impl ReadParser for PlupParser {
     /// Fetch and parse pileups within a specified genomic interval.
     /// Returns the set of haplotypes
-    fn find_reads(&mut self, chrom: &str, start: u64, end: u64) -> (Vec<ReadPileup>, CoverageTrack) {
+    fn find_reads(
+        &mut self,
+        chrom: &str,
+        start: u64,
+        end: u64,
+    ) -> (Vec<ReadPileup>, CoverageTrack) {
         let window_start = start.saturating_sub(self.params.neighdist);
         let window_end = end + self.params.neighdist;
 
@@ -174,17 +194,20 @@ impl ReadParser for PlupParser {
             .fetch(tid, window_start, window_end)
             .expect("Could not fetch region from TBX");
 
-        let mut seq_meta_template = SequenceMeta::new(self.get_sample_idx(), self.get_sample_count());
-        let mut reads : Vec<ReadPileup> = vec![];
+        let seq_meta_template = SequenceMeta::new(self.get_sample_idx(), self.get_sample_count());
+        let mut reads: Vec<ReadPileup> = vec![];
         let mut read_pileup_lookup = ReadsMap::new();
         let mut p_variants = PileupSet::new();
 
-        let mut coverage : Vec<(u64, u64)> = vec![];
+        let mut coverage: Vec<(u64, u64)> = vec![];
 
         for (qname, line) in self.tbx.records().filter_map(Result::ok).enumerate() {
-            if let Some(mut read) =
-                ReadPileup::new_text(&line, self.params.sizemin, self.params.sizemax, seq_meta_template.clone())
-            {
+            if let Some(mut read) = ReadPileup::new_text(
+                &line,
+                self.params.sizemin,
+                self.params.sizemax,
+                seq_meta_template.clone(),
+            ) {
                 coverage.push((read.start, read.end));
 
                 for m_var in read.pileups.drain(..) {
@@ -198,9 +221,16 @@ impl ReadParser for PlupParser {
             }
         }
 
-        ( 
-            pileup_finisher(chrom, reads, read_pileup_lookup, p_variants, &self.reference),
-            CoverageTrack::new(Some(coverage), self.params.neighdist)
+        pileup_finisher(
+            chrom,
+            &mut reads,
+            read_pileup_lookup,
+            p_variants,
+            &self.reference,
+        );
+        (
+            reads,
+            CoverageTrack::new(Some(coverage), self.params.neighdist),
         )
     }
 
@@ -273,17 +303,13 @@ pub fn collect_read_data(
     samples: &mut Vec<Box<dyn ReadParser>>,
     m_graph: &VariantGraph,
 ) -> ReadData {
-    let mut reads = Vec::<Haplotype>::new();
+    let mut reads = Vec::<ReadPileup>::new();
     let mut coverages = Vec::<CoverageTrack>::with_capacity(samples.len());
     for samp in samples.iter_mut() {
-        let (reads, cov_track) = samp.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
-        reads.extend(reads);
+        let (m_reads, cov_track) = samp.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
+        reads.extend(m_reads);
         coverages.push(cov_track);
     }
 
-    ReadData {
-        reads,
-        coverages,
-    }
+    ReadData { reads, coverages }
 }
-

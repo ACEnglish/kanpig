@@ -1,7 +1,7 @@
 use crate::kplib::{
     germ_genotyper::Genotyper, metrics::overlaps, traverse::brute_force_find_path,
-    traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, CoverageTrack,
-    GenotypeAnno, GraphParams, Haplotype, PathScore, Ploidy,
+    traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, GenotypeAnno, GraphParams,
+    Haplotype, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -139,7 +139,7 @@ impl VariantGraph {
     pub fn take_annotated(
         &mut self,
         paths: Vec<&[PathScore]>,
-        coverages: Vec<CoverageTrack>,
+        coverages: Vec<u64>,
         ploidy: Vec<&Ploidy>,
         genotyper: &Genotyper,
     ) -> ChannelOutput {
@@ -153,9 +153,7 @@ impl VariantGraph {
                     .take()
                     .map(|entry| {
                         let mut annos = Vec::with_capacity(coverages.len());
-                        for (i, (&cov_track, &ploid)) in coverages.iter().zip(ploidy.iter()).enumerate() {
-                            let (start, end) = entry.boundaries();
-                            let cov = cov_track.count_spanning_reads(start, end);
+                        for (i, (&cov, &ploid)) in coverages.iter().zip(ploidy.iter()).enumerate() {
                             annos.push(GenotypeAnno::new(
                                 var_idx, paths[i], cov, ploid, self.start, i, genotyper,
                             ));
