@@ -11,9 +11,10 @@ use crate::{
     commands::KanpigCommand,
     file_validators,
     kplib::{
+        find_subintervals,
         build_region_tree, germ_genotyper::Genotyper, hp_sorter, open_reads, open_writer_thread,
         ChannelInput, ChannelOutput, GraphParams, PathScore, Ploidy, PloidyRegions, VariantGraph,
-        VcfChunker,
+        VcfChunker, Haplotype,
     },
 };
 fn task_thread(
@@ -55,55 +56,63 @@ fn task_thread(
                 //let (haps, local_neigh, coverage_track) =
                 let (reads, coverage_track) =
                     m_reads.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
-                /* Structure
-                let subintiv = find_subintervals(&reads, m_args.graph.neighdist);
-                for si in subintiv.iter() {
-                    // Just yoink out the variants
-                    let subgraph = m_grah.make_subgraph(si.0, si.1);
-                    // TODO
-                    let m_reads = reads.iter().map(|r| r.trim_read(si.0, si.1) as Haplotype).collect();
-                    let coverage = m_reads.len() as u64;
-                    Resume ploidy.cluster below
-                    And subgraph.apply_haplotype()
-                }
 
-                for remaining_variant in m_graph.iter() {
+                let subintiv = find_subintervals(&reads, m_args.graph.neighdist);
+                // This is too deep -- need to pull some of this code out
+                for si in subintiv.iter() {
+                    
+                    // Just yoink out the variants
+                    let mut subgraph = m_graph.make_subgraph(si.0, si.1);
+
+                    // Then pull trimmed reads that span the subgraph
+                    let mut m_haps: Vec<Haplotype> = vec![];
+                    let mut coverage = 0;
+
+                    for read in reads.iter() {
+                        if !read.spans(si.0, si.1) {
+                            continue
+                        }
+                        coverage += 1;
+                        if !read.pileups.is_empty() {
+                            m_haps.push(Haplotype::from_readpileup(read.trim(si.0, si.1), m_args.graph.kmer));
+                        }
+                    }
+
+                    let haps = ploidy.cluster(
+                        m_haps,
+                        coverage,
+                        0,
+                        m_args.hps_weight,
+                        m_args.hapsim,
+                        m_args.ab,
+                        &m_args.graph,
+                    );
+
+                    // Only need to build the full graph sometimes
+                    let should_build = !haps.is_empty()
+                        && !m_args.graph.one_to_one
+                        && subgraph.node_indices.len() <= (m_args.graph.maxnodes + 2);
+                    subgraph.build(should_build);
+                    // I kinda want to push this into a VariantGraph.apply_haplotypes
+                    // its reused I believe the same in the other commands
+                    let mut paths: Vec<PathScore> = haps
+                        .iter()
+                        .map(|h| subgraph.apply_haplotype(h, &m_args.graph))
+                        .filter(|p| *p != PathScore::default())
+                        .collect();
+                    paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
+                    m_result_sender
+                        .send(subgraph.take_annotated(
+                            vec![&paths],
+                            vec![coverage],
+                            vec![&ploidy],
+                            &genotyper,
+                        ))
+                        .unwrap();
+                }
+                /*for remaining_variant in m_graph.iter() {
                     Annotate remaining_variant with coverage_track
                 }*/
-
-                let coverage = coverage_track.count_spanning_reads(m_graph.start, m_graph.end);
-
-                let haps = ploidy.cluster(
-                    haps,
-                    coverage,
-                    0,
-                    m_args.hps_weight,
-                    m_args.hapsim,
-                    m_args.ab,
-                    &m_args.graph,
-                );
-
-                // Only need to build the full graph sometimes
-                let should_build = !haps.is_empty()
-                    && !m_args.graph.one_to_one
-                    && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
-                m_graph.build(should_build);
-                // I kinda want to push this into a VariantGraph.apply_haplotypes
-                // its reused I believe the same in the other commands
-                let mut paths: Vec<PathScore> = haps
-                    .iter()
-                    .map(|h| m_graph.apply_haplotype(h, &m_args.graph))
-                    .filter(|p| *p != PathScore::default())
-                    .collect();
-                paths.sort_by(|a, b| hp_sorter(&a.meta.hp[0], &b.meta.hp[0]));
-                m_result_sender
-                    .send(m_graph.take_annotated(
-                        vec![&paths],
-                        vec![coverage],
-                        vec![&ploidy],
-                        &genotyper,
-                    ))
-                    .unwrap();
             }
         }
     }

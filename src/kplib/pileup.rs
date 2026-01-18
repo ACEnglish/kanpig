@@ -219,14 +219,17 @@ impl ReadPileup {
         })
     }
 
-    /*
     /// Create a new ReadPileup with a subset of the read.
-    ///
-    // TODO pub fn trim_read(&self, start, end) -> Self
-    // TODO {
-    // I just have to subset the self.pileups to those within start/end
-    // TODO }
-     */
+    /// Only call this if you're sure that self.spans
+    pub fn trim(&self, start: u64, end: u64) -> ReadPileup
+    {
+        todo!("implement trimming logic")
+    }
+
+    pub fn spans(&self, start: u64, end: u64) -> bool
+    {
+        (self.start <= start) & (end >= self.end)
+    }
 }
 
 impl fmt::Display for ReadPileup {
