@@ -24,10 +24,12 @@ impl CoverageTrack {
         }
     }
 
-    pub fn count_spanning_reads(&self, query_start: u64, query_end: u64) -> u64 {
+    pub fn count_spanning_reads(&self, mut query_start: u64, mut query_end: u64) -> u64 {
+        query_start -= self.buffer;
+        query_end += self.buffer;
         self.intervals
-            .find(query_start - self.buffer, query_end + self.buffer)
-            .filter(|interval| interval.start <= query_start && interval.stop >= query_end)
+            .find(query_start, query_end)
+            .filter(|read| read.start <= query_start && query_end <= read.stop)
             .count() as u64
     }
 }

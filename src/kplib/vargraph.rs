@@ -211,9 +211,9 @@ impl VariantGraph {
         } else {
             // I dislike this.. a lot
             let mut graph = DiGraph::new();
-            let node_indices: Vec::<NodeIndex<_>> = vec![
-                    graph.add_node(VarNode::new_anchor(self.kmer)),
-                    graph.add_node(VarNode::new_anchor(self.kmer))
+            let node_indices: Vec<NodeIndex<_>> = vec![
+                graph.add_node(VarNode::new_anchor(self.kmer)),
+                graph.add_node(VarNode::new_anchor(self.kmer)),
             ];
             *self = VariantGraph {
                 chrom: self.chrom.clone(),
@@ -254,7 +254,9 @@ impl VariantGraph {
                                 &[],
                                 cov,
                                 ploid,
-                                start,
+                                start, // TODO: I think this is the PS - but I should be setting it to
+                                // None here because two variants could be started at same
+                                // spot
                                 i,
                                 genotyper,
                             ));
