@@ -225,7 +225,7 @@ impl ReadPileup {
         let pileups: Vec<_> = self
             .pileups
             .iter()
-            .filter(|p| p.position >= start && p.end <= end)
+            .filter(|p| p.position >= start && p.position <= end) // questionable
             .cloned() // or .cloned() depending on your type
             .collect();
 
@@ -239,7 +239,7 @@ impl ReadPileup {
     }
 
     pub fn spans(&self, start: u64, end: u64) -> bool {
-        (self.start <= start) & (end >= self.end)
+        (self.start <= start) & (end <= self.end)
     }
 }
 
@@ -488,7 +488,8 @@ pub fn pileup_finisher(
     for (read_idx, plup_idxs) in read_pileup_lookup.into_iter() {
         let mut pileups = vec![];
         for p in plup_idxs {
-            pileups.push(filled_plups[plups.len() - p - 1].clone())
+            // Why is this backwards?
+            pileups.push(filled_plups[p].clone()) //filled_plups.len() - p - 1].clone())
         }
         read_pileups[read_idx].pileups = pileups
     }

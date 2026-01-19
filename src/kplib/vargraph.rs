@@ -59,9 +59,8 @@ pub struct VariantGraph {
 impl VariantGraph {
     pub fn new(mut variants: Vec<RecordBuf>, kmer: u8) -> Self {
         if variants.is_empty() {
-            panic!("Cannot create a graph from no variants");
+            panic!("Can't create a graph without variants");
         }
-
         let mut graph = DiGraph::new();
 
         let (chrom, start, end) = VariantGraph::get_region(&variants);
@@ -168,7 +167,7 @@ impl VariantGraph {
 
     /// Creates a subgraph of the records within a boundary
     /// This takes the records away from this graph
-    pub fn make_subgraph(&mut self, start: u64, end: u64) -> VariantGraph {
+    pub fn make_subgraph(&mut self, start: u64, end: u64) -> Option<VariantGraph> {
         let mut take_entries = Vec::new();
 
         // Take entries that fall within the range
@@ -176,7 +175,7 @@ impl VariantGraph {
             if let Some(node) = self.graph.node_weight_mut(*var_idx) {
                 let should_take = if let Some(ref entry) = node.entry {
                     let (entry_start, entry_end) = entry.boundaries();
-                    entry_start >= start && entry_end <= end
+                    start <= entry_start && entry_end <= end
                 } else {
                     // Source/sink node - don't take it
                     false
@@ -190,7 +189,10 @@ impl VariantGraph {
             }
         }
 
-        let take_graph = VariantGraph::new(take_entries, self.kmer);
+        let take_graph = match take_entries.is_empty() {
+            false => Some(VariantGraph::new(take_entries, self.kmer)),
+            true => None,
+        };
 
         // Rebuild self with remaining entries (those not taken)
         // This will skip None entries (source/sink nodes that had None to begin with)
@@ -204,7 +206,24 @@ impl VariantGraph {
             })
             .collect();
 
-        *self = VariantGraph::new(keep_entries, self.kmer);
+        if !keep_entries.is_empty() {
+            *self = VariantGraph::new(keep_entries, self.kmer);
+        } else {
+            // I dislike this.. a lot
+            let mut graph = DiGraph::new();
+            let mut node_indices: Vec::<NodeIndex<_>>> = vec![
+                    graph.add_node(VarNode::new_anchor(self.kmer)),
+                    graph.add_node(VarNode::new_anchor(self.kmer))
+            ];
+            *self = VariantGraph {
+                chrom: self.chrom.clone(),
+                start: self.start,
+                end: self.end,
+                node_indices,
+                graph,
+                kmer: self.kmer,
+            };
+        }
 
         take_graph
     }

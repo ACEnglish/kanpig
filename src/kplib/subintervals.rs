@@ -8,7 +8,7 @@ pub fn find_subintervals(reads: &Vec<ReadPileup>, neighdist: u64) -> Vec<(u64, u
     let mut coords = vec![];
     for read in reads {
         for pileup in &read.pileups {
-            coords.push((pileup.position - neighdist, pileup.position + neighdist));
+            coords.push((pileup.position - neighdist, pileup.end + neighdist));
         }
     }
     let mut cov_track = CoverageTrack::new(Some(coords), 0);

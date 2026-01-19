@@ -39,8 +39,8 @@ fn task_thread(
                 debug!(
                     "Chunk {:?}:{:?}-{:?} w/ {}",
                     m_graph.chrom,
-                    m_graph.start,
-                    m_graph.end,
+                    m_graph.start - m_args.graph.neighdist,
+                    m_graph.end + m_args.graph.neighdist,
                     m_graph.node_indices.len() - 2
                 );
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
@@ -52,15 +52,17 @@ fn task_thread(
                     continue;
                 }
 
-                //let (haps, local_neigh, coverage_track) =
                 let (reads, coverage_track) =
                     m_reads.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
 
+                // debug!("Reads: {:#?}", reads);
                 let subintiv = find_subintervals(&reads, m_args.graph.neighdist);
                 // This is too deep -- need to pull some of this code out
                 for si in subintiv.iter() {
-                    // Just yoink out the variants
-                    let mut subgraph = m_graph.make_subgraph(si.0, si.1);
+                    // Just yoink out the variants, if there are any around this subintv
+                    let Some(mut subgraph) = m_graph.make_subgraph(si.0, si.1) else {
+                        continue;
+                    };
 
                     // Then pull trimmed reads that span the subgraph
                     let mut m_haps: Vec<Haplotype> = vec![];
@@ -93,6 +95,7 @@ fn task_thread(
                     let should_build = !haps.is_empty()
                         && !m_args.graph.one_to_one
                         && subgraph.node_indices.len() <= (m_args.graph.maxnodes + 2);
+
                     subgraph.build(should_build);
                     // I kinda want to push this into a VariantGraph.apply_haplotypes
                     // its reused I believe the same in the other commands

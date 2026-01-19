@@ -11,7 +11,7 @@ pub struct Haplotype {
     pub size: i64,
     pub n: u64, // Number of parts
     pub kfeat: Vec<f32>,
-    pub parts: Vec<(i64, Vec<f32>)>,
+    pub parts: Vec<(i64, Vec<f32>)>, // TODO: I think this is doing something inefficient
     pub partial: usize,
     pub meta: SequenceMeta,
 }
@@ -44,10 +44,11 @@ impl Haplotype {
     pub fn from_readpileup(pileup: ReadPileup, kmer: u8) -> Haplotype {
         let mut ret = Haplotype::blank(kmer, pileup.meta.clone());
         for p in pileup.pileups.iter() {
+            // This is gross
             ret.size += p.size;
             ret.n += 1;
             let other_kfeat = seq_to_kmer(
-                &p.sequence
+                p.sequence
                     .as_ref()
                     .expect("You didn't fill in pileup sequence"),
                 kmer,
@@ -57,6 +58,7 @@ impl Haplotype {
                 .iter_mut()
                 .zip(other_kfeat.iter())
                 .for_each(|(x, y)| *x += y);
+            ret.parts.push((p.size, other_kfeat));
         }
         ret
     }

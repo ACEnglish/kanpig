@@ -104,8 +104,6 @@ impl ReadParser for BamParser {
                     seq_meta_template.clone(),
                 );
 
-                // Kind of weird we yoink all the pileups and then place them back later
-                // But I guess that's fine
                 for m_var in read.pileups.drain(..) {
                     if m_var.position >= window_start && m_var.position <= window_end {
                         let (p_idx, _) = p_variants.insert_full(m_var);
