@@ -211,7 +211,7 @@ impl VariantGraph {
         } else {
             // I dislike this.. a lot
             let mut graph = DiGraph::new();
-            let mut node_indices: Vec::<NodeIndex<_>>> = vec![
+            let node_indices: Vec::<NodeIndex<_>> = vec![
                     graph.add_node(VarNode::new_anchor(self.kmer)),
                     graph.add_node(VarNode::new_anchor(self.kmer))
             ];
