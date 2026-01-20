@@ -13,6 +13,7 @@ use crate::{
     kplib::{
         build_region_tree,
         cluster::collapse_haplotypes,
+        find_subintervals,
         germ_genotyper::Genotyper,
         open_reads, open_writer_thread,
         polycluster::{self, ToPolyCluParams},
@@ -74,62 +75,78 @@ fn task_thread(
                     .collect();
                 let ploidy: Vec<&Ploidy> = ploidy_owned.iter().collect();
 
-                // TODO:
-                let pileup_data = collect_read_data(&mut reads, &m_graph);
+                let mut pileup_data = collect_read_data(&mut reads, &m_graph);
 
-                let n_haps = pileup_data.haplos.len();
-                if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
-                    debug!(
-                        "Region skipped extreme coverage {}x @ {}:{}-{}",
-                        n_haps, m_graph.chrom, m_graph.start, m_graph.end
+                let subintv = find_subintervals(&pileup_data.reads, m_args.graph.neighdist);
+                for (sub_start, sub_end) in subintv.into_iter() {
+                    let Some(mut subgraph) = m_graph.make_subgraph(sub_start, sub_end) else {
+                        continue;
+                    };
+                    // This is the block we're reusing in the different parts
+                    let (haplos, coverages, ref_coverage) =
+                        pileup_data.subset_to_interval(sub_start, sub_end, m_args.graph.kmer);
+
+                    let n_haps = haplos.len();
+                    if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
+                        debug!(
+                            "Region skipped extreme coverage {}x @ {}:{}-{}",
+                            n_haps, subgraph.chrom, sub_start, sub_end
+                        );
+                        m_result_sender
+                            .send(subgraph.take_annotated(
+                                vec![&[], &[], &[]],
+                                coverages.to_vec(),
+                                &ploidy,
+                                &germ_genotyper,
+                            ))
+                            .unwrap();
+                        continue;
+                    }
+
+                    let cluster_result = polycluster::perform_clustering(&haplos, &pclu_params, 3);
+
+                    let read_counts = polycluster::count_reads(
+                        cluster_result.k,
+                        &ref_coverage,
+                        &cluster_result.assignments,
+                        &haplos,
                     );
+
+                    debug!("Read Counts:\n {:?}", read_counts);
+                    let gts = trio_genotyper(&read_counts, &cluster_result.quality);
+
+                    let clustered_haps = collapse_haplotypes(cluster_result, haplos, gts);
+
+                    let should_build = !clustered_haps.is_empty()
+                        && !m_args.graph.one_to_one
+                        && subgraph.node_indices.len() <= (m_args.graph.maxnodes + 2);
+                    subgraph.build(should_build);
+
+                    let paths: Vec<PathScore> = clustered_haps
+                        .into_iter()
+                        .map(|h| subgraph.apply_haplotype(&h, &m_args.graph))
+                        .filter(|p| *p != PathScore::default())
+                        .collect();
+
+                    let separated_paths = polycluster::separate_paths_by_sample(paths, 3);
+
                     m_result_sender
-                        .send(m_graph.take_annotated(
-                            vec![&[], &[], &[]],
-                            pileup_data.coverages.to_vec(),
-                            ploidy,
+                        .send(subgraph.take_annotated(
+                            separated_paths.iter().map(|bin| bin.as_slice()).collect(),
+                            coverages.to_vec(),
+                            &ploidy,
                             &germ_genotyper,
                         ))
                         .unwrap();
-                    continue;
                 }
 
-                let cluster_result =
-                    polycluster::perform_clustering(&pileup_data.haplos, &pclu_params, 3);
-
-                let read_counts = polycluster::count_reads(
-                    cluster_result.k,
-                    &pileup_data.ref_coverage,
-                    &cluster_result.assignments,
-                    &pileup_data.haplos,
-                );
-
-                debug!("Read Counts:\n {:?}", read_counts);
-                let gts = trio_genotyper(&read_counts, &cluster_result.quality);
-
-                let clustered_haps = collapse_haplotypes(cluster_result, pileup_data.haplos, gts);
-
-                let should_build = !clustered_haps.is_empty()
-                    && !m_args.graph.one_to_one
-                    && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
-                m_graph.build(should_build);
-
-                let paths: Vec<PathScore> = clustered_haps
-                    .into_iter()
-                    .map(|h| m_graph.apply_haplotype(&h, &m_args.graph))
-                    .filter(|p| *p != PathScore::default())
-                    .collect();
-
-                let separated_paths = polycluster::separate_paths_by_sample(paths, 3);
-
-                m_result_sender
-                    .send(m_graph.take_annotated(
-                        separated_paths.iter().map(|bin| bin.as_slice()).collect(),
-                        pileup_data.coverages.to_vec(),
-                        ploidy,
-                        &germ_genotyper,
-                    ))
-                    .unwrap();
+                // Remaining refcovered
+                let remaining_variants =
+                    m_graph.take_refcovered(pileup_data.coverages, &ploidy, &germ_genotyper);
+                // Guard because I don't know what happens to variant-less graphs
+                if remaining_variants.is_some() {
+                    m_result_sender.send(remaining_variants).unwrap();
+                }
             }
         }
     }

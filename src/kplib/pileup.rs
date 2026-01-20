@@ -467,7 +467,7 @@ impl std::fmt::Debug for PileupVariant {
 ///
 pub fn pileup_finisher(
     chrom: &str,
-    read_pileups: &mut Vec<ReadPileup>,
+    read_pileups: &mut [ReadPileup],
     read_pileup_lookup: ReadsMap, // read_index_in_vecplup: [index to pileup variant,]
     mut plups: PileupSet,
     reference: &faidx::Reader,

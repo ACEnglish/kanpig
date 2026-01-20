@@ -141,7 +141,7 @@ impl VariantGraph {
         &mut self,
         paths: Vec<&[PathScore]>,
         coverages: Vec<u64>,
-        ploidy: Vec<&Ploidy>,
+        ploidy: &Vec<&Ploidy>,
         genotyper: &Genotyper,
     ) -> ChannelOutput {
         self.node_indices
@@ -231,7 +231,7 @@ impl VariantGraph {
     pub fn take_refcovered(
         &mut self,
         coverages: Vec<CoverageTrack>,
-        ploidy: Vec<&Ploidy>,
+        ploidy: &Vec<&Ploidy>,
         genotyper: &Genotyper,
     ) -> ChannelOutput {
         self.node_indices

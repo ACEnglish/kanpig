@@ -47,7 +47,12 @@ fn task_thread(
                 // For zero, we don't have to waste time going into the bam
                 if ploidy == Ploidy::Zero {
                     m_result_sender
-                        .send(m_graph.take_annotated(vec![&[]], vec![0], vec![&ploidy], &genotyper))
+                        .send(m_graph.take_annotated(
+                            vec![&[]],
+                            vec![0],
+                            &vec![&ploidy],
+                            &genotyper,
+                        ))
                         .unwrap();
                     continue;
                 }
@@ -65,6 +70,8 @@ fn task_thread(
                     };
 
                     // Then pull trimmed reads that span the subgraph
+                    // This is abstracted out in readparsers::ReadData, need to make this
+                    // consistent to the other callers DRY
                     let mut m_haps: Vec<Haplotype> = vec![];
                     let mut coverage = 0;
 
@@ -109,14 +116,14 @@ fn task_thread(
                         .send(subgraph.take_annotated(
                             vec![&paths],
                             vec![coverage],
-                            vec![&ploidy],
+                            &vec![&ploidy],
                             &genotyper,
                         ))
                         .unwrap();
                 }
                 // Annotate remaining_variants with coverage_track
                 let remaining_variants =
-                    m_graph.take_refcovered(vec![coverage_track], vec![&ploidy], &genotyper);
+                    m_graph.take_refcovered(vec![coverage_track], &vec![&ploidy], &genotyper);
                 // Guard because I don't know what happens to variant-less graphs
                 if remaining_variants.is_some() {
                     m_result_sender.send(remaining_variants).unwrap();

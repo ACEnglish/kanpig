@@ -1,6 +1,6 @@
 use crate::kplib::{
     pileup::{pileup_finisher, PileupSet, ReadPileup, ReadsMap},
-    CoverageTrack, GraphParams, SequenceMeta, VariantGraph,
+    CoverageTrack, GraphParams, Haplotype, SequenceMeta, VariantGraph,
 };
 use rust_htslib::{
     bam::ext::BamRecordExtensions,
@@ -111,6 +111,7 @@ impl ReadParser for BamParser {
                     }
                 }
 
+                reads.push(read);
                 qname += 1;
             }
         }
@@ -290,11 +291,50 @@ pub fn open_reads(
     }
 }
 
-// Data structure to hold pileup information from multiple samples
+// Data structure to hold pileup information
+// This needs helper methods to subset read information to subintervals so that we can
+// create the same information that we need in each of the modes
+// So 1. refactor germ mode so it uses these
+// Then 2. I won't need to work so hard in trio/mosaic to lift that code over
+// I still don't know where that coverge vector is going to come into play
+// Its very important for trio/mosaic
 #[derive(Clone)]
 pub struct ReadData {
-    pub reads: Vec<ReadPileup>, // TODO: These should be ReadPileup
+    pub reads: Vec<ReadPileup>,
     pub coverages: Vec<CoverageTrack>,
+}
+
+impl ReadData {
+    ///
+    /// Do read trimming and conversion to haplotypes as well as making the
+    /// classic coverage vectors. Note that this can only be called on reads
+    /// with sequence metadata holding info on a single sample.
+    ///
+    pub fn subset_to_interval(
+        &mut self,
+        start: u64,
+        end: u64,
+        kmer: u8,
+    ) -> (Vec<Haplotype>, Vec<u64>, Vec<usize>) {
+        let mut m_haps: Vec<Haplotype> = vec![];
+        let mut m_coverage: Vec<u64> = vec![0; self.coverages.len()];
+        let mut m_ref_coverage: Vec<usize> = vec![0; self.coverages.len()];
+
+        for read in self.reads.iter() {
+            if !read.spans(start, end) {
+                continue;
+            }
+            let sample_idx = read.meta.samples_flag.trailing_zeros() as usize;
+            m_coverage[sample_idx] += 1;
+            if !read.pileups.is_empty() {
+                m_haps.push(Haplotype::from_readpileup(read.trim(start, end), kmer));
+            } else {
+                m_ref_coverage[sample_idx] += 1
+            }
+        }
+
+        (m_haps, m_coverage, m_ref_coverage)
+    }
 }
 
 pub fn collect_read_data(
