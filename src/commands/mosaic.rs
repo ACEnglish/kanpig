@@ -45,6 +45,69 @@ fn separate_paths_by_vaf(
     (germ, soma)
 }
 
+///
+/// After clustering the haplotypes, it is possible for a variant to be shared between multiple
+/// paths. Since the output VCFs are biallelic, we must consolidate the e.g. AD_alt with the read
+/// support from these low VAF haplotypes.
+/// This requires checking each variant to see if it was used by any of the somatic paths before
+/// adding in the somatic paths' coverage. 
+/// If this process updates any annotations, we then need to recalculate the genotype since its
+/// possible that the new VAF could make the SV change from e.g heterozygous to homozygous.
+/// This works on a set of annotations, the ChannelOutput from take_annotated, and the
+/// somatic_paths, and the germ_genotyper.
+///
+fn update_somatic(mut send_back: ChannelOutput, somatic_paths: Vec<Vec<PathScore>>, germ_genotyper: Genotyper) {
+    if let Some(ref mut send_back) = send_back {
+        for (_record, annos) in &mut *send_back {
+            // Sample columns
+            for (sample_idx, (anno, sample_paths)) in
+                annos.iter_mut().zip(&somatic_paths).enumerate()
+            {
+                let mut any_update = false;
+                // Check all paths this sample had reads in
+                for path in sample_paths {
+                    if path.path.contains(&anno.var_idx) {
+                        // This sample will need to be updated
+                        any_update = true;
+                        if !anno.gt.contains("1") {
+                            anno.gq = gts.quality_score.round() as i32;
+                        }
+                        anno.rnames.extend(path.meta.rnames.clone());
+                        anno.filt |= FiltFlags::SOMATIC;
+
+                        // TODO: wrong for haploid regions
+                        *anno.ad[1].get_or_insert(0) +=
+                            path.meta.coverage[sample_idx] as i32;
+                        // Logic here is that the germline reference allele
+                        // coverage is inflated during GenotypeAnno calculation
+                        // so we're moving it to the alternate as part of the
+                        // somatic support
+                        *anno.ad[0].get_or_insert(0) = anno.ad[0]
+                            .unwrap_or(0)
+                            .saturating_sub(path.meta.coverage[sample_idx] as i32);
+                    }
+                }
+
+                if any_update {
+                    // Redo the genotyping with the new coverage
+                    if let (Some(rcov), Some(acov)) = (anno.ad[0], anno.ad[1]) {
+                        let ngt = germ_genotyper.genotype(rcov as u64, 0, acov as u64);
+                        anno.sq = ngt.sq as i32;
+                        anno.gq = ngt.gq.round() as i32;
+                        anno.gt_state = ngt.state;
+                        anno.gt = match anno.gt_state {
+                            GTstate::Ref => "0/0".to_string(),
+                            GTstate::Het => "0/1".to_string(),
+                            GTstate::Hom => "1/1".to_string(),
+                            GTstate::Non => "./.".to_string(),
+                        };
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn task_thread(
     m_args: MosaicCommand,
     m_receiver: Receiver<ChannelInput>,
@@ -190,58 +253,10 @@ fn task_thread(
                     vec![&ploidy; n_samples],
                     &germ_genotyper,
                 );
+                
 
-                // Before updating the somatic in place
-                if let Some(ref mut send_back) = send_back {
-                    // VCF entry
-                    for (_record, annos) in &mut *send_back {
-                        // Sample columns
-                        for (sample_idx, (anno, sample_paths)) in
-                            annos.iter_mut().zip(&somatic_paths).enumerate()
-                        {
-                            let mut any_update = false;
-                            // Check all paths this sample had reads in
-                            for path in sample_paths {
-                                if path.path.contains(&anno.var_idx) {
-                                    // This sample will need to be updated
-                                    any_update = true;
-                                    if !anno.gt.contains("1") {
-                                        anno.gq = gts.quality_score.round() as i32;
-                                    }
-                                    anno.rnames.extend(path.meta.rnames.clone());
-                                    anno.filt |= FiltFlags::SOMATIC;
+                update_somatic(send_back, somatic_paths, germ_genotyper);
 
-                                    // TODO: wrong for haploid regions
-                                    *anno.ad[1].get_or_insert(0) +=
-                                        path.meta.coverage[sample_idx] as i32;
-                                    // Logic here is that the germline reference allele
-                                    // coverage is inflated during GenotypeAnno calculation
-                                    // so we're moving it to the alternate as part of the
-                                    // somatic support
-                                    *anno.ad[0].get_or_insert(0) = anno.ad[0]
-                                        .unwrap_or(0)
-                                        .saturating_sub(path.meta.coverage[sample_idx] as i32);
-                                }
-                            }
-
-                            if any_update {
-                                // Redo the genotyping with the new coverage
-                                if let (Some(rcov), Some(acov)) = (anno.ad[0], anno.ad[1]) {
-                                    let ngt = germ_genotyper.genotype(rcov as u64, 0, acov as u64);
-                                    anno.sq = ngt.sq as i32;
-                                    anno.gq = ngt.gq.round() as i32;
-                                    anno.gt_state = ngt.state;
-                                    anno.gt = match anno.gt_state {
-                                        GTstate::Ref => "0/0".to_string(),
-                                        GTstate::Het => "0/1".to_string(),
-                                        GTstate::Hom => "1/1".to_string(),
-                                        GTstate::Non => "./.".to_string(),
-                                    };
-                                }
-                            }
-                        }
-                    }
-                }
 
                 m_result_sender.send(send_back).unwrap();
             }
@@ -249,6 +264,7 @@ fn task_thread(
     }
     // This should give a result
 }
+
 
 #[derive(Parser, Debug, Clone)]
 pub struct MosaicCommand {
