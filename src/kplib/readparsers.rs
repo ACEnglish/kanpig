@@ -117,6 +117,7 @@ impl ReadParser for BamParser {
                     }
                 }
 
+                reads.push(read);
                 qname += 1;
             }
         }
