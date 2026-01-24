@@ -24,3 +24,4 @@ mkdir -p $OD
 source $TESTSRC/giab_v1.1/run_test.sh
 source $TESTSRC/plat/run_test.sh
 source $TESTSRC/mims/run_test.sh
+source $TESTSRC/pybind/run_test.sh
