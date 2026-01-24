@@ -21,4 +21,4 @@ bcftools merge -m none -O z \
         -o ${OD}/plat/default_merged.vcf.gz
 tabix ${OD}/plat/default_merged.vcf.gz
 
-python ${TESTSRC}/calc_trio_perf.py ${OD}/plat/default_merged.vcf.gz ${TESTSRC}/giab_v1.1/include.bed
+python ${TESTSRC}/plat/calc_perf.py ${OD}/plat/default_merged.vcf.gz ${TESTSRC}/plat/include.bed

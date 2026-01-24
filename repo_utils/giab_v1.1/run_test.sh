@@ -17,7 +17,7 @@ bcftools merge -m none -O z \
         -o ${OD}/giab_v1.1/default_merged.vcf.gz
 tabix ${OD}/giab_v1.1/default_merged.vcf.gz
 
-python ${TESTSRC}/calc_perf.py ${OD}/giab_v1.1/default_merged.vcf.gz ${TESTSRC}/giab_v1.1/include.bed
+python ${TESTSRC}/giab_v1.1/calc_perf.py ${OD}/giab_v1.1/default_merged.vcf.gz ${TESTSRC}/giab_v1.1/include.bed
 
 echo '### Test BAM to PLUP ###'
 $kanpig \
@@ -46,4 +46,4 @@ bcftools merge -m none -O z \
         -o ${OD}/giab_v1.1/plup_merged.vcf.gz
 tabix ${OD}/giab_v1.1/plup_merged.vcf.gz
 
-python ${TESTSRC}/calc_perf.py ${OD}/giab_v1.1/plup_merged.vcf.gz ${TESTSRC}/giab_v1.1/include.bed
+python ${TESTSRC}/giab_v1.1/calc_perf.py ${OD}/giab_v1.1/plup_merged.vcf.gz ${TESTSRC}/giab_v1.1/include.bed

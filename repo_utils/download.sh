@@ -11,7 +11,10 @@ bash giab_v1.1/download.sh
 
 # Platinum Pedigres
 
+bash plat/download.sh
 
 # MIMS
+
+bash mims/download.sh
 
 
