@@ -4,16 +4,16 @@
 cd "$( dirname "${BASH_SOURCE[0]}" )"/../
 
 GITHASH=$(git rev-parse --short HEAD)
-echo "### Testing kanpig commit ${GITHASH}"
+DATE=$(date +%Y%m%d_%H%M%S)
+echo "### Testing kanpig commit ${GITHASH} on ${DATE}"
 
 OD=test_results
 TESTSRC=repo_utils/
 REF=$TESTSRC/GRCh38_chr20.fa
 kanpig="cargo run --release -- "
 
-LOGDIR=${TESTSRC}/history/${GITHASH}
+LOGDIR=${TESTSRC}/history/${DATE}_${GITHASH}
 mkdir -p ${LOGDIR}
-rm ${LOGDIR}/*
 exec > >(tee -a ${LOGDIR}/main.out)
 exec 2> >(tee -a ${LOGDIR}/main.err >&2)
 

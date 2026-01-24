@@ -1,6 +1,6 @@
 mkdir -p ${OD}/plat/
 
-echo '### Test trios ###'
+echo '### Test trio ###'
 
 $kanpig \
     trio \

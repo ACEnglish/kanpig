@@ -1,11 +1,16 @@
 mkdir -p ${OD}/mims/
 
-echo '### Test trios ###'
+echo '### Test mosaic ###'
 
 $kanpig \
     mosaic \
     --bed ${TESTSRC}/mims/include.bed \
-    --reads ${TESTSRC}/mims/HapMap.cram \
+    --reads ${TESTSRC}/mims/SMAFIKCF6M5Z.cram \
+    --sample samp0 \
+    --reads ${TESTSRC}/mims/SMAFIOYCBUCR.cram \
+    --sample samp1 \
+    --reads ${TESTSRC}/mims/SMAFIR3J8UVK.cram \
+    --sample samp2 \
     --input ${TESTSRC}/mims/baseline.vcf.gz \
     --threads 4 \
     --reference ${REF} \
