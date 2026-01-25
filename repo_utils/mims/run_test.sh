@@ -1,27 +1,28 @@
-mkdir -p ${OD}/mims/
+OD=$1
+SRC=$2
 
 echo '### Test mosaic ###'
 
 $kanpig \
     mosaic \
-    --bed ${TESTSRC}/mims/include.bed \
-    --reads ${TESTSRC}/mims/SMAFIKCF6M5Z.cram \
+    --bed ${SRC}/include.bed \
+    --reads ${SRC}/SMAFIKCF6M5Z.cram \
     --sample samp0 \
-    --reads ${TESTSRC}/mims/SMAFIOYCBUCR.cram \
+    --reads ${SRC}/SMAFIOYCBUCR.cram \
     --sample samp1 \
-    --reads ${TESTSRC}/mims/SMAFIR3J8UVK.cram \
+    --reads ${SRC}/SMAFIR3J8UVK.cram \
     --sample samp2 \
-    --input ${TESTSRC}/mims/baseline.vcf.gz \
+    --input ${SRC}/baseline.vcf.gz \
     --threads 4 \
     --reference ${REF} \
-    | bcftools sort  -O z -o ${OD}/mims/default_output.vcf.gz
+    | bcftools sort  -O z -o ${OD}/default_output.vcf.gz
 
-tabix ${OD}/mims/default_output.vcf.gz
+tabix ${OD}/default_output.vcf.gz
 
 bcftools merge -m none -O z \
-        ${TESTSRC}/mims/baseline.vcf.gz \
-        ${OD}/mims/default_output.vcf.gz \
-        -o ${OD}/mims/default_merged.vcf.gz
-tabix ${OD}/mims/default_merged.vcf.gz
+        ${SRC}/baseline.vcf.gz \
+        ${OD}/default_output.vcf.gz \
+        -o ${OD}/default_merged.vcf.gz
+tabix ${OD}/default_merged.vcf.gz
 
-python ${TESTSRC}/mims/calc_perf.py ${OD}/mims/default_merged.vcf.gz ${TESTSRC}/mims/include.bed
+python ${SRC}/calc_perf.py ${OD}/default_merged.vcf.gz ${SRC}/include.bed
