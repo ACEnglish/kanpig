@@ -3,7 +3,7 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use std::{cmp::Ordering, collections::BinaryHeap};
 
-use crate::kplib::{Haplotype, KDParams, PathScore, VarNode};
+use crate::kplib::{vargraph::VarNode, GraphParams, Haplotype, PathScore};
 
 #[derive(Clone, Eq)]
 pub struct PathNodeState {
@@ -39,10 +39,14 @@ impl PartialEq for PathNodeState {
 pub fn brute_force_find_path(
     graph: &DiGraph<VarNode, ()>,
     target: &Haplotype,
-    params: &KDParams,
+    params: &GraphParams,
 ) -> PathScore {
     let mut npaths = 0;
-    let mut best_path = PathScore::default();
+    let mut best_path = PathScore {
+        meta: target.meta.clone(),
+        ..Default::default()
+    };
+
     let snk_node = NodeIndex::new(graph.node_count() - 1);
     let partial_haps = target.partial_haplotypes(params.kmer, params.fnmax, params.pileupmax);
 
@@ -95,7 +99,7 @@ pub fn brute_force_find_path(
 pub fn get_one_to_one(
     graph: &DiGraph<VarNode, ()>,
     target: &Haplotype,
-    params: &KDParams,
+    params: &GraphParams,
 ) -> Vec<PathScore> {
     graph
         .node_indices()

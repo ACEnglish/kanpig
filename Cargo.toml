@@ -1,17 +1,17 @@
 [package]
 name = "kanpig"
-version = "1.1.0"
+version = "2.0.0-dev"
 edition = "2021"
 
 [dependencies]
 bitflags = { version = "2.6.0" }
+chrono = "0.4.42"
 clap = { version = "4.0", features = ["derive"] }
-crossbeam-channel = { version = "0.5.13" }
+crossbeam-channel = { version = "0.5.15" }
 indexmap = { version = "2.7.0" }
 indicatif = { version = "0.17.9" }
 itertools = { version = "0.13.0" }
 kmedoids = { version = "0.5.3" }
-lazy_static = { version = "1.5.0" }
 log = { version = "0.4", features = ["std", "serde"] }
 ndarray = "0.16.1"
 noodles-vcf = { version = "0.68.0" }
@@ -19,11 +19,26 @@ ordered-float = { version = "4.0", default-features = false }
 page_size = { version = "0.6.0" }
 petgraph = { version = "0.6.5" }
 pretty_env_logger = { version = "0.5.0" }
+pyo3 = { version = "0.15.1", features = ["extension-module"], optional = true}
 rand = "0.8.5"
-rust-htslib = { version = "0.46.0" }
+rust-htslib = { version = "0.46.0", features=["curl", "static", "s3", "gcs"]}
 rust-lapper = { version = "1.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
+statrs = { version = "0.18.0" }
+url = { version = "2.5.7" }
+
+[lib]
+name = "kanpig"
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "kanpig"
+path = "src/main.rs"
+
+[features]
+default = []
+python = ["pyo3/extension-module"]
 
 [profile.release]
 opt-level = 3

@@ -1,0 +1,49 @@
+2025-11-15 11:55:32,346 [INFO] Parsing VCF
+2025-11-15 11:55:56,131 [INFO] Full Genotype Accuracy:
+    state  False    True       Acc
+    Ogt                           
+    HET     4340   13776  0.760433
+    HOM      685    4163  0.858705
+    REF     4950  253855  0.980874
+    All     9975  271794  0.964599
+2025-11-15 11:55:56,165 [INFO] Full GT Confusion Matrix:
+    Kgt    HET   HOM     REF
+    Ogt                     
+    HET  13776   273    4067
+    HOM    252  4163     433
+    REF   4418   532  253855
+2025-11-15 11:55:56,249 [INFO] Leaving out 0.1 (N=28177) genotypes
+2025-11-15 11:55:56,257 [INFO] Leaveout Genotype Accuracy:
+    state  False   True       Acc
+    Ogt                          
+    HET      442   1370  0.756071
+    HOM       63    422  0.870103
+    REF      498  25382  0.980757
+    All     1003  27174  0.964404
+2025-11-15 11:55:56,264 [INFO] Leaveout GT Confusion Matrix:
+    Kgt   HET  HOM    REF
+    Ogt                  
+    HET  1370   26    416
+    HOM    19  422     44
+    REF   444   54  25382
+2025-11-15 11:55:56,374 [INFO] Using 238514 sites for parameter estimation
+2025-11-15 11:55:56,374 [INFO] Genotype distribution:
+2025-11-15 11:55:56,377 [INFO]   {0: 222689, 1: 12187, 2: 3638}
+2025-11-15 11:55:56,409 [INFO] Initial parameter estimates:
+2025-11-15 11:55:56,410 [INFO]   GT 0: mu=0.000, nu=12.7, n=222689
+2025-11-15 11:55:56,410 [INFO]   GT 1: mu=0.494, nu=24.4, n=12187
+2025-11-15 11:55:56,410 [INFO]   GT 2: mu=0.997, nu=8.1, n=3638
+2025-11-15 11:55:56,416 [INFO] Optimizing parameters...
+2025-11-15 11:56:06,588 [INFO] Fitted parameters:
+2025-11-15 11:56:06,588 [INFO]   Mixture fractions: [0.934, 0.051, 0.015]
+2025-11-15 11:56:06,588 [INFO]   Means (mu):        [0.0001, 0.4941, 0.9973]
+2025-11-15 11:56:06,588 [INFO]   Precisions (nu):   [12.7, 24.4, 8.1]
+2025-11-15 11:56:06,588 [INFO]   Log-likelihood:    -318946.1
+2025-11-15 11:56:06,590 [INFO] Calibrating GQs
+2025-11-15 11:56:21,453 [INFO] Regenotyping with config
+2025-11-15 11:56:38,741 [INFO] Saving gqconfig
+2025-11-15 11:56:39,904 [INFO] Making original plots
+2025-11-15 11:56:46,691 [INFO] Making calibrated plots
+2025-11-15 11:56:55,579 [INFO] Making leaveout original plots
+2025-11-15 11:57:02,153 [INFO] Making leaveout calibrated plots
+2025-11-15 11:57:10,086 [INFO] Finished

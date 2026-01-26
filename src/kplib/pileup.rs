@@ -1,5 +1,5 @@
 /// A pileup variant that's hashable / comparable
-use crate::kplib::Svtype;
+use crate::kplib::{vcftraits::Svtype, Haplotype, ReadParser, Variants};
 use rust_htslib::{bam::ext::BamRecordExtensions, bam::record::Aux, bam::Record};
 use std::{
     fmt,
@@ -14,6 +14,7 @@ pub struct ReadPileup {
     pub pileups: Vec<PileupVariant>,
     pub ps: Option<u32>,
     pub hp: Option<u8>,
+    pub rname: Option<String>,
 }
 
 /// A struct representing a read and its pileups
@@ -45,10 +46,11 @@ impl ReadPileup {
     pub fn new(chrom: String, record: &Record, sizemin: u32, sizemax: u32) -> Self {
         let start = record.reference_start();
         let end = record.reference_end();
+        let rname = Some(String::from_utf8_lossy(record.qname()).into_owned());
 
         let mut pileups = Vec::<PileupVariant>::new();
         let mut read_offset = 0;
-        let mut align_offset = start as usize - 1;
+        let mut align_offset = (start as usize).saturating_sub(1);
 
         for cigar in record.cigar().iter() {
             match cigar.char() {
@@ -128,6 +130,7 @@ impl ReadPileup {
             pileups,
             ps,
             hp,
+            rname,
         }
     }
 
@@ -198,6 +201,7 @@ impl ReadPileup {
             pileups,
             ps,
             hp,
+            rname: None,
         })
     }
 }
@@ -397,5 +401,35 @@ impl std::fmt::Debug for PileupVariant {
             .field("sequence", &seq)
             // Exclude kfeat from the debug output
             .finish()
+    }
+}
+
+// Data structure to hold pileup information from multiple samples
+#[derive(Clone)]
+pub struct PileupData {
+    pub haplos: Vec<Haplotype>,
+    pub ref_coverage: Vec<usize>,
+    pub coverages: Vec<u64>,
+}
+
+// Collect pileup data from all samples
+pub fn collect_pileup_data(
+    samples: &mut Vec<Box<dyn ReadParser>>,
+    m_graph: &Variants,
+) -> PileupData {
+    let mut ref_coverage = Vec::<usize>::with_capacity(samples.len());
+    let mut coverages = Vec::<u64>::with_capacity(samples.len());
+    let mut haplos = Vec::<Haplotype>::new();
+    for samp in samples.iter_mut() {
+        let (haps, cov) = samp.find_pileups(&m_graph.chrom, m_graph.start, m_graph.end);
+        ref_coverage.push(cov as usize - haps.len());
+        coverages.push(cov);
+        haplos.extend(haps);
+    }
+
+    PileupData {
+        haplos,
+        ref_coverage,
+        coverages,
     }
 }

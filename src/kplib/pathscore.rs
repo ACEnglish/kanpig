@@ -1,4 +1,4 @@
-use crate::kplib::{metrics, Haplotype, KDParams, VarNode};
+use crate::kplib::{metrics, vargraph::VarNode, GraphParams, Haplotype, HaplotypeMeta};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::cmp::Ordering;
 
@@ -8,11 +8,9 @@ pub struct PathScore {
     #[allow(dead_code)]
     pub sizesim: f32,
     pub seqsim: f32,
-    pub coverage: Option<u64>,
     pub path: Vec<NodeIndex>,
     pub full_target: bool, // Does this path use partial
-    pub ps: Option<u32>,
-    pub hp: Option<u8>,
+    pub meta: HaplotypeMeta,
 }
 
 impl Eq for PathScore {}
@@ -44,10 +42,8 @@ impl Default for PathScore {
             path: vec![],
             sizesim: 0.0,
             seqsim: 0.0,
-            coverage: None,
             full_target: false,
-            ps: None,
-            hp: None,
+            meta: HaplotypeMeta::default(),
         }
     }
 }
@@ -58,11 +54,14 @@ impl PathScore {
         path: Vec<NodeIndex>,
         path_size: i64,
         targets: &[Haplotype],
-        params: &KDParams,
+        params: &GraphParams,
         target: &Haplotype,
     ) -> Self {
         let mut path_k: Option<Vec<f32>> = None;
-        let mut best_path = PathScore::default();
+        let mut best_path = PathScore {
+            meta: target.meta.clone(),
+            ..Default::default()
+        };
         // Return the partials in order from all to least
         for hap_parts in targets {
             if path_size.signum() != hap_parts.size.signum() {
@@ -115,10 +114,8 @@ impl PathScore {
                     path: path.clone(),
                     sizesim,
                     seqsim,
-                    coverage: None,
                     full_target: hap_parts.partial == 0,
-                    ps: target.ps,
-                    hp: target.hp,
+                    meta: target.meta.clone(),
                 };
             }
         }

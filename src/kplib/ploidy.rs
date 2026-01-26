@@ -1,5 +1,5 @@
 use crate::kplib::cluster::{diploid_haplotypes, haploid_haplotypes};
-use crate::kplib::{BedParser, Haplotype, KDParams};
+use crate::kplib::{BedParser, GraphParams, Haplotype};
 use rust_lapper::{Interval, Lapper};
 use std::{collections::HashMap, str::FromStr};
 
@@ -35,15 +35,20 @@ impl Ploidy {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn cluster(
         &self,
         haps: Vec<Haplotype>,
         coverage: u64,
-        params: &KDParams,
+        sample_idx: usize,
+        hps_weight: f32,
+        hapsim: f32,
+        ab: f32,
+        params: &GraphParams,
     ) -> Vec<Haplotype> {
         match self {
-            Ploidy::Haploid => haploid_haplotypes(haps, coverage, params),
-            _ => diploid_haplotypes(haps, coverage, params),
+            Ploidy::Haploid => haploid_haplotypes(haps, coverage, sample_idx, params),
+            _ => diploid_haplotypes(haps, coverage, sample_idx, hps_weight, hapsim, ab, params),
             // and then eventually this could allow a --ploidy flag to branch to
             // polyploid_haplotypes
         }

@@ -1,8 +1,11 @@
-use crate::kplib::{GenotypeAnno, KDParams, KdpVcf, Ploidy, Regions};
+use crate::kplib::{vcftraits::KdpVcf, ChannelOutput, GraphParams, Regions};
 use crossbeam_channel::Sender;
-use noodles_vcf::{self as vcf, variant::RecordBuf};
-use petgraph::graph::NodeIndex;
-use std::io::BufRead;
+use noodles_vcf::{
+    self as vcf,
+    variant::{record_buf::AlternateBases, Record, RecordBuf},
+};
+use rust_htslib::faidx;
+use std::{io::BufRead, path::PathBuf};
 
 /// Takes a vcf and filtering parameters to create in iterable which will
 /// return chunks of variants in the same neighborhood
@@ -10,7 +13,8 @@ pub struct VcfChunker<R: BufRead> {
     pub m_vcf: vcf::io::Reader<R>,
     pub m_header: vcf::Header,
     regions: Regions,
-    params: KDParams,
+    reference: faidx::Reader,
+    params: GraphParams,
     // Variables for tracking chunks
     cur_chrom: String,
     cur_end: u64,
@@ -21,7 +25,7 @@ pub struct VcfChunker<R: BufRead> {
     pub chunk_count: u64,
     pub call_count: u64,
     pub skip_count: u64,
-    result_sender: Sender<Option<Vec<GenotypeAnno>>>,
+    result_sender: Sender<ChannelOutput>,
 }
 
 impl<R: BufRead> VcfChunker<R> {
@@ -29,13 +33,16 @@ impl<R: BufRead> VcfChunker<R> {
         m_vcf: vcf::io::Reader<R>,
         m_header: vcf::Header,
         regions: Regions,
-        params: KDParams,
-        result_sender: Sender<Option<Vec<GenotypeAnno>>>,
+        reference_path: &PathBuf,
+        params: GraphParams,
+        result_sender: Sender<ChannelOutput>,
     ) -> Self {
+        let reference = faidx::Reader::from_path(reference_path).unwrap();
         Self {
             m_vcf,
             m_header,
             regions,
+            reference,
             params,
             cur_chrom: String::new(),
             cur_end: 0,
@@ -53,12 +60,19 @@ impl<R: BufRead> VcfChunker<R> {
         if self.params.passonly & entry.is_filtered(&self.m_header) {
             return false;
         }
-
         if !entry.valid_alt() {
             return false;
         }
 
-        let size = entry.size() as u32;
+        let size = if entry.get_alt() == "<DEL>" {
+            let (start, _) = entry.boundaries();
+            let end =
+                u64::try_from(usize::from(entry.variant_end(&self.m_header).unwrap())).unwrap();
+            (end - start) as u32
+        } else {
+            entry.size() as u32
+        };
+
         if self.params.sizemin > size || self.params.sizemax < size {
             return false;
         }
@@ -109,17 +123,24 @@ impl<R: BufRead> VcfChunker<R> {
                     if self.filter_entry(&entry) {
                         // Clear samples early
                         *entry.samples_mut() = vcf::variant::record_buf::Samples::default();
+                        // Fill in symbolic DELs
+                        if entry.get_alt() == "<DEL>" {
+                            let (start, _) = entry.boundaries();
+                            let end = usize::from(entry.variant_end(&self.m_header).unwrap()) - 1;
+                            let seq = self
+                                .reference
+                                .fetch_seq(entry.reference_sequence_name(), start as usize, end)
+                                .unwrap();
+                            let seq = String::from_utf8(seq.to_vec()).unwrap();
+                            let first_base = seq.chars().next().unwrap().to_string();
+                            *entry.reference_bases_mut() = seq;
+                            *entry.alternate_bases_mut() = AlternateBases::from(vec![first_base]);
+                            //seq[0]]);
+                        }
                         return Some(entry);
                     } else {
                         self.skip_count += 1;
-                        let _ = self.result_sender.send(Some(vec![GenotypeAnno::new(
-                            entry.clone(),
-                            &NodeIndex::new(0),
-                            &[],
-                            0,
-                            &Ploidy::Zero,
-                            0,
-                        )]));
+                        let _ = self.result_sender.send(Some(vec![(entry.clone(), vec![])]));
                     }
                 }
             }

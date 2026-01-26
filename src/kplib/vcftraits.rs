@@ -30,7 +30,7 @@ impl FromStr for Svtype {
 }
 
 pub trait KdpVcf {
-    fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64);
+    fn to_kfeat(&self, kmer: u8) -> (Vec<f32>, i64);
     fn boundaries(&self) -> (u64, u64);
     fn size(&self) -> u64;
     fn is_filtered(&self, header: &Header) -> bool;
@@ -40,19 +40,19 @@ pub trait KdpVcf {
 
 impl KdpVcf for RecordBuf {
     /// Convert variant sequence to Kfeat
-    fn to_kfeat(&self, kmer: u8, maxhom: usize) -> (Vec<f32>, i64) {
+    fn to_kfeat(&self, kmer: u8) -> (Vec<f32>, i64) {
         let ref_seq = self.reference_bases();
         let alt_seq = self.get_alt();
 
         let size = alt_seq.len() as i64 - ref_seq.len() as i64;
 
-        let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer, false, maxhom);
-        let m_alt = seq_to_kmer(&alt_seq.as_bytes()[1..], kmer, false, maxhom);
+        let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer, false);
+        let m_alt = seq_to_kmer(&alt_seq.as_bytes()[1..], kmer, false);
 
         let m_ret: Vec<_> = m_alt
             .iter()
             .zip(m_ref.iter())
-            .map(|(&x, &y)| (x - y))
+            .map(|(&x, &y)| x - y)
             .collect();
 
         (m_ret, size)
@@ -94,7 +94,7 @@ impl KdpVcf for RecordBuf {
     /// Alternate sequence isn't '.' or '*' or bnd or symbolic
     fn valid_alt(&self) -> bool {
         let alt = self.get_alt();
-        alt != "." && alt != "*" && !alt.contains(':') && !alt.contains('<')
+        alt != "." && alt != "*" && !alt.contains(':') && (!alt.contains('<') || alt == "<DEL>")
     }
 
     /// Returns the first alternate allele or a blank string with '.' if there isn't any
