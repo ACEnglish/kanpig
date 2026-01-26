@@ -62,7 +62,7 @@ impl ReadPileup {
 
         let mut pileups = Vec::<PileupVariant>::new();
         let mut read_offset = 0;
-        let mut align_offset = start as usize - 1;
+        let mut align_offset = (start as usize).saturating_sub(1);
 
         for cigar in record.cigar().iter() {
             match cigar.char() {
