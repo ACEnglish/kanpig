@@ -23,3 +23,5 @@ bcftools merge -m none -O z \
 tabix ${OD}/default_merged.vcf.gz
 
 python ${SRC}/calc_perf.py ${OD}/default_merged.vcf.gz ${SRC}/include.bed
+
+bcftools +mendelian2 ${OD}/default_output.vcf.gz -p 1X:PRO,PAT,MAT -m c
