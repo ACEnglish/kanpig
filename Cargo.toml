@@ -19,7 +19,7 @@ ordered-float = { version = "4.0", default-features = false }
 page_size = { version = "0.6.0" }
 petgraph = { version = "0.6.5" }
 pretty_env_logger = { version = "0.5.0" }
-pyo3 = { version = "0.15.1", features = ["extension-module"], optional = true}
+pyo3 = { version = "0.24.1", features = ["extension-module"], optional = true}
 rand = { version = "0.9.2" }
 rust-htslib = { version = "0.46.0", features=["curl", "static", "s3", "gcs"]}
 rust-lapper = { version = "1.1.0" }
