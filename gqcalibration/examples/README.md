@@ -33,6 +33,13 @@ kanpig plup --threads 4 --bam https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSample
 tabix -p bed HG002.revio38x.plup.gz
 ```
 
+Note: If you get an error saying `[E::easy_errno] Libcurl reported error 60 (SSL peer certificate or SSH remote key was not OK)`, try setting the below environment variable:
+```bash
+export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt  # Debian/Ubuntu
+export CURL_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt    # RHEL/CentOS
+export CURL_CA_BUNDLE=/etc/ssl/cert.pem                   # macOS
+```
+
 The truth set SV (`stvar`) VCF and high-confidence bed file from GIAB v1.1 was downloaded from
 [NIST](https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_HG002_DraftBenchmark_defrabbV0.019-20241113/).
 
