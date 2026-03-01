@@ -27,8 +27,8 @@ pub struct GraphParams {
     #[arg(long, default_value_t = 3840, help_heading = "Variants & Reads")]
     pub mapflag: u16,
 
-    /// Minimum sequence similarity for paths
-    #[arg(long, default_value_t = 0.90, help_heading = "Graph")]
+    /// Minimum kmer similarity for paths
+    #[arg(long, default_value_t = 0.60, help_heading = "Graph")]
     pub seqsim: f32,
 
     /// Minimum size similarity for paths
@@ -93,7 +93,7 @@ impl Default for GraphParams {
             sizemax: 10000,
             mapq: 5,
             mapflag: 3840,
-            seqsim: 0.90,
+            seqsim: 0.60,
             sizesim: 0.90,
             gpenalty: 0.02,
             fpenalty: 0.10,

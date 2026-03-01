@@ -25,6 +25,7 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--brief", action="store_true")
+    parser.add_argument("--write-sim", type=str, default=None)
     args = parser.parse_args()
 
     if args.seed is None:
@@ -81,6 +82,11 @@ if __name__ == '__main__':
     args = parse_args()
     if not args.brief:
         print(json.dumps(vars(args), indent=2))
+
+    if args.write_sim:
+        args.write_sim = open(args.write_sim, 'w')
+        args.write_sim.write("cansim_q1\tcansim_q2\tseqsim_q1\tseqsim_q2\n")
+
     random.seed(args.seed)
 
     invalid = 0 # Both queries shouldn't hit the same target
@@ -149,28 +155,32 @@ if __name__ == '__main__':
             print(f"Best target is {best_idx1} ({base_sim1:.4f}, {base_sim2:.4f})")
         
         # Do the queries hit the best target
-        base_sim1 = kanpig.cansim(query_vec1, target_vecs[0], args.mink)
-        base_sim2 = kanpig.cansim(query_vec2, target_vecs[0], args.mink)
+        can_sim1 = kanpig.cansim(query_vec1, target_vecs[0], args.mink)
+        can_sim2 = kanpig.cansim(query_vec2, target_vecs[0], args.mink)
         best_can_idx1 = 0
         best_can_idx2 = 0
 
         for idx, t in enumerate(target_vecs[1:]):
             sim1 = kanpig.cansim(query_vec1, t, args.mink)
-            if base_sim1 < sim1:
-                base_sim1 = sim1
+            if can_sim1 < sim1:
+                can_sim1 = sim1
                 best_can_idx1 = idx + 1
 
             sim2 = kanpig.cansim(query_vec1, t, args.mink)
-            if base_sim2 < sim1:
-                base_sim1 = sim1
+            if can_sim2 < sim1:
+                can_sim1 = sim1
                 best_can_idx2 = idx + 1
 
         if args.debug:
-            print(f"Queries hit {best_can_idx1} ({base_sim1:.4f}) & {best_can_idx2} ({base_sim2:.4f})")
+            print(f"Queries hit {best_can_idx1} ({can_sim1:.4f}) & {best_can_idx2} ({can_sim2:.4f})")
         
         if best_can_idx1 == best_can_idx2 and best_idx1 != 0 and best_can_idx1 == 0:
             odd_balls += 1
             continue
+        
+        # Just the same/correct ones to keep it less noisy
+        if args.write_sim and best_can_idx1 == best_can_idx2 == best_idx1:
+            args.write_sim.write(f"{can_sim1}\t{can_sim2}\t{base_sim1}\t{base_sim2}\n")
 
         tests += 1
         same += best_can_idx1 == best_can_idx2
