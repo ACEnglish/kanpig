@@ -44,11 +44,11 @@ pub struct GraphParams {
     pub fpenalty: f32,
 
     /// Kmer size for featurization (max 32)
-    #[arg(long, default_value_t = 4, help_heading = "Graph")]
+    #[arg(long, default_value_t = 16, help_heading = "Graph")]
     pub kmer: u8,
 
     /// Minimum frequency of kmers
-    #[arg(long, default_value_t = 2, help_heading = "Graph")]
+    #[arg(long, default_value_t = 1, help_heading = "Graph")]
     pub minkfreq: u64,
 
     /// Maximum graph size to search; otherwise perform 1-to-1
@@ -97,8 +97,8 @@ impl Default for GraphParams {
             sizesim: 0.90,
             gpenalty: 0.02,
             fpenalty: 0.10,
-            kmer: 4,
-            minkfreq: 2,
+            kmer: 16,
+            minkfreq: 1,
             maxnodes: 5000,
             maxpaths: 5000,
             pileupmax: 100,

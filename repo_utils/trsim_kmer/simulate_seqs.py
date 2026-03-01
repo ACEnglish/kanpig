@@ -83,9 +83,11 @@ if __name__ == '__main__':
         print(json.dumps(vars(args), indent=2))
     random.seed(args.seed)
 
-    tests = 0
-    same = 0
-    same_correct = 0
+    invalid = 0 # Both queries shouldn't hit the same target
+    odd_balls = 0 # Queries should hit a different target than 0, but don't
+    tests = 0 # valid tests run
+    same = 0 # tests where both queries hit the same target
+    same_correct = 0 # tests where both queries hit the same correct target
 
     for _ in range(args.num_experiments):
     
@@ -139,6 +141,7 @@ if __name__ == '__main__':
                 best_idx2 = idx + 1
 
         if best_idx1 != best_idx2:
+            invalid += 1
             if args.debug:
                 print("Invalid. Queries shouldn't hit same target")
             continue
@@ -164,6 +167,10 @@ if __name__ == '__main__':
 
         if args.debug:
             print(f"Queries hit {best_can_idx1} ({base_sim1:.4f}) & {best_can_idx2} ({base_sim2:.4f})")
+        
+        if best_can_idx1 == best_can_idx2 and best_idx1 != 0 and best_can_idx1 == 0:
+            odd_balls += 1
+            continue
 
         tests += 1
         same += best_can_idx1 == best_can_idx2
@@ -173,15 +180,21 @@ if __name__ == '__main__':
         #different += best_can_idx1 != best_can_idx2
     
     if args.brief:
-        print(tests, same, same_correct)
+        print(invalid, odd_balls, tests, same, same_correct)
         exit(0)
 
     print('-' * 10)
     width = len(str(tests)) + 1
-    print("Tests:", f"{tests:>{width}}")
+    print("Invalid: ", f"{invalid:>{width}}")
+    print("Odd:     ", f"{odd_balls:>{width}}")
+    print("Tests:   ", f"{tests:>{width}}")
     if tests:
-        print("Same: ", f"{same:>{width}}", f"{round(same / tests * 100, 1)}%")
-        print("&Corr:", f"{same_correct:>{width}}", f"{round(same_correct / tests * 100, 1)}%")
+        print("Same:    ", f"{same:>{width}}", f"{round(same / tests * 100, 1)}%")
+        print("&Corr:   ", f"{same_correct:>{width}}", f"{round(same_correct / tests * 100, 1)}%")
+    else:
+        print("Same:    ", f"{0:>{width}}", f"0")
+        print("&Corr:   ", f"{0:>{width}}", f"0")
+
                 
 
 """Notes
