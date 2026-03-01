@@ -119,6 +119,7 @@ pub fn seqsim_dense(a: &[f32], b: &[f32], mink: f32) -> f32 {
     1.0 - (neum / deno)
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,9 +176,29 @@ mod tests {
             let dense = seq_to_kmer_dense(seq, k, false);
             let sparse = seq_to_kmer(seq, k, false);
             let roundtripped = sparse_to_dense(&sparse, k);
-            assert_ne!(dense, roundtripped, "kmer counts differ at k={}", k);
+            assert_eq!(dense, roundtripped, "kmer counts differ at k={}", k);
         }
     }
+    
+    #[test]
+    fn test_kmer_roundtrip_merge() {
+        let seq1 = b"GCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCC";
+        let seq2 = b"GCCGCGCCACGCCGCGCCGCGTCGCCCGCGCCGGGCCACGCCGCGCGCGCCGCGCCGCGCCGCC";
+        for k in [4u8, 6u8] {
+            let mut dense = seq_to_kmer_dense(seq1, k, false);
+            let dense2 = seq_to_kmer_dense(seq2, k, false);
+            dense.iter_mut()
+                        .zip(dense2.iter())
+                        .for_each(|(x, y)| *x += y);
+
+            let sparse1 = seq_to_kmer(seq1, k, false);
+            let sparse2 = seq_to_kmer(seq2, k, false);
+            let sparse = merge_kmers(&sparse1, &sparse2);
+            let roundtripped = sparse_to_dense(&sparse, k);
+            assert_eq!(dense, roundtripped, "kmer counts differ at k={}", k);
+        }
+    }
+
 
     #[test]
     fn test_seqsim_equivalence() {
@@ -195,4 +216,34 @@ mod tests {
                 "seqsim differs at k={}: dense={} sparse={}", k, sim_dense, sim_sparse);
         }
     }
+
+    #[test]
+    fn test_sparse_dense_seqsim() {
+        let seq1 = b"GCCGCCGCCGAT";
+        let seq2 = b"GCCGCCGCCGCC";
+        let k = 4u8;
+
+        let dense1 = seq_to_kmer_dense(seq1, k, false);
+        let dense2 = seq_to_kmer_dense(seq2, k, false);
+        let sparse1 = seq_to_kmer(seq1, k, false);
+        let sparse2 = seq_to_kmer(seq2, k, false);
+
+        // First verify kmer counts match
+        for &(idx, v) in &sparse1 {
+            assert_eq!(dense1[idx as usize], v, "kmer {} count mismatch", idx);
+        }
+        // Verify no nonzero entries were dropped
+        for (idx, &v) in dense1.iter().enumerate() {
+            if v != 0.0 {
+                assert!(sparse1.iter().any(|&(k,_)| k == idx as u32),
+                    "kmer {} missing from sparse", idx);
+            }
+        }
+
+        let sim_dense = seqsim_dense(&dense1, &dense2, 1.0);
+        let sim_sparse = metrics::seqsim(&sparse1, &sparse2, 1.0);
+        assert!((sim_dense - sim_sparse).abs() < 1e-6,
+            "dense={} sparse={}", sim_dense, sim_sparse);
+    }
+
 }

@@ -46,7 +46,7 @@ impl KdpVcf for RecordBuf {
 
         let size = alt_seq.len() as i64 - ref_seq.len() as i64;
 
-        let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer, false);
+        let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer, true);
         let m_alt = seq_to_kmer(&alt_seq.as_bytes()[1..], kmer, false);
         
         let m_ret = merge_kmers(&m_ref, &m_alt);
