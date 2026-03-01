@@ -432,7 +432,7 @@ impl KanpigCommand for MosaicCommand {
                 self.io.sample = (0..self.io.reads.len())
                     .map(|i| format!("SAMPLE{}", i))
                     .collect();
-                info!("Setting samples to {}", self.io.sample.join(", "));
+                info!("setting samples to {}", self.io.sample.join(", "));
             } else {
                 error!(
                     "Expected one --sample for each --read, got {} and {}",

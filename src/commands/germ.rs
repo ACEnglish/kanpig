@@ -239,7 +239,7 @@ impl KanpigCommand for GermCommand {
                 std::process::exit(1);
             }
             let samp_name = input_header.sample_names()[0].clone();
-            info!("Setting sample to {}", samp_name);
+            info!("setting sample to {}", samp_name);
             self.io.sample = Some(samp_name);
         }
 

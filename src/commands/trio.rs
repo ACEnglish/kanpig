@@ -360,7 +360,7 @@ impl KanpigCommand for TrioCommand {
         let input_header = input_vcf.read_header().expect("Unable to parse vcf header");
 
         info!(
-            "Setting samples to {}, {}, {}",
+            "setting samples to {}, {}, {}",
             self.io.proband_sample, self.io.father_sample, self.io.mother_sample
         );
 
