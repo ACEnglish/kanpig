@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument("--kmer-size", type=int, default=4)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--brief", action="store_true")
     args = parser.parse_args()
 
     if args.seed is None:
@@ -78,7 +79,8 @@ def mutate_dna(sequence, mutation_rate=0.05):
 
 if __name__ == '__main__':
     args = parse_args()
-    print(json.dumps(vars(args), indent=2))
+    if not args.brief:
+        print(json.dumps(vars(args), indent=2))
     random.seed(args.seed)
 
     tests = 0
@@ -170,6 +172,10 @@ if __name__ == '__main__':
         #same_wrong_one += (best_can_idx1 == best_can_idx2) and (best_can_idx1 != best_idx1 ^ best_can_idx2 != best_idx1)
         #different += best_can_idx1 != best_can_idx2
     
+    if args.brief:
+        print(tests, same, same_correct)
+        exit(0)
+
     print('-' * 10)
     width = len(str(tests)) + 1
     print("Tests:", f"{tests:>{width}}")
