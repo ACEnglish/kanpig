@@ -1,7 +1,7 @@
 use crate::kplib::{
     germ_genotyper::Genotyper, metrics::overlaps, traverse::brute_force_find_path,
     traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, GenotypeAnno, GraphParams,
-    Haplotype, PathScore, Ploidy,
+    Haplotype, KmerVec, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -13,7 +13,7 @@ pub struct VarNode {
     pub end: u64,
     pub size: i64,
     pub entry: Option<RecordBuf>,
-    pub kfeat: Vec<f32>,
+    pub kfeat: KmerVec,
 }
 
 impl VarNode {
@@ -30,13 +30,13 @@ impl VarNode {
         }
     }
 
-    pub fn new_anchor(kmer: u8) -> Self {
+    pub fn new_anchor() -> Self {
         Self {
             start: 0,
             end: 0,
             size: 0,
             entry: None,
-            kfeat: vec![0f32; 4_usize.pow(kmer.into())],
+            kfeat: vec![],
         }
     }
 }
@@ -65,7 +65,7 @@ impl Variants {
 
         let (chrom, start, end) = Variants::get_region(&variants);
         let mut node_indices = Vec::<NodeIndex<_>>::with_capacity(variants.len() + 2);
-        node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
+        node_indices.push(graph.add_node(VarNode::new_anchor()));
 
         node_indices.append(
             &mut variants
@@ -74,7 +74,7 @@ impl Variants {
                 .collect(),
         );
 
-        node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
+        node_indices.push(graph.add_node(VarNode::new_anchor()));
 
         Self {
             chrom,

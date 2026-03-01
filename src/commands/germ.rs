@@ -183,8 +183,9 @@ impl KanpigCommand for GermCommand {
             warn!("--sizemin is recommended to be at least 10");
         }
 
-        if self.graph.kmer >= 8 {
-            warn!("--kmer above 8 becomes memory intensive");
+        if self.graph.kmer > 32 {
+            error!("--kmer must be below 33");
+            is_ok = false;
         }
 
         if self.graph.kmer < 1 {

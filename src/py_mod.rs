@@ -12,9 +12,9 @@ use crate::kplib::{
 use std::{path::PathBuf, str::FromStr};
 
 #[pyfunction]
-pub fn cansim(a: &PyAny, b: &PyAny, mink: f32) -> PyResult<f32> {
-    let vec_a: Vec<f32> = a.extract()?;
-    let vec_b: Vec<f32> = b.extract()?;
+pub fn cansim(a: &Bound<'_, PyAny>, b: &Bound<'_, PyAny>, mink: f32) -> PyResult<f32> {
+    let vec_a: Vec<(u64, f32)> = a.extract()?;
+    let vec_b: Vec<(u64, f32)> = b.extract()?;
 
     Ok(crate::kplib::metrics::seqsim(&vec_a, &vec_b, mink))
 }
@@ -23,7 +23,7 @@ pub fn cansim(a: &PyAny, b: &PyAny, mink: f32) -> PyResult<f32> {
 /// Input: `sequence: bytes`, `kmer: int`, `negative: bool`, `maxhom: int`
 /// Output: list of floats
 #[pyfunction]
-fn seq_to_kmer(_py: Python<'_>, sequence: String, kmer: u8, negative: bool) -> PyResult<Vec<f32>> {
+fn seq_to_kmer(_py: Python<'_>, sequence: String, kmer: u8, negative: bool) -> PyResult<Vec<(u64, f32)>> {
     // Convert Python bytes -> Rust &[u8]
     let seq: &[u8] = sequence.as_bytes();
 
@@ -104,16 +104,16 @@ pub struct PyHaplotype {
 #[pymethods]
 impl PyHaplotype {
     #[new]
-    pub fn new(kfeat: Vec<f32>, size: i64, n: u64, hap_meta: PyHaplotypeMeta) -> Self {
+    pub fn new(kfeat: Vec<(u64, f32)>, size: i64, n: u64, hap_meta: PyHaplotypeMeta) -> Self {
         Self {
             inner: Haplotype::new(kfeat, size, n, hap_meta.inner),
         }
     }
 
     #[staticmethod]
-    pub fn blank(kmer: u8, hap_meta: PyHaplotypeMeta) -> Self {
+    pub fn blank(hap_meta: PyHaplotypeMeta) -> Self {
         Self {
-            inner: Haplotype::blank(kmer, hap_meta.inner),
+            inner: Haplotype::blank(hap_meta.inner),
         }
     }
 
@@ -123,12 +123,11 @@ impl PyHaplotype {
 
     pub fn partial_haplotypes(
         &self,
-        kmer: u8,
         max_fns: usize,
         max_parts: usize,
     ) -> Vec<PyHaplotype> {
         self.inner
-            .partial_haplotypes(kmer, max_fns, max_parts)
+            .partial_haplotypes(max_fns, max_parts)
             .into_iter()
             .map(|h| PyHaplotype { inner: h })
             .collect()
@@ -144,11 +143,11 @@ impl PyHaplotype {
         self.inner.n
     }
     #[getter]
-    pub fn kfeat(&self) -> Vec<f32> {
+    pub fn kfeat(&self) -> Vec<(u64, f32)> {
         self.inner.kfeat.clone()
     }
     #[getter]
-    pub fn parts(&self) -> Vec<(i64, Vec<f32>)> {
+    pub fn parts(&self) -> Vec<(i64, Vec<(u64, f32)>)> {
         self.inner.parts.clone()
     }
     #[getter]
@@ -256,7 +255,7 @@ struct PyGenotyper {
 #[pymethods]
 impl PyGenotyper {
     #[new]
-    #[args(config_path = "None")]
+    #[pyo3(signature = (config = None))]
     fn new(config: Option<PyGenotyperConfig>) -> PyResult<Self> {
         Ok(PyGenotyper {
             inner: Genotyper::from_config(config.unwrap().inner),
@@ -377,7 +376,7 @@ impl PyGenotyperConfig {
     ///
     /// Python: GenotyperConfig.from_config_file(path: str) -> GenotyperConfig
     #[classmethod]
-    pub fn from_config_path(_cls: &PyType, path: &str) -> PyResult<Self> {
+    pub fn from_config_path(_cls: &Bound<'_, PyType>, path: &str) -> PyResult<Self> {
         let pb = PathBuf::from(path);
         match GenotyperConfig::from_config_file(pb) {
             Ok(cfg) => Ok(PyGenotyperConfig { inner: cfg }),
@@ -392,7 +391,7 @@ impl PyGenotyperConfig {
     ///
     /// Python: GenotyperConfig.from_optional_config(path: Optional[str]) -> GenotyperConfig
     #[classmethod]
-    pub fn from_optional_config(_cls: &PyType, path: Option<&str>) -> PyResult<Self> {
+    pub fn from_optional_config(_cls: &Bound<'_, PyType>, path: Option<&str>) -> PyResult<Self> {
         let opt_pb = path.map(PathBuf::from);
         let cfg = GenotyperConfig::from_optional_config(opt_pb);
         Ok(PyGenotyperConfig { inner: cfg })
@@ -402,7 +401,7 @@ impl PyGenotyperConfig {
     ///
     /// Python: GenotyperConfig.default() -> GenotyperConfig
     #[classmethod]
-    pub fn default(_cls: &PyType) -> PyResult<Self> {
+    pub fn default(_cls: &Bound<'_, PyType>) -> PyResult<Self> {
         Ok(PyGenotyperConfig {
             inner: GenotyperConfig::default(),
         })
@@ -422,7 +421,7 @@ impl PyGenotyperConfig {
 
 /// Define the Python module
 #[pymodule]
-fn kanpig(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn kanpig(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(seq_to_kmer, m)?)?;
     m.add_function(wrap_pyfunction!(cansim, m)?)?;
     // m.add_class::<PyKDParams>()?; Too much overhead to bind

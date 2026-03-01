@@ -15,10 +15,10 @@ mod haplotype;
 pub use crate::kplib::haplotype::{Haplotype, HaplotypeMeta};
 
 mod infra;
-pub use crate::kplib::infra::{ChannelInput, ChannelOutput};
+pub use crate::kplib::infra::{ChannelInput, ChannelOutput, KmerVec};
 
 mod kmer;
-pub use crate::kplib::kmer::seq_to_kmer;
+pub use crate::kplib::kmer::{merge_kmers, seq_to_kmer};
 
 pub mod meanshift;
 
