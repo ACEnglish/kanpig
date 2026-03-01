@@ -1,4 +1,4 @@
-use crate::kplib::merge_kmers;
+use crate::kplib::{merge_kmers, KmerVec};
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -83,14 +83,14 @@ impl HaplotypeMeta {
 pub struct Haplotype {
     pub size: i64,
     pub n: u64,
-    pub kfeat: Vec<(u32, f32)>,
-    pub parts: Vec<(i64, Vec<(u32, f32)>)>,
+    pub kfeat: KmerVec,
+    pub parts: Vec<(i64, KmerVec)>,
     pub partial: usize,
     pub meta: HaplotypeMeta,
 }
 
 impl Haplotype {
-    pub fn new(kfeat: Vec<(u32, f32)>, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
+    pub fn new(kfeat: KmerVec, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
         Self {
             size,
             n,
@@ -103,7 +103,7 @@ impl Haplotype {
 
     // Create an empty haplotype
     pub fn blank(meta: HaplotypeMeta) -> Haplotype {
-        let mk: Vec<(u32, f32)> = Vec::new();
+        let mk: KmerVec = Vec::new();
         Haplotype {
             size: 0,
             n: 0,

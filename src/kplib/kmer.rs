@@ -1,3 +1,4 @@
+use crate::kplib::KmerVec;
 /// Encodes a nucleotide character into its 2-bit representation.
 ///
 /// # Parameters
@@ -7,7 +8,7 @@
 /// A 64-bit unsigned integer representing the binary encoding of the nucleotide.
 /// ```
 #[inline]
-fn encode_nuc(nuc: u8) -> u32 {
+fn encode_nuc(nuc: u8) -> u64 {
     match nuc.to_ascii_uppercase() {
         b'A' => 0,
         b'G' => 1,
@@ -36,7 +37,7 @@ fn encode_nuc(nuc: u8) -> u32 {
 /// let kmer_counts = kanpig::seq_to_kmer(sequence, kmer, negative);
 /// assert_eq!(kmer_counts.len(), 64); // Example length for k=3
 /// ```
-pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool) -> Vec<(u32, f32)> {
+pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool) -> KmerVec {
     let ukmer = kmer as usize;
     let cnt = if negative { -1.0 } else { 1.0 };
 
@@ -45,10 +46,10 @@ pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool) -> Vec<(u32, f32)>
         return Vec::new();
     }
 
-    let mut result: Vec<(u32, f32)> = Vec::with_capacity(sequence.len());
+    let mut result: KmerVec = Vec::with_capacity(sequence.len());
 
     // index of the first kmer
-    let mut f_result: u32 = 0;
+    let mut f_result: u64 = 0;
     for (pos, i) in sequence.iter().take(ukmer).enumerate() {
         let f_nuc = encode_nuc(*i);
         f_result += f_nuc << ((ukmer - pos - 1) * 2);
@@ -56,7 +57,7 @@ pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool) -> Vec<(u32, f32)>
     result.push((f_result, cnt));
 
     // rolling sum masks off first nuc and adds the next one
-    let mask: u32 = (1 << (2 * (kmer - 1) as u32)) - 1;
+    let mask: u64 = (1 << (2 * (kmer - 1) as u64)) - 1;
 
     for i in sequence.iter().skip(ukmer) {
         let f_nuc = encode_nuc(*i);
@@ -79,7 +80,7 @@ pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool) -> Vec<(u32, f32)>
 }
 
 /// Combine two seq_to_kmer results
-pub fn merge_kmers(a: &[(u32, f32)], b: &[(u32, f32)]) -> Vec<(u32, f32)> {
+pub fn merge_kmers(a: &KmerVec, b: &KmerVec) -> KmerVec {
     let mut merged = Vec::with_capacity(a.len() + b.len());
     let (mut i, mut j) = (0, 0);
     while i < a.len() && j < b.len() {
@@ -169,7 +170,7 @@ mod tests {
         kcounts
     }
 
-    fn sparse_to_dense(sparse: &[(u32, f32)], kmer: u8) -> Vec<f32> {
+    fn sparse_to_dense(sparse: &[(u64, f32)], kmer: u8) -> Vec<f32> {
         let mut dense = vec![0f32; 1 << (2 * kmer as usize)];
         for &(k, v) in sparse {
             dense[k as usize] = v;
@@ -249,7 +250,7 @@ mod tests {
         for (idx, &v) in dense1.iter().enumerate() {
             if v != 0.0 {
                 assert!(
-                    sparse1.iter().any(|&(k, _)| k == idx as u32),
+                    sparse1.iter().any(|&(k, _)| k == idx as u64),
                     "kmer {} missing from sparse",
                     idx
                 );

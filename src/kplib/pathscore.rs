@@ -1,5 +1,5 @@
 use crate::kplib::{
-    merge_kmers, metrics, vargraph::VarNode, GraphParams, Haplotype, HaplotypeMeta,
+    merge_kmers, metrics, vargraph::VarNode, GraphParams, Haplotype, HaplotypeMeta, KmerVec,
 };
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::cmp::Ordering;
@@ -59,7 +59,7 @@ impl PathScore {
         params: &GraphParams,
         target: &Haplotype,
     ) -> Self {
-        let mut path_k: Option<Vec<(u32, f32)>> = None;
+        let mut path_k: Option<KmerVec> = None;
         let mut best_path = PathScore {
             meta: target.meta.clone(),
             ..Default::default()
@@ -81,7 +81,7 @@ impl PathScore {
                     path.iter()
                         .filter_map(|&node_index| graph.node_weight(node_index))
                         .map(|x| x.kfeat.as_ref())
-                        .fold(vec![], |acc: Vec<(u32, f32)>, other: &Vec<(u32, f32)>| {
+                        .fold(vec![], |acc: KmerVec, other: &KmerVec| {
                             merge_kmers(&acc, other)
                         }),
                 );

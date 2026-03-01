@@ -1,3 +1,4 @@
+use crate::kplib::KmerVec;
 /// Computes the Canberra distance similarity between two featurized k-mer vectors.
 /// The similarity is calculated as 1 minus the Canberra distance, providing a measure of similarity between 0 and 1.
 ///
@@ -10,7 +11,7 @@
 /// A floating-point value representing the similarity between the two vectors:
 /// - 1.0 indicates identical vectors.
 /// - 0.0 indicates no kmers or maximum dissimilarity.
-pub fn seqsim(a: &[(u32, f32)], b: &[(u32, f32)], mink: f32) -> f32 {
+pub fn seqsim(a: &KmerVec, b: &KmerVec, mink: f32) -> f32 {
     let mut deno: f32 = 0.0;
     let mut neum: f32 = 0.0;
 

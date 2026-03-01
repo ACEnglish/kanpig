@@ -1,7 +1,7 @@
 use crate::kplib::{
     germ_genotyper::Genotyper, metrics::overlaps, traverse::brute_force_find_path,
     traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, GenotypeAnno, GraphParams,
-    Haplotype, PathScore, Ploidy,
+    Haplotype, KmerVec, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -13,7 +13,7 @@ pub struct VarNode {
     pub end: u64,
     pub size: i64,
     pub entry: Option<RecordBuf>,
-    pub kfeat: Vec<(u32, f32)>,
+    pub kfeat: KmerVec,
 }
 
 impl VarNode {

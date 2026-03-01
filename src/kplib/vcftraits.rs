@@ -1,4 +1,4 @@
-use crate::kplib::{merge_kmers, seq_to_kmer};
+use crate::kplib::{merge_kmers, seq_to_kmer, KmerVec};
 use noodles_vcf::{
     variant::record::AlternateBases, variant::record::Filters, variant::RecordBuf, Header,
 };
@@ -30,7 +30,7 @@ impl FromStr for Svtype {
 }
 
 pub trait KdpVcf {
-    fn to_kfeat(&self, kmer: u8) -> (Vec<(u32, f32)>, i64);
+    fn to_kfeat(&self, kmer: u8) -> (KmerVec, i64);
     fn boundaries(&self) -> (u64, u64);
     fn size(&self) -> u64;
     fn is_filtered(&self, header: &Header) -> bool;
@@ -40,7 +40,7 @@ pub trait KdpVcf {
 
 impl KdpVcf for RecordBuf {
     /// Convert variant sequence to Kfeat
-    fn to_kfeat(&self, kmer: u8) -> (Vec<(u32, f32)>, i64) {
+    fn to_kfeat(&self, kmer: u8) -> (KmerVec, i64) {
         let ref_seq = self.reference_bases();
         let alt_seq = self.get_alt();
 

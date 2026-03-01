@@ -43,7 +43,7 @@ pub struct GraphParams {
     #[arg(long, default_value_t = 0.10, help_heading = "Graph")]
     pub fpenalty: f32,
 
-    /// Kmer size for featurization
+    /// Kmer size for featurization (max 32)
     #[arg(long, default_value_t = 4, help_heading = "Graph")]
     pub kmer: u8,
 
