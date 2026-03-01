@@ -1,4 +1,4 @@
-use crate::kplib::seq_to_kmer;
+use crate::kplib::{seq_to_kmer, merge_kmers};
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -83,14 +83,14 @@ impl HaplotypeMeta {
 pub struct Haplotype {
     pub size: i64,
     pub n: u64,
-    pub kfeat: Vec<f32>,
-    pub parts: Vec<(i64, Vec<f32>)>,
+    pub kfeat: Vec<(u32, f32)>,
+    pub parts: Vec<(i64, Vec<(u32, f32)>)>,
     pub partial: usize,
     pub meta: HaplotypeMeta,
 }
 
 impl Haplotype {
-    pub fn new(kfeat: Vec<f32>, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
+    pub fn new(kfeat: Vec<(u32, f32)>, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
         Self {
             size,
             n,
@@ -103,7 +103,7 @@ impl Haplotype {
 
     // Create an empty haplotype
     pub fn blank(kmer: u8, meta: HaplotypeMeta) -> Haplotype {
-        let mk = seq_to_kmer(&[], kmer, false);
+        let mk : Vec<(u32, f32)> = Vec::new();
         Haplotype {
             size: 0,
             n: 0,
@@ -125,18 +125,16 @@ impl Haplotype {
 
     /// Add another variant to a Haplotype
     pub fn add(&mut self, other: &Haplotype) {
-        if !self.kfeat.len() == other.kfeat.len() {
-            panic!("Cannot add haplotypes of different kmer size");
-        }
-        self.kfeat
-            .iter_mut()
-            .zip(other.kfeat.iter())
-            .for_each(|(x, y)| *x += y);
+        self.kfeat = merge_kmers(&self.kfeat, &other.kfeat);
         self.size += other.size;
         self.n += 1;
         self.parts.push((other.size, other.kfeat.clone()));
     }
-
+    
+    /// Create new haplotypes of subsets of the variants
+    /// This is essentially allowing for false negatives in the graph by pretending
+    /// the haplotype doesn't have all the variants, and if so, perhaps there is a 
+    /// better fit
     pub fn partial_haplotypes(&self, kmer: u8, max_fns: usize, max_parts: usize) -> Vec<Haplotype> {
         let mut ret = vec![];
         let m_len = self.parts.len();
@@ -150,14 +148,8 @@ impl Haplotype {
                 let mut cur_hap = Haplotype::blank(kmer, self.meta.clone());
                 for k in j.iter() {
                     cur_hap.size += k.0;
-                    cur_hap
-                        .kfeat
-                        .iter_mut()
-                        .zip(k.1.iter())
-                        .for_each(|(x, y)| *x += y);
+                    cur_hap.kfeat = merge_kmers(&cur_hap.kfeat, &k.1);
                     cur_hap.n += 1;
-                    // Partials are temporary, so we don't need to do this
-                    // cur_hap.samples_idx |= k.1.samples_idx | k.0.
                 }
                 cur_hap.partial = m_len - i;
                 ret.push(cur_hap);
@@ -194,18 +186,27 @@ impl Ord for Haplotype {
         if size_ordering != Ordering::Equal {
             return size_ordering;
         }
+        
+        // Merge scan tiebreaker
+        let (mut i, mut j) = (0, 0);
+        let (a, b) = (&self.kfeat, &other.kfeat);
+        while i < a.len() && j < b.len() {
+            let (ki, vi, kj, vj) = match a[i].0.cmp(&b[j].0) {
+                Ordering::Less    => { i += 1; (a[i-1].0, a[i-1].1 as u64, a[i-1].0, 0u64) }
+                Ordering::Greater => { j += 1; (b[j-1].0, 0u64, b[j-1].0, b[j-1].1 as u64) }
+                Ordering::Equal   => { i += 1; j += 1; (a[i-1].0, a[i-1].1 as u64, b[j-1].0, b[j-1].1 as u64) }
+            };
+            let ord = ki.cmp(&kj).then(vi.cmp(&vj));
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
 
-        self.kfeat
-            .iter()
-            .zip(&other.kfeat)
-            .find_map(|(i, j)| {
-                if (*i as u64) != (*j as u64) {
-                    Some((*i as u64).cmp(&(*j as u64)))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(Ordering::Equal)
+        // Remaining entries on either side mean the other is effectively 0
+        if i < a.len() { return Ordering::Greater; }
+        if j < b.len() { return Ordering::Less; }
+
+        Ordering::Equal
     }
 }
 
@@ -214,11 +215,12 @@ impl PartialEq for Haplotype {
         self.meta.coverage.iter().sum::<u64>() == other.meta.coverage.iter().sum::<u64>()
             && self.size == other.size
             && self.n == other.n
+            && self.kfeat.len() == other.kfeat.len()
             && self
                 .kfeat
                 .iter()
                 .zip(&other.kfeat)
-                .all(|(i, j)| *i as u64 == *j as u64)
+                .all(|(&(ki, vi), &(kj, vj))| ki == kj && vi as u64 == vj as u64)
     }
 }
 
@@ -226,8 +228,9 @@ impl Eq for Haplotype {}
 
 impl Hash for Haplotype {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        for &val in &self.kfeat {
-            val.to_bits().hash(state);
+        for &(k, v) in &self.kfeat {
+            k.hash(state);
+            v.to_bits().hash(state);
         }
     }
 }

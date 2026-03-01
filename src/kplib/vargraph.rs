@@ -13,7 +13,7 @@ pub struct VarNode {
     pub end: u64,
     pub size: i64,
     pub entry: Option<RecordBuf>,
-    pub kfeat: Vec<f32>,
+    pub kfeat: Vec<(u32, f32)>,
 }
 
 impl VarNode {
@@ -36,7 +36,7 @@ impl VarNode {
             end: 0,
             size: 0,
             entry: None,
-            kfeat: vec![0f32; 4_usize.pow(kmer.into())],
+            kfeat: vec![],
         }
     }
 }
