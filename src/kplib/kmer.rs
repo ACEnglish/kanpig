@@ -1,5 +1,3 @@
-use crate::kplib::metrics;
-
 /// Encodes a nucleotide character into its 2-bit representation.
 ///
 /// # Parameters
@@ -63,13 +61,18 @@ pub fn seq_to_kmer(sequence: &[u8], kmer: u8, negative: bool) -> Vec<(u32, f32)>
     for i in sequence.iter().skip(ukmer) {
         let f_nuc = encode_nuc(*i);
         f_result = ((f_result & mask) << 2) + f_nuc;
-        
+
         result.push((f_result, cnt));
     }
-    
+
     result.sort_unstable_by_key(|&(k, _)| k);
     result.dedup_by(|a, b| {
-        if a.0 == b.0 { b.1 += a.1; true } else { false }
+        if a.0 == b.0 {
+            b.1 += a.1;
+            true
+        } else {
+            false
+        }
     });
 
     result
@@ -81,11 +84,18 @@ pub fn merge_kmers(a: &[(u32, f32)], b: &[(u32, f32)]) -> Vec<(u32, f32)> {
     let (mut i, mut j) = (0, 0);
     while i < a.len() && j < b.len() {
         match a[i].0.cmp(&b[j].0) {
-            std::cmp::Ordering::Less => { merged.push(a[i]); i += 1; }
-            std::cmp::Ordering::Greater => { merged.push(b[j]); j += 1; }
+            std::cmp::Ordering::Less => {
+                merged.push(a[i]);
+                i += 1;
+            }
+            std::cmp::Ordering::Greater => {
+                merged.push(b[j]);
+                j += 1;
+            }
             std::cmp::Ordering::Equal => {
                 merged.push((a[i].0, a[i].1 + b[j].1));
-                i += 1; j += 1;
+                i += 1;
+                j += 1;
             }
         }
     }
@@ -94,35 +104,33 @@ pub fn merge_kmers(a: &[(u32, f32)], b: &[(u32, f32)]) -> Vec<(u32, f32)> {
     merged
 }
 
-
-pub fn seqsim_dense(a: &[f32], b: &[f32], mink: f32) -> f32 {
-    let mut deno: f32 = 0.0;
-    let mut neum: f32 = 0.0;
-    let mut total_d: f32;
-
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        total_d = x.abs() + y.abs();
-        if total_d >= mink {
-            deno += total_d;
-            neum += (x - y).abs();
-        }
-    }
-
-    if deno == 0.0 {
-        return 0.0;
-    }
-
-    if neum == 0.0 {
-        return 1.0;
-    }
-
-    1.0 - (neum / deno)
-}
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn seqsim_dense(a: &[f32], b: &[f32], mink: f32) -> f32 {
+        let mut deno: f32 = 0.0;
+        let mut neum: f32 = 0.0;
+        let mut total_d: f32;
+
+        for (&x, &y) in a.iter().zip(b.iter()) {
+            total_d = x.abs() + y.abs();
+            if total_d >= mink {
+                deno += total_d;
+                neum += (x - y).abs();
+            }
+        }
+
+        if deno == 0.0 {
+            return 0.0;
+        }
+
+        if neum == 0.0 {
+            return 1.0;
+        }
+
+        1.0 - (neum / deno)
+    }
 
     fn seq_to_kmer_dense(sequence: &[u8], kmer: u8, negative: bool) -> Vec<f32> {
         let ukmer = kmer as usize;
@@ -179,7 +187,7 @@ mod tests {
             assert_eq!(dense, roundtripped, "kmer counts differ at k={}", k);
         }
     }
-    
+
     #[test]
     fn test_kmer_roundtrip_merge() {
         let seq1 = b"GCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCGCCGCC";
@@ -187,9 +195,10 @@ mod tests {
         for k in [4u8, 6u8] {
             let mut dense = seq_to_kmer_dense(seq1, k, false);
             let dense2 = seq_to_kmer_dense(seq2, k, false);
-            dense.iter_mut()
-                        .zip(dense2.iter())
-                        .for_each(|(x, y)| *x += y);
+            dense
+                .iter_mut()
+                .zip(dense2.iter())
+                .for_each(|(x, y)| *x += y);
 
             let sparse1 = seq_to_kmer(seq1, k, false);
             let sparse2 = seq_to_kmer(seq2, k, false);
@@ -198,7 +207,6 @@ mod tests {
             assert_eq!(dense, roundtripped, "kmer counts differ at k={}", k);
         }
     }
-
 
     #[test]
     fn test_seqsim_equivalence() {
@@ -211,9 +219,14 @@ mod tests {
             let sparse2 = seq_to_kmer(seq2, k, true);
 
             let sim_dense = seqsim_dense(&dense1, &dense2, 1.0);
-            let sim_sparse = metrics::seqsim(&sparse1, &sparse2, 1.0);
-            assert!((sim_dense - sim_sparse).abs() < 1e-6,
-                "seqsim differs at k={}: dense={} sparse={}", k, sim_dense, sim_sparse);
+            let sim_sparse = crate::kplib::metrics::seqsim(&sparse1, &sparse2, 1.0);
+            assert!(
+                (sim_dense - sim_sparse).abs() < 1e-6,
+                "seqsim differs at k={}: dense={} sparse={}",
+                k,
+                sim_dense,
+                sim_sparse
+            );
         }
     }
 
@@ -235,15 +248,21 @@ mod tests {
         // Verify no nonzero entries were dropped
         for (idx, &v) in dense1.iter().enumerate() {
             if v != 0.0 {
-                assert!(sparse1.iter().any(|&(k,_)| k == idx as u32),
-                    "kmer {} missing from sparse", idx);
+                assert!(
+                    sparse1.iter().any(|&(k, _)| k == idx as u32),
+                    "kmer {} missing from sparse",
+                    idx
+                );
             }
         }
 
         let sim_dense = seqsim_dense(&dense1, &dense2, 1.0);
-        let sim_sparse = metrics::seqsim(&sparse1, &sparse2, 1.0);
-        assert!((sim_dense - sim_sparse).abs() < 1e-6,
-            "dense={} sparse={}", sim_dense, sim_sparse);
+        let sim_sparse = crate::kplib::metrics::seqsim(&sparse1, &sparse2, 1.0);
+        assert!(
+            (sim_dense - sim_sparse).abs() < 1e-6,
+            "dense={} sparse={}",
+            sim_dense,
+            sim_sparse
+        );
     }
-
 }

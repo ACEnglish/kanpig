@@ -1,4 +1,4 @@
-use crate::kplib::{seq_to_kmer, merge_kmers};
+use crate::kplib::merge_kmers;
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -102,8 +102,8 @@ impl Haplotype {
     }
 
     // Create an empty haplotype
-    pub fn blank(kmer: u8, meta: HaplotypeMeta) -> Haplotype {
-        let mk : Vec<(u32, f32)> = Vec::new();
+    pub fn blank(meta: HaplotypeMeta) -> Haplotype {
+        let mk: Vec<(u32, f32)> = Vec::new();
         Haplotype {
             size: 0,
             n: 0,
@@ -130,12 +130,12 @@ impl Haplotype {
         self.n += 1;
         self.parts.push((other.size, other.kfeat.clone()));
     }
-    
+
     /// Create new haplotypes of subsets of the variants
     /// This is essentially allowing for false negatives in the graph by pretending
-    /// the haplotype doesn't have all the variants, and if so, perhaps there is a 
+    /// the haplotype doesn't have all the variants, and if so, perhaps there is a
     /// better fit
-    pub fn partial_haplotypes(&self, kmer: u8, max_fns: usize, max_parts: usize) -> Vec<Haplotype> {
+    pub fn partial_haplotypes(&self, max_fns: usize, max_parts: usize) -> Vec<Haplotype> {
         let mut ret = vec![];
         let m_len = self.parts.len();
         if m_len >= max_parts {
@@ -145,7 +145,7 @@ impl Haplotype {
         let lower = if m_len <= max_fns { 1 } else { m_len - max_fns };
         for i in (lower..(m_len + 1)).rev() {
             for j in self.parts.iter().combinations(i) {
-                let mut cur_hap = Haplotype::blank(kmer, self.meta.clone());
+                let mut cur_hap = Haplotype::blank(self.meta.clone());
                 for k in j.iter() {
                     cur_hap.size += k.0;
                     cur_hap.kfeat = merge_kmers(&cur_hap.kfeat, &k.1);
@@ -186,15 +186,25 @@ impl Ord for Haplotype {
         if size_ordering != Ordering::Equal {
             return size_ordering;
         }
-        
+
         // Merge scan tiebreaker
         let (mut i, mut j) = (0, 0);
         let (a, b) = (&self.kfeat, &other.kfeat);
         while i < a.len() && j < b.len() {
             let (ki, vi, kj, vj) = match a[i].0.cmp(&b[j].0) {
-                Ordering::Less    => { i += 1; (a[i-1].0, a[i-1].1 as u64, a[i-1].0, 0u64) }
-                Ordering::Greater => { j += 1; (b[j-1].0, 0u64, b[j-1].0, b[j-1].1 as u64) }
-                Ordering::Equal   => { i += 1; j += 1; (a[i-1].0, a[i-1].1 as u64, b[j-1].0, b[j-1].1 as u64) }
+                Ordering::Less => {
+                    i += 1;
+                    (a[i - 1].0, a[i - 1].1 as u64, a[i - 1].0, 0u64)
+                }
+                Ordering::Greater => {
+                    j += 1;
+                    (b[j - 1].0, 0u64, b[j - 1].0, b[j - 1].1 as u64)
+                }
+                Ordering::Equal => {
+                    i += 1;
+                    j += 1;
+                    (a[i - 1].0, a[i - 1].1 as u64, b[j - 1].0, b[j - 1].1 as u64)
+                }
             };
             let ord = ki.cmp(&kj).then(vi.cmp(&vj));
             if ord != Ordering::Equal {
@@ -203,8 +213,12 @@ impl Ord for Haplotype {
         }
 
         // Remaining entries on either side mean the other is effectively 0
-        if i < a.len() { return Ordering::Greater; }
-        if j < b.len() { return Ordering::Less; }
+        if i < a.len() {
+            return Ordering::Greater;
+        }
+        if j < b.len() {
+            return Ordering::Less;
+        }
 
         Ordering::Equal
     }

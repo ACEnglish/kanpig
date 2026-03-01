@@ -383,7 +383,7 @@ fn pileups_to_haps(
 
     // qname: [plup_idx, ]
     for (read_idx, read) in reads.into_iter() {
-        let mut cur_hap = Haplotype::blank(params.kmer, hap_meta.clone());
+        let mut cur_hap = Haplotype::blank(hap_meta.clone());
 
         cur_hap.meta.hp[sample_idx] = *hps.get(&read_idx).expect("hp populated with reads");
 

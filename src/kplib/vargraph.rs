@@ -30,7 +30,7 @@ impl VarNode {
         }
     }
 
-    pub fn new_anchor(kmer: u8) -> Self {
+    pub fn new_anchor() -> Self {
         Self {
             start: 0,
             end: 0,
@@ -65,7 +65,7 @@ impl Variants {
 
         let (chrom, start, end) = Variants::get_region(&variants);
         let mut node_indices = Vec::<NodeIndex<_>>::with_capacity(variants.len() + 2);
-        node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
+        node_indices.push(graph.add_node(VarNode::new_anchor()));
 
         node_indices.append(
             &mut variants
@@ -74,7 +74,7 @@ impl Variants {
                 .collect(),
         );
 
-        node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
+        node_indices.push(graph.add_node(VarNode::new_anchor()));
 
         Self {
             chrom,

@@ -1,4 +1,4 @@
-use crate::kplib::{seq_to_kmer, merge_kmers};
+use crate::kplib::{merge_kmers, seq_to_kmer};
 use noodles_vcf::{
     variant::record::AlternateBases, variant::record::Filters, variant::RecordBuf, Header,
 };
@@ -48,7 +48,7 @@ impl KdpVcf for RecordBuf {
 
         let m_ref = seq_to_kmer(&ref_seq.as_bytes()[1..], kmer, true);
         let m_alt = seq_to_kmer(&alt_seq.as_bytes()[1..], kmer, false);
-        
+
         let m_ret = merge_kmers(&m_ref, &m_alt);
         (m_ret, size)
     }

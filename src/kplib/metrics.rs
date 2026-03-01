@@ -17,9 +17,19 @@ pub fn seqsim(a: &[(u32, f32)], b: &[(u32, f32)], mink: f32) -> f32 {
     let (mut i, mut j) = (0, 0);
     while i < a.len() && j < b.len() {
         let (x, y) = match a[i].0.cmp(&b[j].0) {
-            std::cmp::Ordering::Less    => { i += 1; (a[i-1].1, 0.0) }
-            std::cmp::Ordering::Greater => { j += 1; (0.0, b[j-1].1) }
-            std::cmp::Ordering::Equal   => { i += 1; j += 1; (a[i-1].1, b[j-1].1) }
+            std::cmp::Ordering::Less => {
+                i += 1;
+                (a[i - 1].1, 0.0)
+            }
+            std::cmp::Ordering::Greater => {
+                j += 1;
+                (0.0, b[j - 1].1)
+            }
+            std::cmp::Ordering::Equal => {
+                i += 1;
+                j += 1;
+                (a[i - 1].1, b[j - 1].1)
+            }
         };
         let total_d = x.abs() + y.abs();
         if total_d >= mink {
@@ -31,15 +41,25 @@ pub fn seqsim(a: &[(u32, f32)], b: &[(u32, f32)], mink: f32) -> f32 {
     // Unmatched tail entries — other side is 0.0
     for &(_, x) in &a[i..] {
         let total_d = x.abs();
-        if total_d >= mink { deno += total_d; neum += total_d; }
+        if total_d >= mink {
+            deno += total_d;
+            neum += total_d;
+        }
     }
     for &(_, y) in &b[j..] {
         let total_d = y.abs();
-        if total_d >= mink { deno += total_d; neum += total_d; }
+        if total_d >= mink {
+            deno += total_d;
+            neum += total_d;
+        }
     }
 
-    if deno == 0.0 { return 0.0; }
-    if neum == 0.0 { return 1.0; }
+    if deno == 0.0 {
+        return 0.0;
+    }
+    if neum == 0.0 {
+        return 1.0;
+    }
     1.0 - (neum / deno)
 }
 

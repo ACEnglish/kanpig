@@ -48,7 +48,7 @@ pub fn brute_force_find_path(
     };
 
     let snk_node = NodeIndex::new(graph.node_count() - 1);
-    let partial_haps = target.partial_haplotypes(params.kmer, params.fnmax, params.pileupmax);
+    let partial_haps = target.partial_haplotypes(params.fnmax, params.pileupmax);
 
     let mut stack: BinaryHeap<PathNodeState> = BinaryHeap::new();
     stack.push(PathNodeState {
