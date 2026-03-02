@@ -48,12 +48,14 @@ impl PyPlupParser {
         sample_name: String,
         sample_idx: usize,
         sample_count: usize,
+        kmer: u8,
     ) -> PyResult<Self> {
         // Open internals here
         let reference = faidx::Reader::from_path(reference_path)
             .map_err(|e| PyValueError::new_err(format!("Failed to open reference: {}", e)))?;
 
-        let params = crate::kplib::GraphParams::default();
+        let mut params = crate::kplib::GraphParams::default();
+        params.kmer = kmer;
 
         Ok(PyPlupParser {
             inner: crate::kplib::PlupParser::new(
