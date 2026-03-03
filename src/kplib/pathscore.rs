@@ -1,6 +1,4 @@
-use crate::kplib::{
-    merge_kmers, metrics, vargraph::VarNode, GraphParams, Haplotype, HaplotypeMeta, KmerVec,
-};
+use crate::kplib::{metrics, vargraph::VarNode, GraphParams, Haplotype, HaplotypeMeta, KmerVec};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::cmp::Ordering;
 
@@ -77,25 +75,22 @@ impl PathScore {
             }
 
             if path_k.is_none() {
-                path_k = Some(
-                    path.iter()
-                        .filter_map(|&node_index| graph.node_weight(node_index))
-                        .map(|x| x.kfeat.as_ref())
-                        .fold(vec![], |acc: KmerVec, other: &KmerVec| {
-                            merge_kmers(&acc, other)
-                        }),
-                );
+                let mut kv = KmerVec::blank();
+                for node in path.iter().filter_map(|&n| graph.node_weight(n)) {
+                    kv += &node.kmers;
+                }
+                path_k = Some(kv);
             }
 
-            let seqsim = metrics::seqsim(
-                path_k.as_ref().unwrap(),
-                &hap_parts.kfeat,
-                params.minkfreq as f32,
-            );
+            let pk = path_k.as_ref().unwrap();
 
-            if seqsim < params.seqsim {
+            let fine_sim = pk.fine_similarity(&hap_parts.kmers);
+            if fine_sim < params.seqsim {
                 continue;
             }
+
+            let coarse_sim = pk.coarse_similarity(&hap_parts.kmers);
+            let seqsim = (fine_sim * coarse_sim).sqrt(); // Geometric Mean
 
             let mut score =
                 ((seqsim + sizesim) / 2.0) - (params.fpenalty * hap_parts.partial as f32);

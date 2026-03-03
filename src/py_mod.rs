@@ -23,7 +23,12 @@ pub fn cansim(a: &Bound<'_, PyAny>, b: &Bound<'_, PyAny>, mink: f32) -> PyResult
 /// Input: `sequence: bytes`, `kmer: int`, `negative: bool`, `maxhom: int`
 /// Output: list of floats
 #[pyfunction]
-fn seq_to_kmer(_py: Python<'_>, sequence: String, kmer: u8, negative: bool) -> PyResult<Vec<(u64, f32)>> {
+fn seq_to_kmer(
+    _py: Python<'_>,
+    sequence: String,
+    kmer: u8,
+    negative: bool,
+) -> PyResult<Vec<(u64, f32)>> {
     // Convert Python bytes -> Rust &[u8]
     let seq: &[u8] = sequence.as_bytes();
 
@@ -123,11 +128,7 @@ impl PyHaplotype {
         self.inner.add(&other.inner);
     }
 
-    pub fn partial_haplotypes(
-        &self,
-        max_fns: usize,
-        max_parts: usize,
-    ) -> Vec<PyHaplotype> {
+    pub fn partial_haplotypes(&self, max_fns: usize, max_parts: usize) -> Vec<PyHaplotype> {
         self.inner
             .partial_haplotypes(max_fns, max_parts)
             .into_iter()

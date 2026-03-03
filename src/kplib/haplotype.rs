@@ -1,4 +1,4 @@
-use crate::kplib::{merge_kmers, KmerVec};
+use crate::kplib::KmerVec;
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -83,19 +83,19 @@ impl HaplotypeMeta {
 pub struct Haplotype {
     pub size: i64,
     pub n: u64,
-    pub kfeat: KmerVec,
+    pub kmers: KmerVec,
     pub parts: Vec<(i64, KmerVec)>,
     pub partial: usize,
     pub meta: HaplotypeMeta,
 }
 
 impl Haplotype {
-    pub fn new(kfeat: KmerVec, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
+    pub fn new(kmers: KmerVec, size: i64, n: u64, hap_meta: HaplotypeMeta) -> Self {
         Self {
             size,
             n,
-            kfeat: kfeat.clone(),
-            parts: vec![(size, kfeat)],
+            kmers: kmers.clone(),
+            parts: vec![(size, kmers)],
             partial: 0,
             meta: hap_meta,
         }
@@ -103,11 +103,10 @@ impl Haplotype {
 
     // Create an empty haplotype
     pub fn blank(meta: HaplotypeMeta) -> Haplotype {
-        let mk: KmerVec = Vec::new();
         Haplotype {
             size: 0,
             n: 0,
-            kfeat: mk.clone(),
+            kmers: KmerVec::blank(),
             parts: vec![],
             partial: 0,
             meta,
@@ -115,6 +114,7 @@ impl Haplotype {
     }
 
     /// Clear the Metadata and return a clone
+    /// This allows us to preserve the KmerVec but update the meta
     pub fn clear_clone(&self, id: usize) -> Haplotype {
         let mut ret = self.clone();
         let mut n_meta = HaplotypeMeta::new_blank(self.meta.coverage.len());
@@ -124,17 +124,19 @@ impl Haplotype {
     }
 
     /// Add another variant to a Haplotype
+    /// This is useful for combining "haplotypes" that are actually sub-haplotypes
+    /// e.g. variants across a read
     pub fn add(&mut self, other: &Haplotype) {
-        self.kfeat = merge_kmers(&self.kfeat, &other.kfeat);
+        self.kmers += &other.kmers;
         self.size += other.size;
         self.n += 1;
-        self.parts.push((other.size, other.kfeat.clone()));
+        self.parts.push((other.size, other.kmers.clone()));
     }
 
     /// Create new haplotypes of subsets of the variants
     /// This is essentially allowing for false negatives in the graph by pretending
     /// the haplotype doesn't have all the variants, and if so, perhaps there is a
-    /// better fit
+    /// better fit.
     pub fn partial_haplotypes(&self, max_fns: usize, max_parts: usize) -> Vec<Haplotype> {
         let mut ret = vec![];
         let m_len = self.parts.len();
@@ -143,15 +145,15 @@ impl Haplotype {
             return ret;
         }
         let lower = if m_len <= max_fns { 1 } else { m_len - max_fns };
-        for i in (lower..(m_len + 1)).rev() {
-            for j in self.parts.iter().combinations(i) {
+        for n in (lower..(m_len + 1)).rev() {
+            for subset in self.parts.iter().combinations(n) {
                 let mut cur_hap = Haplotype::blank(self.meta.clone());
-                for k in j.iter() {
-                    cur_hap.size += k.0;
-                    cur_hap.kfeat = merge_kmers(&cur_hap.kfeat, &k.1);
+                for part in subset.iter() {
+                    cur_hap.size += part.0;
+                    cur_hap.kmers += &part.1;
                     cur_hap.n += 1;
                 }
-                cur_hap.partial = m_len - i;
+                cur_hap.partial = m_len - n;
                 ret.push(cur_hap);
             }
         }
@@ -187,40 +189,7 @@ impl Ord for Haplotype {
             return size_ordering;
         }
 
-        // Merge scan tiebreaker
-        let (mut i, mut j) = (0, 0);
-        let (a, b) = (&self.kfeat, &other.kfeat);
-        while i < a.len() && j < b.len() {
-            let (ki, vi, kj, vj) = match a[i].0.cmp(&b[j].0) {
-                Ordering::Less => {
-                    i += 1;
-                    (a[i - 1].0, a[i - 1].1 as u64, a[i - 1].0, 0u64)
-                }
-                Ordering::Greater => {
-                    j += 1;
-                    (b[j - 1].0, 0u64, b[j - 1].0, b[j - 1].1 as u64)
-                }
-                Ordering::Equal => {
-                    i += 1;
-                    j += 1;
-                    (a[i - 1].0, a[i - 1].1 as u64, b[j - 1].0, b[j - 1].1 as u64)
-                }
-            };
-            let ord = ki.cmp(&kj).then(vi.cmp(&vj));
-            if ord != Ordering::Equal {
-                return ord;
-            }
-        }
-
-        // Remaining entries on either side mean the other is effectively 0
-        if i < a.len() {
-            return Ordering::Greater;
-        }
-        if j < b.len() {
-            return Ordering::Less;
-        }
-
-        Ordering::Equal
+        self.kmers.cmp(&other.kmers)
     }
 }
 
@@ -229,23 +198,16 @@ impl PartialEq for Haplotype {
         self.meta.coverage.iter().sum::<u64>() == other.meta.coverage.iter().sum::<u64>()
             && self.size == other.size
             && self.n == other.n
-            && self.kfeat.len() == other.kfeat.len()
-            && self
-                .kfeat
-                .iter()
-                .zip(&other.kfeat)
-                .all(|(&(ki, vi), &(kj, vj))| ki == kj && vi as u64 == vj as u64)
+            && self.kmers == other.kmers
     }
 }
 
 impl Eq for Haplotype {}
 
 impl Hash for Haplotype {
+    // Maybe should take other Haplotype properties into account?
     fn hash<H: Hasher>(&self, state: &mut H) {
-        for &(k, v) in &self.kfeat {
-            k.hash(state);
-            v.to_bits().hash(state);
-        }
+        self.kmers.hash(state);
     }
 }
 
@@ -258,7 +220,7 @@ impl Debug for Haplotype {
             .field("ps", &self.meta.ps)
             .field("hp", &self.meta.hp)
             .field("samp", &self.meta.samples_flag)
-            // Exclude kfeat from the debug output
+            // Exclude kmers from the debug output
             .finish()
     }
 }
