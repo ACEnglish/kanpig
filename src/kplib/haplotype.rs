@@ -1,4 +1,4 @@
-use crate::kplib::{merge_kmers, KmerVec};
+use crate::kplib::KmerVec;
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -106,7 +106,7 @@ impl Haplotype {
         Haplotype {
             size: 0,
             n: 0,
-            kmers: Vec::new(), // F - this needs to know coarse/fine k and be KmerVec::blank()
+            kmers: KmerVec::blank(),
             parts: vec![],
             partial: 0,
             meta,
@@ -127,7 +127,7 @@ impl Haplotype {
     /// This is useful for combining "haplotypes" that are actually sub-haplotypes
     /// e.g. variants across a read
     pub fn add(&mut self, other: &Haplotype) {
-        self.kmers += other.kmers;
+        self.kmers += &other.kmers;
         self.size += other.size;
         self.n += 1;
         self.parts.push((other.size, other.kmers.clone()));
@@ -150,10 +150,10 @@ impl Haplotype {
                 let mut cur_hap = Haplotype::blank(self.meta.clone());
                 for part in subset.iter() {
                     cur_hap.size += part.0;
-                    cur_hap.kmers += part.1;
+                    cur_hap.kmers += &part.1;
                     cur_hap.n += 1;
                 }
-                cur_hap.partial = m_len - i;
+                cur_hap.partial = m_len - n;
                 ret.push(cur_hap);
             }
         }
@@ -189,7 +189,7 @@ impl Ord for Haplotype {
             return size_ordering;
         }
 
-        self.kmers.cmp(other.kmers)
+        self.kmers.cmp(&other.kmers)
     }
 }
 

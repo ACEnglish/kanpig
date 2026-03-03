@@ -35,7 +35,8 @@ fn task_thread(
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = Variants::new(chunk, m_args.graph.kmer);
+                let mut m_graph =
+                    Variants::new(chunk, (m_args.graph.coarse_kmer, m_args.graph.fine_kmer));
                 debug!(
                     "Chunk {:?}:{:?}-{:?} w/ {}",
                     m_graph.chrom,
@@ -179,34 +180,7 @@ impl KanpigCommand for GermCommand {
             is_ok &= file_validators::validate_file(bed_file, "--bed");
         }
 
-        if self.graph.sizemin < 10 {
-            warn!("--sizemin is recommended to be at least 10");
-        }
-
-        if self.graph.kmer > 32 {
-            error!("--kmer must be below 33");
-            is_ok = false;
-        }
-
-        if self.graph.kmer < 1 {
-            error!("--kmer must be at least 1");
-            is_ok = false;
-        }
-
-        if self.graph.sizemin < self.graph.kmer.into() {
-            error!("--sizemin must be ≥ --kmer");
-            is_ok = false;
-        }
-
-        if self.graph.sizesim < 0.0 || self.graph.sizesim > 1.0 {
-            error!("--sizesim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
-
-        if self.graph.seqsim < 0.0 || self.graph.seqsim > 1.0 {
-            error!("--seqsim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
+        is_ok &= self.graph.validate();
 
         if self.hapsim < 0.0 || self.hapsim > 1.0 {
             error!("--hapsim must be between 0.0 and 1.0");

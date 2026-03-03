@@ -1,5 +1,3 @@
-use crate::kplib::KmerVec;
-
 /// Computes size similarity
 /// The similarity is defined as the ratio of the smaller size to the larger size,
 /// with special handling for cases where either size is zero.

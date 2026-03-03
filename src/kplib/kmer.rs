@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, AddAssign};
 
@@ -123,43 +122,29 @@ pub fn seqsim(a: &[(u64, f32)], b: &[(u64, f32)]) -> f32 {
 pub struct KmerVec {
     pub coarse_kfeat: Vec<(u64, f32)>,
     pub fine_kfeat: Vec<(u64, f32)>,
-    pub coarse_k: u8,
-    pub fine_k: u8,
 }
 
 impl KmerVec {
-    pub fn new(sequence: &[u8], coarse_kmer: u8, fine_kmer: u8, negative: bool) -> Self {
+    // kmer is a tuple of coarse_kmer and fine_kmer
+    pub fn new(sequence: &[u8], kmer: (u8, u8), negative: bool) -> Self {
         KmerVec {
-            coarse_kfeat: seq_to_kmer(sequence, coarse_kmer, negative),
-            fine_kfeat: seq_to_kmer(sequence, fine_kmer, negative),
-            coarse_k: coarse_kmer,
-            fine_k: fine_kmer,
+            coarse_kfeat: seq_to_kmer(sequence, kmer.0, negative),
+            fine_kfeat: seq_to_kmer(sequence, kmer.1, negative),
         }
     }
 
-    pub fn blank(coarse_kmer: u8, fine_kmer: u8) -> Self {
+    pub fn blank() -> Self {
         KmerVec {
             coarse_kfeat: Vec::new(),
             fine_kfeat: Vec::new(),
-            coarse_k: coarse_kmer,
-            fine_k: fine_kmer,
         }
     }
 
-    pub fn same_k(&self, other: &Self) -> bool {
-        self.coarse_k == other.coarse_k && self.fine_k == other.fine_k
-    }
-
     pub fn coarse_similarity(&self, other: &Self) -> f32 {
-        debug_assert!(
-            self.same_k(other),
-            "KmerVec k mismatch in coarse_similarity"
-        );
         seqsim(&self.coarse_kfeat, &other.coarse_kfeat)
     }
 
     pub fn fine_similarity(&self, other: &Self) -> f32 {
-        debug_assert!(self.same_k(other), "KmerVec k mismatch in fine_similarity");
         seqsim(&self.fine_kfeat, &other.fine_kfeat)
     }
 }
@@ -168,10 +153,7 @@ impl KmerVec {
 impl Add for KmerVec {
     type Output = KmerVec;
     fn add(self, other: KmerVec) -> KmerVec {
-        debug_assert!(self.same_k(&other), "KmerVec k mismatch in add");
         KmerVec {
-            coarse_k: self.coarse_k,
-            fine_k: self.fine_k,
             coarse_kfeat: merge_kmers(&self.coarse_kfeat, &other.coarse_kfeat),
             fine_kfeat: merge_kmers(&self.fine_kfeat, &other.fine_kfeat),
         }
@@ -182,10 +164,7 @@ impl Add for KmerVec {
 impl Add for &KmerVec {
     type Output = KmerVec;
     fn add(self, other: &KmerVec) -> KmerVec {
-        debug_assert!(self.same_k(other), "KmerVec k mismatch in add");
         KmerVec {
-            coarse_k: self.coarse_k,
-            fine_k: self.fine_k,
             coarse_kfeat: merge_kmers(&self.coarse_kfeat, &other.coarse_kfeat),
             fine_kfeat: merge_kmers(&self.fine_kfeat, &other.fine_kfeat),
         }
@@ -195,7 +174,6 @@ impl Add for &KmerVec {
 // += operator: mutates self in place
 impl AddAssign<&KmerVec> for KmerVec {
     fn add_assign(&mut self, other: &KmerVec) {
-        debug_assert!(self.same_k(other), "KmerVec k mismatch in add_assign");
         self.coarse_kfeat = merge_kmers(&self.coarse_kfeat, &other.coarse_kfeat);
         self.fine_kfeat = merge_kmers(&self.fine_kfeat, &other.fine_kfeat);
     }
@@ -203,9 +181,7 @@ impl AddAssign<&KmerVec> for KmerVec {
 
 impl PartialEq for KmerVec {
     fn eq(&self, other: &Self) -> bool {
-        self.coarse_k == other.coarse_k
-            && self.fine_k == other.fine_k
-            && self.coarse_kfeat.len() == other.coarse_kfeat.len()
+        self.coarse_kfeat.len() == other.coarse_kfeat.len()
             && self
                 .coarse_kfeat
                 .iter()
