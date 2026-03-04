@@ -31,11 +31,13 @@ fn task_thread(
         &m_args.graph,
     );
     let genotyper = Genotyper::from_config_file(m_args.gqconfig);
+    let kmer_tuple = (m_args.graph.coarse_kmer, m_args.graph.fine_kmer);
+
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = VariantGraph::new(chunk, m_args.graph.kmer);
+                let mut m_graph = VariantGraph::new(chunk, kmer_tuple);
                 debug!(
                     "Chunk {:?}:{:?}-{:?} w/ {}",
                     m_graph.chrom,
@@ -80,10 +82,11 @@ fn task_thread(
                             continue;
                         }
                         coverage += 1;
+
                         if !read.pileups.is_empty() {
                             m_haps.push(Haplotype::from_readpileup(
                                 read.trim(si.0, si.1),
-                                m_args.graph.kmer,
+                                kmer_tuple,
                             ));
                         }
                     }
@@ -223,33 +226,7 @@ impl KanpigCommand for GermCommand {
             is_ok &= file_validators::validate_file(bed_file, "--bed");
         }
 
-        if self.graph.sizemin < 10 {
-            warn!("--sizemin is recommended to be at least 10");
-        }
-
-        if self.graph.kmer >= 8 {
-            warn!("--kmer above 8 becomes memory intensive");
-        }
-
-        if self.graph.kmer < 1 {
-            error!("--kmer must be at least 1");
-            is_ok = false;
-        }
-
-        if self.graph.sizemin < self.graph.kmer.into() {
-            error!("--sizemin must be ≥ --kmer");
-            is_ok = false;
-        }
-
-        if self.graph.sizesim < 0.0 || self.graph.sizesim > 1.0 {
-            error!("--sizesim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
-
-        if self.graph.seqsim < 0.0 || self.graph.seqsim > 1.0 {
-            error!("--seqsim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
+        is_ok &= self.graph.validate();
 
         if self.hapsim < 0.0 || self.hapsim > 1.0 {
             error!("--hapsim must be between 0.0 and 1.0");
@@ -282,7 +259,7 @@ impl KanpigCommand for GermCommand {
                 std::process::exit(1);
             }
             let samp_name = input_header.sample_names()[0].clone();
-            info!("Setting sample to {}", samp_name);
+            info!("setting sample to {}", samp_name);
             self.io.sample = Some(samp_name);
         }
 

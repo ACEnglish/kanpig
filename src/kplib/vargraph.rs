@@ -1,7 +1,7 @@
 use crate::kplib::{
     germ_genotyper::Genotyper, metrics::overlaps, traverse::brute_force_find_path,
     traverse::get_one_to_one, vcftraits::KdpVcf, ChannelOutput, CoverageTrack, GenotypeAnno,
-    GraphParams, Haplotype, PathScore, Ploidy,
+    GraphParams, Haplotype, KmerVec, PathScore, Ploidy,
 };
 use itertools::Itertools;
 use noodles_vcf::variant::RecordBuf;
@@ -13,30 +13,30 @@ pub struct VarNode {
     pub end: u64,
     pub size: i64,
     pub entry: Option<RecordBuf>,
-    pub kfeat: Vec<f32>,
+    pub kmers: KmerVec,
 }
 
 impl VarNode {
-    pub fn new(entry: RecordBuf, kmer: u8) -> Self {
+    pub fn new(entry: RecordBuf, kmer: (u8, u8)) -> Self {
         // Want to make a hash for these names for debugging, I think.
         let (start, end) = entry.boundaries();
-        let (kfeat, size) = entry.to_kfeat(kmer);
+        let (kmers, size) = entry.make_kmers(kmer);
         Self {
             start,
             end,
             size,
             entry: Some(entry),
-            kfeat,
+            kmers,
         }
     }
 
-    pub fn new_anchor(kmer: u8) -> Self {
+    pub fn new_anchor() -> Self {
         Self {
             start: 0,
             end: 0,
             size: 0,
             entry: None,
-            kfeat: vec![0f32; 4_usize.pow(kmer.into())],
+            kmers: KmerVec::blank(),
         }
     }
 }
@@ -48,7 +48,7 @@ pub struct VariantGraph {
     pub end: u64,
     pub node_indices: Vec<NodeIndex>,
     pub graph: DiGraph<VarNode, ()>,
-    kmer: u8,
+    kmer: (u8, u8),
 }
 
 /// Build a graph of all variants in a chunk.
@@ -57,7 +57,7 @@ pub struct VariantGraph {
 /// The graph has an upstream 'src' node that point to every variant node
 /// The graph has a dnstream 'snk' node that is pointed to by every variant node and 'src'
 impl VariantGraph {
-    pub fn new(mut variants: Vec<RecordBuf>, kmer: u8) -> Self {
+    pub fn new(mut variants: Vec<RecordBuf>, kmer: (u8, u8)) -> Self {
         if variants.is_empty() {
             panic!("Can't create a graph without variants");
         }
@@ -65,7 +65,7 @@ impl VariantGraph {
 
         let (chrom, start, end) = VariantGraph::get_region(&variants);
         let mut node_indices = Vec::<NodeIndex<_>>::with_capacity(variants.len() + 2);
-        node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
+        node_indices.push(graph.add_node(VarNode::new_anchor()));
 
         node_indices.append(
             &mut variants
@@ -74,7 +74,7 @@ impl VariantGraph {
                 .collect(),
         );
 
-        node_indices.push(graph.add_node(VarNode::new_anchor(kmer)));
+        node_indices.push(graph.add_node(VarNode::new_anchor()));
 
         Self {
             chrom,
@@ -212,8 +212,8 @@ impl VariantGraph {
             // I dislike this.. a lot
             let mut graph = DiGraph::new();
             let node_indices: Vec<NodeIndex<_>> = vec![
-                graph.add_node(VarNode::new_anchor(self.kmer)),
-                graph.add_node(VarNode::new_anchor(self.kmer)),
+                graph.add_node(VarNode::new_anchor()),
+                graph.add_node(VarNode::new_anchor()),
             ];
             *self = VariantGraph {
                 chrom: self.chrom.clone(),

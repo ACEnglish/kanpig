@@ -1,39 +1,3 @@
-/// Computes the Canberra distance similarity between two featurized k-mer vectors.
-/// The similarity is calculated as 1 minus the Canberra distance, providing a measure of similarity between 0 and 1.
-///
-/// # Parameters
-/// - `a`: A slice of floating-point numbers representing the first k-mer vector.
-/// - `b`: A slice of floating-point numbers representing the second k-mer vector.
-/// - `mink`: Threshold for minimum number of observations across vectors.
-///
-/// # Returns
-/// A floating-point value representing the similarity between the two vectors:
-/// - 1.0 indicates identical vectors.
-/// - 0.0 indicates no kmers or maximum dissimilarity.
-pub fn seqsim(a: &[f32], b: &[f32], mink: f32) -> f32 {
-    let mut deno: f32 = 0.0;
-    let mut neum: f32 = 0.0;
-    let mut total_d: f32;
-
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        total_d = x.abs() + y.abs();
-        if total_d >= mink {
-            deno += total_d;
-            neum += (x - y).abs();
-        }
-    }
-
-    if deno == 0.0 {
-        return 0.0;
-    }
-
-    if neum == 0.0 {
-        return 1.0;
-    }
-
-    1.0 - (neum / deno)
-}
-
 /// Computes size similarity
 /// The similarity is defined as the ratio of the smaller size to the larger size,
 /// with special handling for cases where either size is zero.

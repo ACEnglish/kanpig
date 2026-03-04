@@ -62,12 +62,13 @@ fn task_thread(
     let pclu_params = m_args.to_polyclu_params();
     let germ_genotyper = Genotyper::from_config_file(m_args.gqconfig);
     let mut reads = vec![pro_reads, pat_reads, mat_reads];
+    let kmer_tuple = (m_args.graph.coarse_kmer, m_args.graph.fine_kmer);
 
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = VariantGraph::new(chunk, m_args.graph.kmer);
+                let mut m_graph = VariantGraph::new(chunk, kmer_tuple);
 
                 let ploidy_owned: Vec<Ploidy> = m_ploidy
                     .iter()
@@ -84,7 +85,7 @@ fn task_thread(
                     };
                     // This is the block we're reusing in the different parts
                     let (haplos, coverages, ref_coverage) =
-                        pileup_data.subset_to_interval(sub_start, sub_end, m_args.graph.kmer);
+                        pileup_data.subset_to_interval(sub_start, sub_end, kmer_tuple);
 
                     let n_haps = haplos.len();
                     if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
@@ -199,7 +200,6 @@ impl ToPolyCluParams for TrioCommand {
             hps_weight: self.hps_weight,
             len_weight: self.len_weight,
             lengthonly: self.lengthonly,
-            minkfreq: self.graph.minkfreq,
             ..Default::default() // Fill remaining fields with defaults
         }
     }
@@ -323,38 +323,7 @@ impl KanpigCommand for TrioCommand {
             }
         };
 
-        if self.graph.sizemin < 10 {
-            warn!("--sizemin is recommended to be at least 10");
-        }
-
-        if self.graph.kmer >= 8 {
-            warn!("--kmer above 8 becomes memory intensive");
-        }
-
-        if self.graph.kmer < 1 {
-            error!("--kmer must be at least 1");
-            is_ok = false;
-        }
-
-        if self.graph.sizemin < self.graph.kmer.into() {
-            error!("--sizemin must be ≥ --kmer");
-            is_ok = false;
-        }
-
-        if self.graph.sizesim < 0.0 || self.graph.sizesim > 1.0 {
-            error!("--sizesim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
-
-        if self.graph.seqsim < 0.0 || self.graph.seqsim > 1.0 {
-            error!("--seqsim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
-
-        if self.graph.maxpaths < 1 {
-            error!("--maxpaths must be at least 1");
-            is_ok = false;
-        }
+        is_ok &= self.graph.validate();
 
         if self.io.threads < 1 {
             error!("--threads must be at least 1");
@@ -377,7 +346,7 @@ impl KanpigCommand for TrioCommand {
         let input_header = input_vcf.read_header().expect("Unable to parse vcf header");
 
         info!(
-            "Setting samples to {}, {}, {}",
+            "setting samples to {}, {}, {}",
             self.io.proband_sample, self.io.father_sample, self.io.mother_sample
         );
 

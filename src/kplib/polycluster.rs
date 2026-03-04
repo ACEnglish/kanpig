@@ -1,9 +1,7 @@
 use ndarray::{Array, Array2, Axis};
 use rand::SeedableRng;
 
-use crate::kplib::{
-    cluster::ClusterResult, hp_sorter, meanshift::MeanShift, metrics, Haplotype, PathScore,
-};
+use crate::kplib::{cluster::ClusterResult, hp_sorter, meanshift::MeanShift, Haplotype, PathScore};
 
 // Put this trait on TrioCommand and Mosaic Command so we contain the copying
 pub trait ToPolyCluParams {
@@ -27,9 +25,6 @@ pub struct PolyCluParams {
     /// Only cluster on haplotype lengths
     pub lengthonly: bool,
 
-    /// Minimum K Freq for seq_to_kmer
-    pub minkfreq: u64,
-
     /// BP difference between MeanShift clusters
     pub bandwidth: Option<f64>,
 }
@@ -42,7 +37,6 @@ impl Default for PolyCluParams {
             hps_weight: 0.25,
             len_weight: 0.25,
             lengthonly: false,
-            minkfreq: 1,
             bandwidth: None,
         }
     }
@@ -173,8 +167,7 @@ pub fn perform_clustering(
     } else {
         // Kmedoid Clustering
         let dist: Array2<f32> = Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
-            let mut dist: f32 =
-                1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, m_args.minkfreq as f32));
+            let mut dist: f32 = 1.0 - haplos[i].kmers.fine_similarity(&haplos[j].kmers);
             // if same sample and different hp, hps_weight penalty
             let i_samp = haplos[i].meta.samples_flag;
             let j_samp = haplos[j].meta.samples_flag;

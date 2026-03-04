@@ -314,7 +314,7 @@ impl ReadData {
         &mut self,
         start: u64,
         end: u64,
-        kmer: u8,
+        kmer: (u8, u8),
     ) -> (Vec<Haplotype>, Vec<u64>, Vec<usize>) {
         let mut m_haps: Vec<Haplotype> = vec![];
         let mut m_coverage: Vec<u64> = vec![0; self.coverages.len()];

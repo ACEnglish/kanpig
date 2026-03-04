@@ -6,6 +6,7 @@ TESTS=(
     "plat"
     "mims"
     "pybind"
+    "ps_test"
 )
 
 # Run from truvari's base directory

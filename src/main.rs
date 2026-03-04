@@ -76,9 +76,9 @@ fn main() {
         Commands::Trio(mut cmd) => {
             setup_logging(&cmd);
             cmd.run();
-        } Commands::Mosaic(mut cmd) => {
-                setup_logging(&cmd);
-                cmd.run();
-        }
+        } /*Commands::Mosaic(mut cmd) => {
+                  setup_logging(&cmd);
+                  cmd.run();
+          }*/
     }
 }

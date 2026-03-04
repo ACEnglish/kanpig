@@ -21,7 +21,7 @@ mod infra;
 pub use crate::kplib::infra::{ChannelInput, ChannelOutput};
 
 mod kmer;
-pub use crate::kplib::kmer::seq_to_kmer;
+pub use crate::kplib::kmer::{merge_kmers, seq_to_kmer, seqsim, KmerVec};
 
 pub mod meanshift;
 

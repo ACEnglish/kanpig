@@ -285,8 +285,8 @@ fn finalize_annotation(
     // Either use haplotagging PS or NE (+1 for 1-based like in the VCF)
     let ps = paths
         .first()
-        .and_then(|p| p.meta.ps.get(sample_idx).copied())
-        .unwrap_or(Some((neigh_group + 1) as u32));
+        .and_then(|p| p.meta.ps.get(sample_idx).and_then(|&ps| ps))
+        .or(Some((neigh_group + 1) as u32));
 
     let ad = vec![Some(ref_cov as i32), Some((alt_cov1 + alt_cov2) as i32)];
 

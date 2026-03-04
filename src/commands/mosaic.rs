@@ -152,7 +152,7 @@ fn task_thread(
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = VariantGraph::new(chunk, m_args.graph.kmer);
+                let mut m_graph = VariantGraph::new(chunk, (m_args.graph.coarse_kmer, m_args.graph.fine_kmer));
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
                 // For zero, we don't have to waste time going into the bam
@@ -314,7 +314,6 @@ impl ToPolyCluParams for MosaicCommand {
             maxclust: self.maxclust,
             hps_weight: self.hps_weight,
             len_weight: self.len_weight,
-            minkfreq: self.graph.minkfreq,
             bandwidth: Some(self.bandwidth as f64),
             ..Default::default() // Fill remaining fields with defaults
         }
@@ -388,38 +387,7 @@ impl KanpigCommand for MosaicCommand {
             is_ok &= file_validators::validate_file(bed_file, "--bed");
         }
 
-        if self.graph.sizemin < 10 {
-            warn!("--sizemin is recommended to be at least 10");
-        }
-
-        if self.graph.kmer >= 8 {
-            warn!("--kmer above 8 becomes memory intensive");
-        }
-
-        if self.graph.kmer < 1 {
-            error!("--kmer must be at least 1");
-            is_ok = false;
-        }
-
-        if self.graph.sizemin < self.graph.kmer.into() {
-            error!("--sizemin must be ≥ --kmer");
-            is_ok = false;
-        }
-
-        if self.graph.sizesim < 0.0 || self.graph.sizesim > 1.0 {
-            error!("--sizesim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
-
-        if self.graph.seqsim < 0.0 || self.graph.seqsim > 1.0 {
-            error!("--seqsim must be between 0.0 and 1.0");
-            is_ok = false;
-        }
-
-        if self.graph.maxpaths < 1 {
-            error!("--maxpaths must be at least 1");
-            is_ok = false;
-        }
+        is_ok &= self.graph.validate();
 
         if self.io.threads < 1 {
             error!("--threads must be at least 1");
@@ -447,7 +415,7 @@ impl KanpigCommand for MosaicCommand {
                 self.io.sample = (0..self.io.reads.len())
                     .map(|i| format!("SAMPLE{}", i))
                     .collect();
-                info!("Setting samples to {}", self.io.sample.join(", "));
+                info!("setting samples to {}", self.io.sample.join(", "));
             } else {
                 error!(
                     "Expected one --sample for each --read, got {} and {}",
