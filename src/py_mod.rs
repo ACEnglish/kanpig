@@ -7,35 +7,58 @@ use rust_htslib::faidx;
 
 use crate::kplib::{
     germ_genotyper::{GTstate, GenotypeMode, GenotypeResult, Genotyper, GenotyperConfig},
-    Haplotype, HaplotypeMeta, ReadParser,
+    Haplotype, HaplotypeMeta, KmerVec, ReadParser,
 };
 use std::{path::PathBuf, str::FromStr};
 
 #[pyfunction]
-pub fn cansim(a: &Bound<'_, PyAny>, b: &Bound<'_, PyAny>, mink: f32) -> PyResult<f32> {
+pub fn cansim(a: &Bound<'_, PyAny>, b: &Bound<'_, PyAny>) -> PyResult<f32> {
     let vec_a: Vec<(u64, f32)> = a.extract()?;
     let vec_b: Vec<(u64, f32)> = b.extract()?;
 
-    Ok(crate::kplib::metrics::seqsim(&vec_a, &vec_b, mink))
+    Ok(crate::kplib::seqsim(&vec_a, &vec_b))
+}
+
+#[pyclass(name = "KmerVec", unsendable)]
+#[derive(Clone)]
+pub struct PyKmerVec {
+    inner: KmerVec,
+}
+
+#[pymethods]
+impl PyKmerVec {
+    #[new]
+    #[pyo3(signature = (sequence, kmer=(4,16), negative=false))]
+    pub fn new(sequence: String, kmer: (u8, u8), negative: bool) -> Self {
+        let seq: &[u8] = sequence.as_bytes();
+        Self {
+            inner: KmerVec::new(seq, kmer, negative),
+        }
+    }
+
+    pub fn coarse_similarity(&self, other: &PyKmerVec) -> f32 {
+        self.inner.coarse_similarity(&other.inner)
+    }
+
+    pub fn fine_similarity(&self, other: &PyKmerVec) -> f32 {
+        self.inner.fine_similarity(&other.inner)
+    }
 }
 
 /// Wrap the Rust function for Python.
 /// Input: `sequence: bytes`, `kmer: int`, `negative: bool`, `maxhom: int`
 /// Output: list of floats
 #[pyfunction]
+#[pyo3(signature = (sequence, kmer=4, negative=false))]
 fn seq_to_kmer(
     _py: Python<'_>,
     sequence: String,
     kmer: u8,
     negative: bool,
 ) -> PyResult<Vec<(u64, f32)>> {
-    // Convert Python bytes -> Rust &[u8]
     let seq: &[u8] = sequence.as_bytes();
 
-    // Call your existing Rust function
-    let result = crate::kplib::seq_to_kmer(seq, kmer, negative);
-
-    Ok(result)
+    Ok(crate::kplib::seq_to_kmer(seq, kmer, negative))
 }
 
 #[pyclass(name = "PlupParser", unsendable)]
@@ -47,20 +70,25 @@ pub struct PyPlupParser {
 impl PyPlupParser {
     /// Create a new PlupParser from file paths and params
     #[new]
+    #[pyo3(signature = (tbx_path, reference_path, sample_name="SAMPLE".to_string(), sample_idx=0, sample_count=1, sizemin=50, kmer=(16,4)))]
     fn new(
         tbx_path: &str,
         reference_path: &str,
         sample_name: String,
         sample_idx: usize,
         sample_count: usize,
-        kmer: u8,
+        sizemin: u32,
+        kmer: (u8, u8),
     ) -> PyResult<Self> {
         // Open internals here
         let reference = faidx::Reader::from_path(reference_path)
             .map_err(|e| PyValueError::new_err(format!("Failed to open reference: {}", e)))?;
 
+        // TODO: Make an object for these if you actually want to prototype in python
         let mut params = crate::kplib::GraphParams::default();
-        params.kmer = kmer;
+        params.coarse_kmer = kmer.0;
+        params.fine_kmer = kmer.1;
+        params.sizemin = sizemin;
 
         Ok(PyPlupParser {
             inner: crate::kplib::PlupParser::new(
@@ -111,9 +139,9 @@ pub struct PyHaplotype {
 #[pymethods]
 impl PyHaplotype {
     #[new]
-    pub fn new(kfeat: Vec<(u64, f32)>, size: i64, n: u64, hap_meta: PyHaplotypeMeta) -> Self {
+    pub fn new(kfeat: PyKmerVec, size: i64, n: u64, hap_meta: PyHaplotypeMeta) -> Self {
         Self {
-            inner: Haplotype::new(kfeat, size, n, hap_meta.inner),
+            inner: Haplotype::new(kfeat.inner.clone(), size, n, hap_meta.inner),
         }
     }
 
@@ -141,22 +169,29 @@ impl PyHaplotype {
     pub fn size(&self) -> i64 {
         self.inner.size
     }
+
     #[getter]
     pub fn n(&self) -> u64 {
         self.inner.n
     }
+
     #[getter]
-    pub fn kfeat(&self) -> Vec<(u64, f32)> {
-        self.inner.kfeat.clone()
+    pub fn kvec(&self) -> PyKmerVec {
+        PyKmerVec {
+            inner: self.inner.kmers.clone(),
+        }
     }
-    #[getter]
-    pub fn parts(&self) -> Vec<(i64, Vec<(u64, f32)>)> {
+
+    /*#[getter]
+    pub fn parts(&self) -> Vec<(i64, Vec<(u64>)> {
         self.inner.parts.clone()
     }
+
     #[getter]
     pub fn partial(&self) -> usize {
         self.inner.partial
-    }
+    }*/
+
     #[getter]
     pub fn meta(&self) -> PyHaplotypeMeta {
         PyHaplotypeMeta {
@@ -428,11 +463,13 @@ fn kanpig(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(seq_to_kmer, m)?)?;
     m.add_function(wrap_pyfunction!(cansim, m)?)?;
     // m.add_class::<PyKDParams>()?; Too much overhead to bind
+    m.add_class::<PyKmerVec>()?;
     m.add_class::<PyPlupParser>()?;
     m.add_class::<PyHaplotypeMeta>()?;
     m.add_class::<PyHaplotype>()?;
     m.add_class::<PyGenotyperConfig>()?;
     m.add_class::<PyGenotyper>()?;
+    m.add_class::<PyKmerVec>()?;
 
     Ok(())
 }
