@@ -1,5 +1,6 @@
 import sys
 import json
+import math
 import random
 import argparse
 
@@ -7,7 +8,6 @@ from collections import Counter, defaultdict
 
 import kanpig
 import truvari
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -22,7 +22,8 @@ def parse_args():
     parser.add_argument("--db-max-motif-expcon", type=int, default=5)
     parser.add_argument("--query-mutation-rate", type=float, default=0.02)
     parser.add_argument("--query-max-motif-expcon", type=int, default=2)
-    parser.add_argument("--kmer-size", type=int, default=4)
+    parser.add_argument("--kmer-size", type=str, default="16,4")
+    parser.add_argument("--dual", action="store_true")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--brief", action="store_true")
@@ -31,7 +32,8 @@ def parse_args():
 
     if args.seed is None:
         args.seed = random.randint(0, 2**32 - 1)
-
+    
+    args.kmer_size = tuple(map(int, args.kmer_size.split(',')))
     return args
 
 
@@ -76,6 +78,12 @@ def mutate_dna(sequence, mutation_rate=0.05):
 
     return "".join(sequence)
 
+def score(query_vec, target_vec, dual=False):
+    a = query_vec.fine_similarity(target_vec)
+    if not dual:
+        return a
+    b = query_vec.coarse_similarity(target_vec)
+    return math.sqrt(a * b)
 
 if __name__ == '__main__':
     args = parse_args()
@@ -112,7 +120,7 @@ if __name__ == '__main__':
             print("Targets:")
             print(">" + "\n>".join(target_seqs))
 
-        target_vecs = [kanpig.seq_to_kmer(
+        target_vecs = [kanpig.KmerVec(
             t, args.kmer_size) for t in target_seqs]
 
         # Query is a less noisy version of target_0
@@ -126,10 +134,10 @@ if __name__ == '__main__':
             print(">" + query_seq1)
             print(">" + query_seq2)
 
-        query_vec1 = kanpig.seq_to_kmer(query_seq1, args.kmer_size)
-        query_vec2 = kanpig.seq_to_kmer(query_seq2, args.kmer_size)
+        query_vec1 = kanpig.KmerVec(query_seq1, args.kmer_size)
+        query_vec2 = kanpig.KmerVec(query_seq2, args.kmer_size)
 
-        # I should be checking that the querys' seqsim is most similar to target 0
+        # Establish queries' most similar
         base_sim1 = truvari.seqsim(query_seq1, target_seqs[0])
         base_sim2 = truvari.seqsim(query_seq2, target_seqs[0])
         best_idx1 = 0
@@ -155,20 +163,20 @@ if __name__ == '__main__':
                 f"Best target is {best_idx1} ({base_sim1:.4f}, {base_sim2:.4f})")
 
         # Do the queries hit the best target
-        can_sim1 = kanpig.cansim(query_vec1, target_vecs[0])
-        can_sim2 = kanpig.cansim(query_vec2, target_vecs[0])
+        can_sim1 = score(query_vec1, target_vecs[0], args.dual)
+        can_sim2 = score(query_vec2, target_vecs[0], args.dual)
         best_can_idx1 = 0
         best_can_idx2 = 0
 
         for idx, t in enumerate(target_vecs[1:]):
-            sim1 = kanpig.cansim(query_vec1, t)
+            sim1 = score(query_vec1, t, args.dual)
             if can_sim1 < sim1:
                 can_sim1 = sim1
                 best_can_idx1 = idx + 1
 
-            sim2 = kanpig.cansim(query_vec1, t)
-            if can_sim2 < sim1:
-                can_sim1 = sim1
+            sim2 = score(query_vec2, t, args.dual)
+            if can_sim2 < sim2:
+                can_sim2 = sim2
                 best_can_idx2 = idx + 1
 
         if args.debug:
