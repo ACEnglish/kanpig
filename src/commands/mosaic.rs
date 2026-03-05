@@ -182,7 +182,12 @@ fn task_thread(
 
                 let mut pileup_data = collect_read_data(&mut reads, &m_graph);
 
-                let subintv = find_subintervals(&pileup_data.reads, m_args.graph.neighdist);
+                let subintv = if m_args.graph.subintv {
+                    find_subintervals(&pileup_data.reads, m_args.graph.neighdist)
+                } else {
+                    vec![(m_graph.start, m_graph.end)]
+                };
+
                 for (sub_start, sub_end) in subintv.into_iter() {
                     let Some(mut subgraph) = m_graph.make_subgraph(sub_start, sub_end) else {
                         continue;

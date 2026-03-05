@@ -63,9 +63,14 @@ fn task_thread(
                     m_reads.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
 
                 // debug!("Reads: {:#?}", reads);
-                let subintiv = find_subintervals(&reads, m_args.graph.neighdist);
+                let subintv = if m_args.graph.subintv {
+                    find_subintervals(&reads, m_args.graph.neighdist)
+                } else {
+                    vec![(m_graph.start, m_graph.end)]
+                };
+
                 // This is too deep -- need to pull some of this code out
-                for si in subintiv.iter() {
+                for si in subintv.iter() {
                     // Just yoink out the variants, if there are any around this subintv
                     let Some(mut subgraph) = m_graph.make_subgraph(si.0, si.1) else {
                         continue;

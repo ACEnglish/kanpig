@@ -82,6 +82,10 @@ pub struct GraphParams {
     /// Maximum coverage to attempt building haplotypes
     #[arg(long, default_value_t = 1000, help_heading = "Graph")]
     pub maxcoverage: usize,
+
+    /// [Experimental] Subset graphs to subintervals around pileups
+    #[arg(long, default_value_t = false, help_heading = "Graph")]
+    pub subintv: bool,
 }
 
 impl GraphParams {
@@ -147,6 +151,7 @@ impl Default for GraphParams {
             one_to_one: false,
             mincoverage: 1,
             maxcoverage: 1000,
+            subintv: false,
         }
     }
 }
