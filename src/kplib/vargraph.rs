@@ -168,35 +168,7 @@ impl VariantGraph {
     /// Creates a subgraph of the records within a boundary
     /// This takes the records away from this graph
     pub fn make_subgraph(&mut self, start: u64, end: u64) -> Option<VariantGraph> {
-        let mut take_entries = Vec::new();
-
-        // Take entries that fall within the range
-        for var_idx in &self.node_indices {
-            if let Some(node) = self.graph.node_weight_mut(*var_idx) {
-                let should_take = if let Some(ref entry) = node.entry {
-                    let (entry_start, entry_end) = entry.boundaries();
-                    start <= entry_start && entry_end <= end
-                } else {
-                    // Source/sink node - don't take it
-                    false
-                };
-
-                if should_take {
-                    if let Some(entry) = node.entry.take() {
-                        take_entries.push(entry);
-                    }
-                }
-            }
-        }
-
-        let take_graph = match take_entries.is_empty() {
-            false => Some(VariantGraph::new(take_entries, self.kmer)),
-            true => None,
-        };
-
-        // Rebuild self with remaining entries (those not taken)
-        // This will skip None entries (source/sink nodes that had None to begin with)
-        let keep_entries: Vec<_> = self
+        let (take_entries, keep_entries): (Vec<_>, Vec<_>) = self
             .node_indices
             .iter()
             .filter_map(|var_idx| {
@@ -204,26 +176,34 @@ impl VariantGraph {
                     .node_weight_mut(*var_idx)
                     .and_then(|node| node.entry.take())
             })
-            .collect();
+            .partition(|entry| {
+                let (s, e) = entry.boundaries();
+                start <= s && e <= end
+            });
 
-        if !keep_entries.is_empty() {
-            *self = VariantGraph::new(keep_entries, self.kmer);
+        let take_graph =
+            (!take_entries.is_empty()).then(|| VariantGraph::new(take_entries, self.kmer));
+
+        let new_me = if !keep_entries.is_empty() {
+            VariantGraph::new(keep_entries, self.kmer)
         } else {
-            // I dislike this.. a lot
+            // Should be in some kind of default-like constructor
             let mut graph = DiGraph::new();
             let node_indices: Vec<NodeIndex<_>> = vec![
                 graph.add_node(VarNode::new_anchor()),
                 graph.add_node(VarNode::new_anchor()),
             ];
-            *self = VariantGraph {
+            VariantGraph {
                 chrom: self.chrom.clone(),
                 start: self.start,
                 end: self.end,
                 node_indices,
                 graph,
                 kmer: self.kmer,
-            };
-        }
+            }
+        };
+
+        *self = new_me;
 
         take_graph
     }

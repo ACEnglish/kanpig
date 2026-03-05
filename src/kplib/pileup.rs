@@ -12,7 +12,7 @@ pub type ReadsMap = IndexMap<usize, Vec<usize>>;
 /// Unique pileups found by the read parsers
 pub type PileupSet = IndexSet<PileupVariant>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReadPileup {
     pub chrom: String,
     pub start: u64,
@@ -169,8 +169,6 @@ impl ReadPileup {
     /// # Example
     /// ```rust
     /// let line = b"chr1\t1000\t1010\t.";
-    /// let pileup = ReadPileup::decode(line, 10, 100);
-    /// println!("{:?}", pileup);
     /// ```
     pub fn new_text(
         line: &[u8],
@@ -231,8 +229,8 @@ impl ReadPileup {
 
         ReadPileup {
             chrom: self.chrom.clone(),
-            start,
-            end,
+            start: self.start, // keep the old position?
+            end: self.end,
             pileups,
             meta: self.meta.clone(),
         }
@@ -492,5 +490,29 @@ pub fn pileup_finisher(
             pileups.push(filled_plups[p].clone()) //filled_plups.len() - p - 1].clone())
         }
         read_pileups[read_idx].pileups = pileups
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_makeplup() {
+        let seqmeta = crate::kplib::SequenceMeta::new(0, 1);
+        // 10bp deletion
+        let data = "chr1\t100\t200\t20:10,50:5\t.\t.";
+        let plup = ReadPileup::new_text(data.as_bytes(), 5, 50, seqmeta).unwrap();
+        //let t = plup.trim(101, 131);
+        let reads = vec![plup.clone()];
+        let subi = crate::kplib::find_subintervals(&reads, 5);
+        assert_eq!(
+            0,
+            1,
+            "plup:\n\t{:#?}\nsubintv:\n\t{:#?}\n\tA:{:?}",
+            plup,
+            subi,
+            plup.trim(115, 160)
+        );
     }
 }

@@ -66,7 +66,10 @@ fn task_thread(
                 let subintv = if m_args.graph.subintv {
                     find_subintervals(&reads, m_args.graph.neighdist)
                 } else {
-                    vec![(m_graph.start, m_graph.end)]
+                    vec![(
+                        m_graph.start - m_args.graph.neighdist,
+                        m_graph.end + m_args.graph.neighdist,
+                    )]
                 };
 
                 // This is too deep -- need to pull some of this code out
