@@ -57,8 +57,6 @@ fn task_thread(
         &m_args.graph,
     );
 
-    // These need to be pulled out so we can do the polyclustering
-    // on both TrioCommand and MosaicCommand
     let pclu_params = m_args.to_polyclu_params();
     let germ_genotyper = Genotyper::from_config_file(m_args.gqconfig);
     let mut reads = vec![pro_reads, pat_reads, mat_reads];
@@ -87,6 +85,7 @@ fn task_thread(
                     let (haplos, coverages, ref_coverage) =
                         pileup_data.subset_to_interval(sub_start, sub_end, kmer_tuple);
 
+                    // Reads have become haplotypes at this point, but are still unclustered
                     let n_haps = haplos.len();
                     if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
                         debug!(
@@ -151,7 +150,7 @@ fn task_thread(
             }
         }
     }
-    // This should give a result
+    // This should give a Result
 }
 
 #[derive(Parser, Debug, Clone)]

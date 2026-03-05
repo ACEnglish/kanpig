@@ -15,6 +15,7 @@ use crate::{
         annotator::FiltFlags,
         build_region_tree,
         cluster::collapse_haplotypes,
+        find_subintervals,
         germ_genotyper::{GTstate, GenotypeMode, Genotyper, GenotyperConfig},
         mosaic_genotyper::{GenotypeHypothesis, MosaicGenotyper},
         open_reads, open_writer_thread,
@@ -50,13 +51,17 @@ fn separate_paths_by_vaf(
 /// paths. Since the output VCFs are biallelic, we must consolidate the e.g. AD_alt with the read
 /// support from these low VAF haplotypes.
 /// This requires checking each variant to see if it was used by any of the somatic paths before
-/// adding in the somatic paths' coverage. 
+/// adding in the somatic paths' coverage.
 /// If this process updates any annotations, we then need to recalculate the genotype since its
 /// possible that the new VAF could make the SV change from e.g heterozygous to homozygous.
 /// This works on a set of annotations, the ChannelOutput from take_annotated, and the
 /// somatic_paths, and the germ_genotyper.
 ///
-fn update_somatic(mut send_back: ChannelOutput, somatic_paths: Vec<Vec<PathScore>>, germ_genotyper: Genotyper) {
+fn update_somatic(
+    send_back: &mut ChannelOutput,
+    somatic_paths: Vec<Vec<PathScore>>,
+    germ_genotyper: &Genotyper,
+) {
     if let Some(ref mut send_back) = send_back {
         for (_record, annos) in &mut *send_back {
             // Sample columns
@@ -69,15 +74,16 @@ fn update_somatic(mut send_back: ChannelOutput, somatic_paths: Vec<Vec<PathScore
                     if path.path.contains(&anno.var_idx) {
                         // This sample will need to be updated
                         any_update = true;
-                        if !anno.gt.contains("1") {
+                        // TODO: Fix quality score calibration events
+                        /*if !anno.gt.contains("1") {
                             anno.gq = gts.quality_score.round() as i32;
-                        }
+                        }*/
+
                         anno.rnames.extend(path.meta.rnames.clone());
                         anno.filt |= FiltFlags::SOMATIC;
 
                         // TODO: wrong for haploid regions
-                        *anno.ad[1].get_or_insert(0) +=
-                            path.meta.coverage[sample_idx] as i32;
+                        *anno.ad[1].get_or_insert(0) += path.meta.coverage[sample_idx] as i32;
                         // Logic here is that the germline reference allele
                         // coverage is inflated during GenotypeAnno calculation
                         // so we're moving it to the alternate as part of the
@@ -142,129 +148,151 @@ fn task_thread(
         m_args.soma_vaf,
         1,
     );
+
     let cfg = GenotyperConfig {
         mode: GenotypeMode::Bino,
         ..Default::default()
     };
+
     let germ_genotyper = Genotyper::from_config(cfg);
+    let kmer_tuple = (m_args.graph.coarse_kmer, m_args.graph.fine_kmer);
 
     loop {
         match m_receiver.recv() {
             Ok(None) | Err(_) => break,
             Ok(Some(chunk)) => {
-                let mut m_graph = VariantGraph::new(chunk, (m_args.graph.coarse_kmer, m_args.graph.fine_kmer));
+                let mut m_graph =
+                    VariantGraph::new(chunk, (m_args.graph.coarse_kmer, m_args.graph.fine_kmer));
 
                 let ploidy = m_ploidy.get_ploidy(&m_graph.chrom, m_graph.start);
+                let all_ploidy = vec![&ploidy; n_samples];
+
                 // For zero, we don't have to waste time going into the bam
                 if ploidy == Ploidy::Zero {
                     m_result_sender
                         .send(m_graph.take_annotated(
                             vec![&[]; n_samples],
                             vec![0; n_samples],
-                            vec![&ploidy; n_samples],
+                            &all_ploidy,
                             &germ_genotyper,
                         ))
                         .unwrap();
                     continue;
                 }
 
-                let pileup_data = collect_read_data(&mut reads, &m_graph);
+                let mut pileup_data = collect_read_data(&mut reads, &m_graph);
 
-                let n_haps = pileup_data.haplos.len();
-                if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
-                    debug!(
-                        "Region skipped extreme coverage {}x @ {}:{}-{}",
-                        n_haps, m_graph.chrom, m_graph.start, m_graph.end
-                    );
-                    m_result_sender
-                        .send(m_graph.take_annotated(
-                            vec![&[]; n_samples],
-                            pileup_data.coverages.to_vec(),
-                            vec![&ploidy; n_samples],
-                            &germ_genotyper,
-                        ))
-                        .unwrap();
-                    continue;
-                }
+                let subintv = find_subintervals(&pileup_data.reads, m_args.graph.neighdist);
+                for (sub_start, sub_end) in subintv.into_iter() {
+                    let Some(mut subgraph) = m_graph.make_subgraph(sub_start, sub_end) else {
+                        continue;
+                    };
 
-                let cluster_result =
-                    polycluster::perform_clustering(&pileup_data.haplos, &pclu_params, n_samples);
+                    let (haplos, coverages, ref_coverage) =
+                        pileup_data.subset_to_interval(sub_start, sub_end, kmer_tuple);
 
-                let read_counts = polycluster::count_reads(
-                    cluster_result.k,
-                    &pileup_data.ref_coverage,
-                    &cluster_result.assignments,
-                    &pileup_data.haplos,
-                );
-
-                debug!("Read Counts:\n {:?}", read_counts);
-                let allele_support: Vec<u32> = read_counts
-                    .axis_iter(Axis(0)) // Iterate over cols
-                    .map(|row| row.sum() as u32)
-                    .collect();
-                let gts = genotyper.genotype(&allele_support);
-
-                debug!("GTs; {:#?}", gts);
-                let gts = match gts {
-                    Some(g) => g,
-                    None => {
+                    let n_haps = haplos.len();
+                    if n_haps <= m_args.graph.mincoverage || n_haps > m_args.graph.maxcoverage {
+                        debug!(
+                            "Region skipped extreme coverage {}x @ {}:{}-{}",
+                            n_haps, subgraph.chrom, subgraph.start, subgraph.end
+                        );
                         m_result_sender
-                            .send(m_graph.take_annotated(
+                            .send(subgraph.take_annotated(
                                 vec![&[]; n_samples],
-                                pileup_data.coverages.to_vec(),
-                                vec![&ploidy; n_samples],
+                                coverages.to_vec(),
+                                &all_ploidy,
                                 &germ_genotyper,
                             ))
                             .unwrap();
                         continue;
                     }
-                };
 
-                let clustered_haps = collapse_haplotypes(
-                    cluster_result,
-                    pileup_data.haplos,
-                    vec![gts.genotype.observed_alleles.clone(); n_samples],
-                );
+                    let cluster_result =
+                        polycluster::perform_clustering(&haplos, &pclu_params, n_samples);
 
-                debug!("Haps: {:#?}", clustered_haps);
+                    let read_counts = polycluster::count_reads(
+                        cluster_result.k,
+                        &ref_coverage,
+                        &cluster_result.assignments,
+                        &haplos,
+                    );
 
-                let should_build = !clustered_haps.is_empty()
-                    && !m_args.graph.one_to_one
-                    && m_graph.node_indices.len() <= (m_args.graph.maxnodes + 2);
-                m_graph.build(should_build);
+                    debug!("Read Counts:\n {:?}", read_counts);
+                    let allele_support: Vec<u32> = read_counts
+                        .axis_iter(Axis(0)) // Iterate over cols
+                        .map(|row| row.sum() as u32)
+                        .collect();
+                    let gts = genotyper.genotype(&allele_support);
 
-                // An id is put on the pathscore.meta so we can still tie it
-                // back to the gt.genotype.observed_alleles
-                let paths: Vec<PathScore> = clustered_haps
-                    .into_iter()
-                    .map(|h| m_graph.apply_haplotype(&h, &m_args.graph))
-                    .filter(|p| *p != PathScore::default())
-                    .collect();
+                    debug!("GTs; {:#?}", gts);
+                    // What is this check? Sites that have no alternates?
+                    let gts = match gts {
+                        Some(g) => g,
+                        None => {
+                            m_result_sender
+                                .send(subgraph.take_annotated(
+                                    vec![&[]; n_samples],
+                                    coverages.to_vec(),
+                                    &all_ploidy,
+                                    &germ_genotyper,
+                                ))
+                                .unwrap();
+                            continue;
+                        }
+                    };
 
-                // Now, for each sample, separate the germline from the somatic
-                let separated_paths = polycluster::separate_paths_by_sample(paths, n_samples);
-                let (germline_paths, somatic_paths) =
-                    separate_paths_by_vaf(separated_paths, gts.genotype);
+                    let clustered_haps = collapse_haplotypes(
+                        cluster_result,
+                        haplos,
+                        vec![gts.genotype.observed_alleles.clone(); n_samples],
+                    );
 
-                // And then m_graph.take_annotated on the germline paths
-                let mut send_back = m_graph.take_annotated(
-                    germline_paths.iter().map(|bin| bin.as_slice()).collect(),
-                    pileup_data.coverages.to_vec(),
-                    vec![&ploidy; n_samples],
-                    &germ_genotyper,
-                );
-                
+                    debug!("Haps: {:#?}", clustered_haps);
 
-                update_somatic(send_back, somatic_paths, germ_genotyper);
+                    let should_build = !clustered_haps.is_empty()
+                        && !m_args.graph.one_to_one
+                        && subgraph.node_indices.len() <= (m_args.graph.maxnodes + 2);
+                    subgraph.build(should_build);
 
+                    // An id is put on the pathscore.meta so we can still tie it
+                    // back to the gt.genotype.observed_alleles
+                    let paths: Vec<PathScore> = clustered_haps
+                        .into_iter()
+                        .map(|h| subgraph.apply_haplotype(&h, &m_args.graph))
+                        .filter(|p| *p != PathScore::default())
+                        .collect();
 
-                m_result_sender.send(send_back).unwrap();
-            }
+                    // Now, for each sample, separate the germline from the somatic
+                    let separated_paths = polycluster::separate_paths_by_sample(paths, n_samples);
+                    let (germline_paths, somatic_paths) =
+                        separate_paths_by_vaf(separated_paths, gts.genotype);
+
+                    // And then subgraph.take_annotated on the germline paths
+                    let mut send_back = subgraph.take_annotated(
+                        germline_paths.iter().map(|bin| bin.as_slice()).collect(),
+                        coverages.to_vec(),
+                        &all_ploidy,
+                        &germ_genotyper,
+                    );
+
+                    update_somatic(&mut send_back, somatic_paths, &germ_genotyper);
+
+                    m_result_sender.send(send_back).unwrap();
+                }
+
+                // Remaining refcovered
+                let remaining_variants =
+                    m_graph.take_refcovered(pileup_data.coverages, &all_ploidy, &germ_genotyper);
+                // Guard because I don't know what happens to variant-less graphs
+                if remaining_variants.is_some() {
+                    m_result_sender.send(remaining_variants).unwrap();
+                }
+            } // End Task Loop
         }
     }
     // This should give a result
 }
-
 
 #[derive(Parser, Debug, Clone)]
 pub struct MosaicCommand {
