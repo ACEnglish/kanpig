@@ -62,7 +62,7 @@ fn task_thread(
                 let (reads, coverage_track) =
                     m_reads.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
 
-                // debug!("Reads: {:#?}", reads);
+                debug!("Reads: {:#?}", reads.len());
                 let subintv = if m_args.graph.subintv {
                     find_subintervals(&reads, m_args.graph.neighdist)
                 } else {
@@ -99,6 +99,8 @@ fn task_thread(
                         }
                     }
 
+                    debug!("Haplotypes: {:#?}", m_haps.len());
+                    m_haps.sort();
                     let haps = ploidy.cluster(
                         m_haps,
                         coverage,
@@ -108,6 +110,8 @@ fn task_thread(
                         m_args.ab,
                         &m_args.graph,
                     );
+                    
+                    debug!("After clustering: {:#?}", haps);
 
                     // Only need to build the full graph sometimes
                     let should_build = !haps.is_empty()
