@@ -137,7 +137,7 @@ if __name__ == '__main__':
         query_vec1 = kanpig.KmerVec(query_seq1, args.kmer_size)
         query_vec2 = kanpig.KmerVec(query_seq2, args.kmer_size)
 
-        # Establish queries' most similar
+        # Establish queries' most similar target
         base_sim1 = truvari.seqsim(query_seq1, target_seqs[0])
         base_sim2 = truvari.seqsim(query_seq2, target_seqs[0])
         best_idx1 = 0
@@ -156,7 +156,7 @@ if __name__ == '__main__':
         if best_idx1 != best_idx2:
             invalid += 1
             if args.debug:
-                print("Invalid. Queries shouldn't hit same target")
+                print("Invalid. Queries should hit same target")
             continue
         elif args.debug:
             print(
@@ -183,6 +183,8 @@ if __name__ == '__main__':
             print(
                 f"Queries hit {best_can_idx1} ({can_sim1:.4f}) & {best_can_idx2} ({can_sim2:.4f})")
 
+        # Sometimes the classic seqsim will choose a different target from what the queries were
+        # simulated from. But then cansim will still find the original target. Odd.
         if best_can_idx1 == best_can_idx2 and best_idx1 != 0 and best_can_idx1 == 0:
             odd_balls += 1
             continue
@@ -216,10 +218,3 @@ if __name__ == '__main__':
     else:
         print("Same:    ", f"{0:>{width}}", f"0")
         print("&Corr:   ", f"{0:>{width}}", f"0")
-
-
-"""Notes
-python simulate_seqs.py --num-experiments 1 --debug  --n-repeats 20 --tr-mutation-rate 0.05  --motif-length 6 --kmer-size 7 --seed 674768669
-
-This one is weird. Kanpig approach hits 0 the best, seqsim on 3
-"""
