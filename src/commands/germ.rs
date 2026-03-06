@@ -62,6 +62,7 @@ fn task_thread(
                 let (reads, coverage_track) =
                     m_reads.find_reads(&m_graph.chrom, m_graph.start, m_graph.end);
 
+
                 debug!("Reads: {:#?}", reads.len());
                 let subintv = if m_args.graph.subintv {
                     find_subintervals(&reads, m_args.graph.neighdist)

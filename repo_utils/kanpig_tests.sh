@@ -9,6 +9,27 @@ TESTS=(
     "ps_test"
 )
 
+test_name=""
+out_prefix=""
+release=" --release "
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -t|--test-name)
+            test_name="$2"
+            shift 2
+            ;;
+        -o|--out-pfx)
+            out_prefix="$2"
+            shift 2
+            ;;
+        -d|--debug)
+            release=""
+            shift
+            ;;
+    esac
+done
+
 # Run from truvari's base directory
 cd "$( dirname "${BASH_SOURCE[0]}" )"/../
 
@@ -19,9 +40,14 @@ echo "### Testing kanpig commit ${GITHASH} on ${DATE}"
 # Variables needed by sub-tests
 export TESTSRC=repo_utils/
 export REF=$TESTSRC/GRCh38_chr20.fa
-export kanpig="cargo run --release -- "
+export kanpig="cargo run ${release} -- "
 
-LOGDIR=${TESTSRC}/history/${DATE}_${GITHASH}
+if [[ -z "${out_prefix}" ]]; then
+    LOGDIR=${TESTSRC}/history/${DATE}_${GITHASH}
+else
+    LOGDIR=${TESTSRC}/history/${out_prefix}_${DATE}_${GITHASH}
+fi
+
 mkdir -p ${LOGDIR}
 exec > >(tee -a ${LOGDIR}/main.out)
 exec 2> >(tee -a ${LOGDIR}/main.err >&2)
@@ -49,15 +75,13 @@ run_test() {
 }
 
 # Main logic
-if [[ $# -eq 0 ]]; then
+if [[ -z "${test_name}" ]]; then
     # No parameters - run all tests
     for test in "${TESTS[@]}"; do
         run_test "$test"
     done
 else
     # Parameter given - run specific test
-    test_name=$1
-
     # Validate test name
     if [[ ${TESTS[@]} =~ ${test_name} ]]; then
         run_test "$test_name"
