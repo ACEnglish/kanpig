@@ -72,6 +72,8 @@ pub fn collapse_haplotypes(
         }
     }
 
+    // Determinism
+    clustered_haps.sort();
     clustered_haps
 }
 
