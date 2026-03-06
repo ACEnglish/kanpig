@@ -64,6 +64,7 @@ fn task_thread(
                     m_args.ab,
                     &m_args.graph,
                 );
+                debug!("After Clustering: {:?}", haps);
 
                 // Only need to build the full graph sometimes
                 let should_build = !haps.is_empty()

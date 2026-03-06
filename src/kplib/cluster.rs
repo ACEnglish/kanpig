@@ -187,12 +187,13 @@ pub fn diploid_haplotypes(
 
     // Now we figure out if the we need two alt alleles or not
     // The reason this takes two steps is the above code is just trying to figure out if
-    // there's 1 or 2 alts. Now we figure out if its Het/Hom
+    // there's 1 or 2 alts. Now we figure out if its Het/Compound Het/Hom
+    // We have to remove this, I think. Let the genotyper actually do the genotyping
     let applied_coverage = hap1.meta.coverage[sample_idx] + hap2.meta.coverage[sample_idx];
     let remaining_coverage = coverage - applied_coverage;
     let genotyper = germ_genotyper::Genotyper {
         config: germ_genotyper::GenotyperConfig {
-            mode: germ_genotyper::GenotypeMode::Phased,
+            mode: germ_genotyper::GenotypeMode::Beta,
             ..Default::default()
         },
     };
@@ -215,7 +216,8 @@ pub fn diploid_haplotypes(
                 < ab
             {
                 // the allele balance suggests they're not likely compound het
-                // Assume hap1 is just noise and leave it as reference coverage
+                // Assume hap1 is just a noisy version of hap2
+                hap2.meta.combine(&hap1.meta);
                 vec![hap2]
             } else {
                 vec![hap1, hap2]
