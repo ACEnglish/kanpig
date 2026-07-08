@@ -17,6 +17,7 @@ pub fn collapse_haplotypes(
     cluster_result: ClusterResult,
     haplos: Vec<Haplotype>,
     gts: Vec<Vec<usize>>,
+    size_threshold: f32,
 ) -> Vec<Haplotype> {
     let mut clustered_haps: Vec<Haplotype> = cluster_result
         .medoids
@@ -34,9 +35,17 @@ pub fn collapse_haplotypes(
         .for_each(|(cluster_idx, m_hap)| {
             // Sample index inside the HaplotypeMeta
             let idx = m_hap.meta.samples_flag.trailing_zeros() as usize;
+
             // Only apply reads to the clustered_hap if it goes together
-            if gts[idx].contains(&(cluster_idx + 1)) {
-                let k_hap = &mut clustered_haps[cluster_idx];
+            let inside_cluster = gts[idx].contains(&(cluster_idx + 1));
+            let k_hap = &mut clustered_haps[cluster_idx];
+
+            // And the read is similar enough to the medoid read
+            let similar_enough = (m_hap.size.signum() == k_hap.size.signum())
+                && metrics::sizesim(m_hap.size.unsigned_abs(), k_hap.size.unsigned_abs())
+                    > size_threshold;
+
+            if inside_cluster & similar_enough {
                 // k_hap.combine(m_hap); I'd like to this, but there's some kinda logic
                 // Around Only apply reads to the clustered_hap if it goes together I have to
                 // consider.. But I can't rember what it is.
@@ -163,7 +172,7 @@ pub fn diploid_haplotypes(
         medoids,
     };
 
-    let mut haps = collapse_haplotypes(results, haplos, vec![vec![1, 2]]);
+    let mut haps = collapse_haplotypes(results, haplos, vec![vec![1, 2]], params.sizesim);
 
     let mut hap1 = haps.swap_remove(0);
     let mut hap2 = haps.swap_remove(0);
