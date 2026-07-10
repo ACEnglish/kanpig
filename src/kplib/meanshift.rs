@@ -71,21 +71,6 @@ impl MeanShift {
         let labels = self.assign_labels(data, &unique_centers);
 
         // Get the index of points closest to the unique_centers
-        let medoids: Vec<usize> = (0..unique_centers.len())
-            .map(|cluster_idx| {
-                let center = unique_centers[cluster_idx];
-                data.iter()
-                    .enumerate()
-                    .filter(|(idx, _)| labels[*idx] == cluster_idx)
-                    .min_by(|(_, &a), (_, &b)| {
-                        (a - center).abs().partial_cmp(&(b - center).abs()).unwrap()
-                    })
-                    .map(|(idx, _)| idx)
-                    .unwrap() // safe: every center has ≥1 point with that label
-            })
-            .collect();
-
-        /*
         let medoids: Vec<usize> = unique_centers
             .iter()
             .map(|&center| {
@@ -98,7 +83,6 @@ impl MeanShift {
                     .unwrap() // Safe because data is not empty (checked at start)
             })
             .collect();
-        */
 
         MeanShiftResult {
             cluster_centers: unique_centers,
