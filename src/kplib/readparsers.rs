@@ -1,8 +1,7 @@
 use crate::kplib::{
     pileup::{PileupVariant, ReadPileup},
-    seq_to_kmer,
     vcftraits::Svtype,
-    GraphParams, Haplotype, HaplotypeMeta,
+    GraphParams, Haplotype, HaplotypeMeta, KmerVec,
 };
 use indexmap::{IndexMap, IndexSet};
 use rust_htslib::faidx;
@@ -372,18 +371,18 @@ fn pileups_to_haps(
             _ => panic!("Unknown Svtype"),
         };
 
-        let n_hap = Haplotype::new(
-            seq_to_kmer(&sequence, params.kmer, p.indel == Svtype::Del),
-            p.size,
-            1,
-            hap_meta.clone(),
+        let kmers = KmerVec::new(
+            &sequence,
+            (params.coarse_kmer, params.fine_kmer),
+            p.indel == Svtype::Del,
         );
+        let n_hap = Haplotype::new(kmers, p.size, 1, hap_meta.clone());
         hap_parts.push(n_hap);
     }
 
     // qname: [plup_idx, ]
     for (read_idx, read) in reads.into_iter() {
-        let mut cur_hap = Haplotype::blank(params.kmer, hap_meta.clone());
+        let mut cur_hap = Haplotype::blank(hap_meta.clone());
 
         cur_hap.meta.hp[sample_idx] = *hps.get(&read_idx).expect("hp populated with reads");
 

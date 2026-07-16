@@ -1,9 +1,7 @@
 use ndarray::{Array, Array2, Axis};
 use rand::SeedableRng;
 
-use crate::kplib::{
-    cluster::ClusterResult, hp_sorter, meanshift::MeanShift, metrics, Haplotype, PathScore,
-};
+use crate::kplib::{cluster::ClusterResult, hp_sorter, meanshift::MeanShift, Haplotype, PathScore};
 
 // Put this trait on TrioCommand and Mosaic Command so we contain the copying
 pub trait ToPolyCluParams {
@@ -27,9 +25,6 @@ pub struct PolyCluParams {
     /// Only cluster on haplotype lengths
     pub lengthonly: bool,
 
-    /// Minimum K Freq for seq_to_kmer
-    pub minkfreq: u64,
-
     /// BP difference between MeanShift clusters
     pub bandwidth: Option<f64>,
 }
@@ -42,7 +37,6 @@ impl Default for PolyCluParams {
             hps_weight: 0.25,
             len_weight: 0.25,
             lengthonly: false,
-            minkfreq: 1,
             bandwidth: None,
         }
     }
@@ -150,21 +144,27 @@ pub fn perform_clustering(
         // Single center, we can't trust the medoids?
         let medoids = kmedoids::random_initialization(
             haplos.len(),
-            2, // K
+            2, //m_args.maxclust, // K
             &mut rand::rngs::StdRng::seed_from_u64(21),
         );
-        (medoids, 2)
+        (medoids, 2) //m_args.maxclust)
     } else if k > m_args.maxclust {
         // Only collect the highest covered medoids if MSk > maxclust
         let read_counts = count_reads(k, &vec![0; n_samps], &ms_result.labels, haplos);
 
         let top = top_n_rows_by_sum(&read_counts, m_args.maxclust);
-        let new_meds = ms_result.medoids.clone();
-        (top.iter().map(|&i| new_meds[i]).collect(), m_args.maxclust)
+        let medoids: Vec<usize> = top.iter().map(|&i| ms_result.medoids[i]).collect();
+        // Filter haplos to only those in the remaining medoids -- maybe not
+        /*let haplos: Vec<Haplotype> = haplos
+        .iter()
+        .zip(ms_result.labels.iter())
+        .filter(|&(_hap, lab)| medoids.contains(lab))
+        .map(|(hap, _lab)| hap.clone())
+        .collect();*/
+        (medoids, m_args.maxclust)
     } else {
         (ms_result.medoids.clone(), k)
     };
-    debug!("Setting K to {:?}", k);
 
     let (assignments, quality) = if m_args.lengthonly {
         // TODO: this is broken. doesn't respect maxclust
@@ -173,8 +173,7 @@ pub fn perform_clustering(
     } else {
         // Kmedoid Clustering
         let dist: Array2<f32> = Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
-            let mut dist: f32 =
-                1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, m_args.minkfreq as f32));
+            let mut dist: f32 = 1.0 - haplos[i].kmers.fine_similarity(&haplos[j].kmers);
             // if same sample and different hp, hps_weight penalty
             let i_samp = haplos[i].meta.samples_flag;
             let j_samp = haplos[j].meta.samples_flag;
@@ -202,6 +201,10 @@ pub fn perform_clustering(
         (assignments, quality)
     };
 
+    // Need to ensure the sizeimilarity of each assignment to the medoid is okay.
+    // And if not, what do you assign it to? I don't have a 'drop this' option.
+    // So I could make a ClusterResult: No, because assignments are the index.
+    // I guess I can remake assignments to be Option<
     ClusterResult {
         assignments,
         quality,

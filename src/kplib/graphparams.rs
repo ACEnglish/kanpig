@@ -27,8 +27,8 @@ pub struct GraphParams {
     #[arg(long, default_value_t = 3840, help_heading = "Variants & Reads")]
     pub mapflag: u16,
 
-    /// Minimum sequence similarity for paths
-    #[arg(long, default_value_t = 0.90, help_heading = "Graph")]
+    /// Minimum kmer similarity for paths
+    #[arg(long, default_value_t = 0.60, help_heading = "Graph")]
     pub seqsim: f32,
 
     /// Minimum size similarity for paths
@@ -43,13 +43,13 @@ pub struct GraphParams {
     #[arg(long, default_value_t = 0.10, help_heading = "Graph")]
     pub fpenalty: f32,
 
-    /// Kmer size for featurization
-    #[arg(long, default_value_t = 4, help_heading = "Graph")]
-    pub kmer: u8,
+    /// Kmer size for coarse comparisons (max 32)
+    #[arg(long, default_value_t = 16, help_heading = "Graph")]
+    pub coarse_kmer: u8,
 
-    /// Minimum frequency of kmers
-    #[arg(long, default_value_t = 2, help_heading = "Graph")]
-    pub minkfreq: u64,
+    /// Kmer size for fine comparisons (max 32)
+    #[arg(long, default_value_t = 4, help_heading = "Graph")]
+    pub fine_kmer: u8,
 
     /// Maximum graph size to search; otherwise perform 1-to-1
     #[arg(long, default_value_t = 5000, help_heading = "Graph")]
@@ -84,6 +84,46 @@ pub struct GraphParams {
     pub maxcoverage: usize,
 }
 
+impl GraphParams {
+    pub fn validate(&self) -> bool {
+        let mut is_ok = true;
+        if self.sizemin < 10 {
+            warn!("--sizemin is recommended to be at least 10");
+        }
+
+        if self.coarse_kmer > 32 || self.fine_kmer > 32 {
+            error!("--kmer must be below 32");
+            is_ok = false;
+        }
+
+        if self.coarse_kmer < 1 || self.fine_kmer < 1 {
+            error!("--kmer must be at least 1");
+            is_ok = false;
+        }
+
+        if self.sizemin < self.coarse_kmer.min(self.fine_kmer).into() {
+            error!("--sizemin must be ≥ --kmer");
+            is_ok = false;
+        }
+
+        if self.sizesim < 0.0 || self.sizesim > 1.0 {
+            error!("--sizesim must be between 0.0 and 1.0");
+            is_ok = false;
+        }
+
+        if self.seqsim < 0.0 || self.seqsim > 1.0 {
+            error!("--seqsim must be between 0.0 and 1.0");
+            is_ok = false;
+        }
+
+        if self.maxpaths < 1 {
+            error!("--maxpaths must be at least 1");
+            is_ok = false;
+        }
+
+        is_ok
+    }
+}
 impl Default for GraphParams {
     fn default() -> Self {
         Self {
@@ -93,12 +133,12 @@ impl Default for GraphParams {
             sizemax: 10000,
             mapq: 5,
             mapflag: 3840,
-            seqsim: 0.90,
-            sizesim: 0.90,
+            seqsim: 0.80,
+            sizesim: 0.85,
             gpenalty: 0.02,
             fpenalty: 0.10,
-            kmer: 4,
-            minkfreq: 2,
+            coarse_kmer: 16,
+            fine_kmer: 4,
             maxnodes: 5000,
             maxpaths: 5000,
             pileupmax: 100,

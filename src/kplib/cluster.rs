@@ -17,6 +17,7 @@ pub fn collapse_haplotypes(
     cluster_result: ClusterResult,
     haplos: Vec<Haplotype>,
     gts: Vec<Vec<usize>>,
+    size_threshold: f32,
 ) -> Vec<Haplotype> {
     let mut clustered_haps: Vec<Haplotype> = cluster_result
         .medoids
@@ -34,9 +35,17 @@ pub fn collapse_haplotypes(
         .for_each(|(cluster_idx, m_hap)| {
             // Sample index inside the HaplotypeMeta
             let idx = m_hap.meta.samples_flag.trailing_zeros() as usize;
+
             // Only apply reads to the clustered_hap if it goes together
-            if gts[idx].contains(&(cluster_idx + 1)) {
-                let k_hap = &mut clustered_haps[cluster_idx];
+            let inside_cluster = gts[idx].contains(&(cluster_idx + 1));
+            let k_hap = &mut clustered_haps[cluster_idx];
+
+            // And the read is similar enough to the medoid read
+            let similar_enough = (m_hap.size.signum() == k_hap.size.signum())
+                && metrics::sizesim(m_hap.size.unsigned_abs(), k_hap.size.unsigned_abs())
+                    > size_threshold;
+
+            if inside_cluster & similar_enough {
                 // k_hap.combine(m_hap); I'd like to this, but there's some kinda logic
                 // Around Only apply reads to the clustered_hap if it goes together I have to
                 // consider.. But I can't rember what it is.
@@ -138,8 +147,7 @@ pub fn diploid_haplotypes(
 
     let distances: Array2<f32> = Array2::from_shape_fn((haplos.len(), haplos.len()), |(i, j)| {
         // Convert similarity to distance
-        let dist =
-            1.0 - (metrics::seqsim(&haplos[i].kfeat, &haplos[j].kfeat, params.minkfreq as f32));
+        let dist = 1.0 - &haplos[i].kmers.fine_similarity(&haplos[j].kmers);
         // Penalize only if both points have defined, different groups
         match (haplos[i].meta.hp[sample_idx], haplos[j].meta.hp[sample_idx]) {
             (Some(group_i), Some(group_j)) if group_i != group_j => dist + hps_weight,
@@ -164,7 +172,7 @@ pub fn diploid_haplotypes(
         medoids,
     };
 
-    let mut haps = collapse_haplotypes(results, haplos, vec![vec![1, 2]]);
+    let mut haps = collapse_haplotypes(results, haplos, vec![vec![1, 2]], params.sizesim);
 
     let mut hap1 = haps.swap_remove(0);
     let mut hap2 = haps.swap_remove(0);
@@ -188,12 +196,13 @@ pub fn diploid_haplotypes(
 
     // Now we figure out if the we need two alt alleles or not
     // The reason this takes two steps is the above code is just trying to figure out if
-    // there's 1 or 2 alts. Now we figure out if its Het/Hom
+    // there's 1 or 2 alts. Now we figure out if its Het/Compound Het/Hom
+    // We have to remove this, I think. Let the genotyper actually do the genotyping
     let applied_coverage = hap1.meta.coverage[sample_idx] + hap2.meta.coverage[sample_idx];
     let remaining_coverage = coverage - applied_coverage;
     let genotyper = germ_genotyper::Genotyper {
         config: germ_genotyper::GenotyperConfig {
-            mode: germ_genotyper::GenotypeMode::Phased,
+            mode: germ_genotyper::GenotypeMode::Beta,
             ..Default::default()
         },
     };
@@ -216,7 +225,8 @@ pub fn diploid_haplotypes(
                 < ab
             {
                 // the allele balance suggests they're not likely compound het
-                // Assume hap1 is just noise and leave it as reference coverage
+                // Assume hap1 is just a noisy version of hap2
+                hap2.meta.combine(&hap1.meta);
                 vec![hap2]
             } else {
                 vec![hap1, hap2]

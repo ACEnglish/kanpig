@@ -399,7 +399,7 @@ impl std::fmt::Debug for PileupVariant {
             .field("size", &self.size)
             .field("indel", &self.indel)
             .field("sequence", &seq)
-            // Exclude kfeat from the debug output
+            // Exclude kmers from the debug output
             .finish()
     }
 }
