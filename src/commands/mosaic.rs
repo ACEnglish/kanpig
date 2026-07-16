@@ -125,6 +125,8 @@ fn task_thread(
                     continue;
                 }
 
+                // TODO: Put the filtered haplotypes into the cluster_result
+                // And use those where you see pileup_data.haplos
                 let cluster_result =
                     polycluster::perform_clustering(&pileup_data.haplos, &pclu_params, n_samples);
 
@@ -162,6 +164,7 @@ fn task_thread(
                     cluster_result,
                     pileup_data.haplos,
                     vec![gts.genotype.observed_alleles.clone(); n_samples],
+                    m_args.graph.sizesim,
                 );
 
                 debug!("Haps: {:#?}", clustered_haps);

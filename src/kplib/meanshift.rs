@@ -39,7 +39,8 @@ impl MeanShift {
 
         // Use bin seeding like scikit-learn for better performance and consistency
         let seeds = self.get_bin_seeds(data, bandwidth, self.min_bin_freq);
-
+        // Under clustering
+        // let seeds = data.to_vec();
         let mut centers = Vec::<f64>::new();
 
         // Apply mean shift to each seed
@@ -114,7 +115,6 @@ impl MeanShift {
             let bin_idx = bin_idx.min(num_bins - 1);
             bins[bin_idx].push(point);
         }
-
         // Create seeds from bin centers that have enough points
         let mut seeds = Vec::new();
         for (i, bin) in bins.iter().enumerate() {
